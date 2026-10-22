@@ -344,6 +344,8 @@ export const api = {
   revealSecret: (id: string) => invoke<string>("reveal_secret", { id }),
   dataFolder: () => invoke<string>("data_folder"),
   systemInfo: () => invoke<{ version: string; windows: string; webview: string; dotnet: string }>("system_info"),
+  /** Hides passwords Cablebag knows and anything that looks like a key or token (the assistant's filter). */
+  redact: (text: string) => invoke<string>("ai_redact", { text }),
   backupData: (path: string) => invoke<void>("backup_data", { path }),
   restoreData: (path: string) => invoke<number>("restore_data", { path }),
   restartApp: () => invoke<void>("restart_app"),

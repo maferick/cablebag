@@ -861,7 +861,7 @@ fn ai_stop(app: AppHandle, request_id: String) {
     ai::stop(&app, &request_id)
 }
 
-/// Hides secrets in a text before the assistant stores it in its memory.
+/// Hides secrets in a text before the assistant stores it in its memory, or before a problem report goes to GitHub.
 #[tauri::command]
 fn ai_redact(app: AppHandle, text: String) -> String {
     ai::redact_known(&app, &text)

@@ -11,7 +11,7 @@
   import type { Session } from "../api";
   import {
     Search, Plus, TerminalSquare, X, Copy, RotateCw, Square, Columns2, Rows2, Grid2x2, Radio, Circle, CircleStop,
-    PanelLeft, Sun, Moon, Download, LockOpen, Lock, RefreshCw, Settings, Play, AArrowUp, AArrowDown, ArrowRight, House, Info, Keyboard, LayoutGrid, History,
+    PanelLeft, Sun, Moon, Download, LockOpen, Lock, RefreshCw, Settings, Play, AArrowUp, AArrowDown, ArrowRight, House, Info, Keyboard, LayoutGrid, History, Bug,
     Server, Monitor, Boxes, FolderTree, ZoomIn, ZoomOut,
   } from "@lucide/svelte";
 
@@ -155,6 +155,7 @@
       ...workspaces.list.map((w) => ({ group: "Workspaces", label: w.name, words: `workspace ${w.tabs.map((t) => t.title).join(" ")}`, icon: LayoutGrid, run: () => workspaces.open(w.tabs) })),
       { group: "Actions", label: "Keyboard shortcuts", words: "keys hotkeys ctrl alt tiling", icon: Keyboard, run: () => app.openSettings("keyboard") },
       { group: "Actions", label: "About Cablebag", words: "version licence license update changelog what's new data folder", icon: Info, run: () => app.openSettings("about") },
+      { group: "Actions", label: "Report a problem", words: "bug issue error crash help github feedback wrong broken", icon: Bug, run: () => app.openReport() },
       { group: "Actions", label: "Import sessions", words: "mobaxterm putty winscp kitty ssh config rdp ini", icon: Download, run: () => (app.importOpen = true) },
     );
     if (vault.status.configured) {

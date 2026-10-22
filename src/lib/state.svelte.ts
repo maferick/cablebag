@@ -168,6 +168,8 @@ class AppState {
   /** The page the Settings tab shows. */
   settingsPage = $state("general");
   importOpen = $state(false);
+  /** The "Report a problem" window, with what it starts with (an error message, for instance), or closed. */
+  reporting = $state<{ what: string } | null>(null);
   paletteOpen = $state(false);
   /** The Proxmox server dialog: "new", the server being edited, or closed. */
   proxmoxEditing = $state<ProxmoxSource | "new" | null>(null);
@@ -183,7 +185,7 @@ class AppState {
 
   /** True while something is drawn over the tab area, so native RDP windows must step aside. */
   get overlay(): boolean {
-    return !!(this.prompts.length || this.editing || this.importOpen || this.paletteOpen || this.proxmoxEditing || this.folderEditing || this.dialogOpen || ask.current);
+    return !!(this.prompts.length || this.editing || this.importOpen || this.reporting || this.paletteOpen || this.proxmoxEditing || this.folderEditing || this.dialogOpen || ask.current);
   }
 
   get active(): Tab | undefined {
@@ -245,6 +247,13 @@ class AppState {
   async setSetting(key: string, value: any) {
     this.settings[key] = value;
     await api.setSetting(key, value);
+  }
+
+  /** Report a problem, starting with what happened (an error message) when there is one. */
+  openReport(what = "") {
+    this.toast = null;
+    this.paletteOpen = false;
+    this.reporting = { what };
   }
 
   notify(text: string, kind: "info" | "error" = "info") {
