@@ -1,11 +1,12 @@
 <script lang="ts">
-  import type { Tab } from "../../state.svelte";
+  import { app, type Tab } from "../../state.svelte";
   import TunnelsView from "./TunnelsView.svelte";
   import NetScanView from "./NetScanView.svelte";
   import PortScanView from "./PortScanView.svelte";
   import OpenPortsView from "./OpenPortsView.svelte";
   import WakeView from "./WakeView.svelte";
   import KeyGenView from "./KeyGenView.svelte";
+  import RunManyView from "./RunManyView.svelte";
   import SettingsDialog from "../SettingsDialog.svelte";
 
   let { tab, visible }: { tab: Tab; visible: boolean } = $props();
@@ -22,6 +23,8 @@
     <OpenPortsView />
   {:else if tab.tool === "wol"}
     <WakeView />
+  {:else if tab.tool === "runmany"}
+    {#key app.runManyFolder}<RunManyView />{/key}
   {:else if tab.tool === "keygen"}
     <KeyGenView />
   {:else if tab.tool === "settings"}

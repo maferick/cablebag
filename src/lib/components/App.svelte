@@ -1,4 +1,5 @@
 <script lang="ts">
+  import FolderSettings from "./FolderSettings.svelte";
   import { workspaces } from "../workspaces.svelte";
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
@@ -525,6 +526,9 @@
 {/if}
 {#if app.importOpen}
   <ImportDialog />
+{/if}
+{#if app.folderEditing}
+  {#key app.folderEditing.id}<FolderSettings folder={app.folderEditing} />{/key}
 {/if}
 {#if app.proxmoxEditing}
   {@const p = app.proxmoxEditing}

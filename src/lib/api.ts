@@ -5,6 +5,8 @@ export interface Folder {
   parent_id: string | null;
   name: string;
   sort: number;
+  /** What sessions inside use when they have no value of their own (see FOLDER_DEFAULTS). */
+  data?: Record<string, any>;
 }
 
 export interface Session {

@@ -3,7 +3,7 @@
   import { untrack } from "svelte";
   import Modal from "./Modal.svelte";
   import { open as openDialog } from "@tauri-apps/plugin-dialog";
-  import { app } from "../state.svelte";
+  import { FOLDER_DEFAULTS, app } from "../state.svelte";
   import { KINDS, kindInfo } from "../kinds";
   import { BUILTIN_SYNTAX } from "../highlight";
   import VaultPicker from "./VaultPicker.svelte";
@@ -57,6 +57,18 @@
     s.kind = id;
     if (!s.port || s.port === old.defaultPort) s.port = kindInfo(id).defaultPort;
   }
+
+  // What the session's folder gives it where it has no value of its own.
+  const folderValues = $derived(app.folderDefaults(s.folder_id));
+  const inherited = $derived(
+    FOLDER_DEFAULTS.filter((d) => d.key in folderValues.values && (!d.kinds.length || d.kinds.includes(s.kind)))
+      .filter((d) => (d.key === "username" ? !s.username : !(Array.isArray(s.data[d.key]) ? s.data[d.key].length : s.data[d.key])))
+      .map((d) => {
+        const v = folderValues.values[d.key];
+        const shown = d.key === "jump_hosts" ? v.map((j: any) => j.host).join(", ") : d.key === "vault_item" ? "set" : d.key === "tab_color" ? "" : v;
+        return `${d.label}${shown ? ` ${shown}` : ""} (${folderValues.from[d.key]})`;
+      }),
+  );
 
   async function browseKey() {
     const f = await openDialog({ title: "Choose a private key file", filters: [{ name: "Keys", extensions: ["*"] }] });
@@ -202,10 +214,13 @@
           </select>
         </label>
       </div>
+      {#if inherited.length}
+        <p class="muted small inherit">From the folder: {inherited.join(", ")}. Fill a field here to use something else for this session.</p>
+      {/if}
       {#if k.needsHost}
         <div class="row3">
           <label class="field grow"><span>Remote host</span><input bind:value={s.host} placeholder="Name or IP address" /></label>
-          <label class="field"><span>User name</span><input bind:value={s.username} placeholder="Ask when connecting" /></label>
+          <label class="field"><span>User name</span><input bind:value={s.username} placeholder={folderValues.values.username && FOLDER_DEFAULTS[0].kinds.includes(s.kind) ? `${folderValues.values.username} (folder)` : "Ask when connecting"} /></label>
           <label class="field port"><span>Port</span><input type="number" bind:value={s.port} /></label>
         </div>
       {/if}
@@ -291,7 +306,7 @@
       {#if s.kind === "ssh" || s.kind === "sftp"}
         <label class="field"><span>Private key file</span>
           <div class="with-btn">
-            <input bind:value={s.data.key_path} placeholder="None: log in with a password or an agent" />
+            <input bind:value={s.data.key_path} placeholder={folderValues.values.key_path ? `${folderValues.values.key_path} (folder)` : "None: log in with a password or an agent"} />
             <button class="btn" onclick={browseKey}><FolderOpen size={14} /> Browse</button>
           </div>
         </label>

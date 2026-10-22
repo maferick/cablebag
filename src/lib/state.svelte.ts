@@ -98,6 +98,17 @@ export const SETTINGS_PAGES = [
 
 const uid = () => crypto.randomUUID();
 
+/** What a folder can give the sessions inside it, and for which kinds of session. */
+export const FOLDER_DEFAULTS: { key: string; label: string; kinds: string[] }[] = [
+  { key: "username", label: "user name", kinds: ["ssh", "sftp", "rdp", "telnet", "ftp"] },
+  { key: "key_path", label: "key file", kinds: ["ssh", "sftp"] },
+  { key: "vault_item", label: "vault login", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet", "ftp"] },
+  { key: "jump_hosts", label: "jump hosts", kinds: ["ssh", "sftp"] },
+  { key: "tab_color", label: "tab colour", kinds: [] },
+];
+
+const filled = (v: unknown) => (Array.isArray(v) ? v.length > 0 : v !== undefined && v !== null && v !== "");
+
 export function newSession(kind = "ssh"): Session {
   return {
     id: "",
@@ -145,12 +156,15 @@ class AppState {
   paletteOpen = $state(false);
   /** The Proxmox server dialog: "new", the server being edited, or closed. */
   proxmoxEditing = $state<ProxmoxSource | "new" | null>(null);
+  folderEditing = $state<Folder | null>(null);
+  /** The folder "Run on many servers" starts with (from a folder's menu). */
+  runManyFolder = $state<string | null>(null);
   toast = $state<{ text: string; kind: "info" | "error" } | null>(null);
   systemDark = $state(false);
 
   /** True while something is drawn over the tab area, so native RDP windows must step aside. */
   get overlay(): boolean {
-    return !!(this.prompts.length || this.editing || this.importOpen || this.paletteOpen || this.proxmoxEditing || ask.current);
+    return !!(this.prompts.length || this.editing || this.importOpen || this.paletteOpen || this.proxmoxEditing || this.folderEditing || ask.current);
   }
 
   get active(): Tab | undefined {
@@ -255,6 +269,7 @@ class AppState {
   }
 
   openSession(s: Session) {
+    s = this.withFolderDefaults(s);
     const title = s.name || (s.host ? `${s.username ? s.username + "@" : ""}${s.host}` : kindInfo(s.kind).label);
     const color = s.data?.tab_color || undefined;
     if (s.kind === "ssh") {
@@ -454,6 +469,53 @@ class AppState {
 
   editSession(s?: Session) {
     this.editing = s ? (JSON.parse(JSON.stringify(s)) as Session) : newSession("ssh");
+  }
+
+  /** Whether a folder is the given folder or lies inside it. */
+  inFolder(id: string | null, ancestor: string): boolean {
+    let cur = this.folders.find((f) => f.id === id);
+    while (cur) {
+      if (cur.id === ancestor) return true;
+      cur = this.folders.find((f) => f.id === cur!.parent_id);
+    }
+    return false;
+  }
+
+  /** The defaults a folder gives (its own over those of the folders above it), and which folder gives each. */
+  folderDefaults(id: string | null): { values: Record<string, any>; from: Record<string, string> } {
+    const chain: Folder[] = [];
+    let cur = this.folders.find((f) => f.id === id);
+    while (cur) {
+      chain.unshift(cur);
+      cur = this.folders.find((f) => f.id === cur!.parent_id);
+    }
+    const values: Record<string, any> = {};
+    const from: Record<string, string> = {};
+    for (const f of chain) {
+      for (const { key } of FOLDER_DEFAULTS) {
+        if (filled(f.data?.[key])) {
+          values[key] = f.data![key];
+          from[key] = f.name;
+        }
+      }
+    }
+    return { values, from };
+  }
+
+  /** The session as it connects: its own values, and its folders' defaults where it has none. */
+  withFolderDefaults(s: Session): Session {
+    const { values } = this.folderDefaults(s.folder_id);
+    if (!Object.keys(values).length) return s;
+    const out: Session = { ...s, data: { ...(s.data ?? {}) } };
+    for (const d of FOLDER_DEFAULTS) {
+      if (!(d.key in values) || (d.kinds.length && !d.kinds.includes(s.kind))) continue;
+      if (d.key === "username") {
+        if (!out.username) out.username = values.username;
+      } else if (!filled(out.data[d.key])) {
+        out.data[d.key] = values[d.key];
+      }
+    }
+    return out;
   }
 
   folderPath(id: string | null): string {

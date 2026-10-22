@@ -11,7 +11,7 @@
   import type { ProxmoxGuest, ProxmoxSource } from "../api";
   import { api, type Folder, type Session } from "../api";
   import {
-    ChevronRight, Folder as FolderIcon, FolderOpen, Search, Plus, FolderPlus, Play, Pencil, Copy, Trash2, X, Activity,
+    ChevronRight, Folder as FolderIcon, FolderOpen, Search, Plus, FolderPlus, Settings2, ListChecks, Play, Pencil, Copy, Trash2, X, Activity,
     ServerCog, Server, Monitor, MonitorPlay, Boxes, Terminal, Globe, Save, Power, RotateCw, Square, RefreshCw, Settings,
   Shield, ShieldCheck, } from "@lucide/svelte";
 
@@ -192,7 +192,16 @@
               icon: Play,
               action: () => app.sessions.filter((s) => s.folder_id === f.id).forEach((s) => app.openSession(s)),
             },
+            {
+              label: "Run a command on all its servers",
+              icon: ListChecks,
+              action: () => {
+                app.runManyFolder = f.id;
+                app.openTool("runmany", "Run on many servers");
+              },
+            },
             { label: "Rename folder", icon: Pencil, action: () => renameFolder(f) },
+            { label: "Folder settings (user, key, vault login, jump host)", icon: Settings2, action: () => (app.folderEditing = f) },
             ((app.settings["ai.protected"] as string[] | undefined) ?? []).includes(f.id)
               ? { label: "Protected for the assistant (click to lift)", icon: ShieldCheck, action: () => assistant.setProtected(f.id, false) }
               : { label: "Protect from the assistant", icon: Shield, action: () => assistant.setProtected(f.id, true) },

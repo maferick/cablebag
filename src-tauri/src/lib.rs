@@ -374,6 +374,26 @@ async fn rdp_snapshot(state: State<'_, AppState>, id: String) -> CmdResult<Strin
     state.rdp.snapshot(&id).await.map_err(err)
 }
 
+struct QuietSink;
+
+impl term::Sink for QuietSink {
+    fn info(&self, _: &str) {}
+    fn error(&self, _: &str) {}
+}
+
+/// One command on one server of "Run on many servers": its own short SSH connection, closed afterwards.
+/// With `root`, through sudo without a password (sudo -n); a server that wants one says so in the output.
+#[tauri::command]
+async fn run_once(app: AppHandle, session: store::Session, command: String, root: bool, timeout_secs: Option<u64>) -> CmdResult<agent::ExecResult> {
+    let secs = timeout_secs.unwrap_or(60).clamp(5, 600);
+    let conn = ssh::connect_chain(&app, &ssh::hops_for(&session), false, &QuietSink).await.map_err(err)?;
+    let quoted = format!("'{}'", command.replace('\'', r"'\''"));
+    let line = if root { format!("sudo -n -- sh -c {quoted}") } else { format!("sh -c {quoted}") };
+    let res = agent::exec_line(&conn, &line, std::time::Duration::from_secs(secs)).await;
+    let _ = conn.handle.disconnect(russh::Disconnect::ByApplication, "", "en").await;
+    res.map_err(err)
+}
+
 /// A command of the assistant inside a Proxmox guest (as root), after the person's approval.
 #[tauri::command]
 async fn proxmox_exec(app: AppHandle, source: String, node: String, kind: String, vmid: u64, command: String, timeout_secs: Option<u64>) -> CmdResult<agent::ExecResult> {
@@ -1028,6 +1048,7 @@ pub fn run() {
             rdp_snapshot,
             rdp_input,
             proxmox_exec,
+            run_once,
             rdp_bounds,
             rdp_visible,
             rdp_command,

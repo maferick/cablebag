@@ -6,6 +6,19 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.10.0 · 22 October 2026
+
+**Folders that do the work**
+
+- **Folder settings**: a folder can give its sessions a user name, a key file, a login from the vault, jump hosts
+  and a tab colour (right-click the folder, Folder settings). Sessions use them wherever they have no value of
+  their own; a subfolder can set its own, and the session editor shows what comes from the folder. Folder
+  settings travel with Sync.
+- **Run on many servers** (Tools, or right-click a folder): one command on every SSH session of a folder, a few at
+  a time, with the answers side by side. Uptime, disk space, pending updates or failed services on 30 servers in
+  one go; click a row for the whole output, copy or save all of it. Optionally as root, where sudo needs no
+  password.
+
 ## 0.9.0 · 22 October 2026
 
 **Pick up where you left off**

@@ -59,6 +59,10 @@ pub struct Folder {
     pub parent_id: Option<String>,
     pub name: String,
     pub sort: i64,
+    /// What the sessions inside use when they have no value of their own: user name, key, vault login,
+    /// jump hosts, tab colour.
+    #[serde(default)]
+    pub data: Value,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -196,24 +200,39 @@ impl Store {
                 at INTEGER NOT NULL, host TEXT NOT NULL, model TEXT NOT NULL, about TEXT NOT NULL,
                 direction TEXT NOT NULL, text TEXT NOT NULL);",
         )?;
+        // Folders got settings of their own (2026-10); older databases get the column.
+        let has_data: bool = conn
+            .prepare("SELECT 1 FROM pragma_table_info('folders') WHERE name = 'data'")?
+            .exists([])?;
+        if !has_data {
+            conn.execute("ALTER TABLE folders ADD COLUMN data TEXT NOT NULL DEFAULT '{}'", [])?;
+        }
         Ok(Self { conn })
     }
 
     // ---------- folders ----------
 
     pub fn folders(&self) -> Result<Vec<Folder>> {
-        let mut st = self.conn.prepare("SELECT id, parent_id, name, sort FROM folders ORDER BY sort, name")?;
+        let mut st = self.conn.prepare("SELECT id, parent_id, name, sort, data FROM folders ORDER BY sort, name")?;
         let rows = st.query_map([], |r| {
-            Ok(Folder { id: r.get(0)?, parent_id: r.get(1)?, name: r.get(2)?, sort: r.get(3)? })
+            let data: String = r.get(4)?;
+            Ok(Folder {
+                id: r.get(0)?,
+                parent_id: r.get(1)?,
+                name: r.get(2)?,
+                sort: r.get(3)?,
+                data: serde_json::from_str(&data).unwrap_or_else(|_| Value::Object(Default::default())),
+            })
         })?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
     pub fn save_folder(&self, f: &Folder) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO folders(id, parent_id, name, sort) VALUES(?1, ?2, ?3, ?4)
-             ON CONFLICT(id) DO UPDATE SET parent_id=?2, name=?3, sort=?4",
-            params![f.id, f.parent_id, f.name, f.sort],
+            "INSERT INTO folders(id, parent_id, name, sort, data) VALUES(?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(id) DO UPDATE SET parent_id=?2, name=?3, sort=?4, data=CASE WHEN ?6 THEN ?5 ELSE data END",
+            // A folder sent without its settings (a rename, a move) keeps the ones it has.
+            params![f.id, f.parent_id, f.name, f.sort, if f.data.is_object() { f.data.to_string() } else { "{}".to_string() }, f.data.is_object()],
         )?;
         Ok(())
     }
@@ -237,7 +256,7 @@ impl Store {
             return Ok(id);
         }
         let id = uuid::Uuid::new_v4().to_string();
-        self.save_folder(&Folder { id: id.clone(), parent_id: parent_id.map(str::to_string), name: name.into(), sort: 0 })?;
+        self.save_folder(&Folder { id: id.clone(), parent_id: parent_id.map(str::to_string), name: name.into(), sort: 0, data: Value::Null })?;
         Ok(id)
     }
 

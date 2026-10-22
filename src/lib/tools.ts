@@ -1,4 +1,4 @@
-import { Waypoints, Radar, ScanSearch, Network, Power, KeyRound } from "@lucide/svelte";
+import { Waypoints, Radar, ScanSearch, Network, Power, KeyRound, ListChecks } from "@lucide/svelte";
 
 export interface ToolInfo {
   id: string;
@@ -9,6 +9,7 @@ export interface ToolInfo {
 
 export const TOOLS: ToolInfo[] = [
   { id: "tunnels", name: "Tunnels", description: "Port forwarding over SSH", icon: Waypoints },
+  { id: "runmany", name: "Run on many servers", description: "One command on every server of a folder", icon: ListChecks },
   { id: "netscan", name: "Network scanner", description: "Find the computers on a network", icon: Radar },
   { id: "portscan", name: "Port scanner", description: "Find the open ports of one computer", icon: ScanSearch },
   { id: "openports", name: "Open ports on this PC", description: "Which programs listen and connect", icon: Network },
