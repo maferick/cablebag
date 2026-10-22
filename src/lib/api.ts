@@ -148,6 +148,8 @@ export interface SyncResult {
   received: number;
   sent: number;
   conflicts: number;
+  /** The items changed here and elsewhere since the last sync, and whose version was kept. */
+  conflict_list?: { what: string; name: string; kept: string }[];
   sessions: number;
   folders: number;
   error: string;

@@ -317,6 +317,19 @@ async fn sftp_fetch_temp(app: AppHandle, tab: String, remote: String) -> CmdResu
 }
 
 #[tauri::command]
+async fn sftp_read_text(app: AppHandle, tab: String, path: String) -> CmdResult<files::TextFile> {
+    if is_ftp(&app, &tab) {
+        return Err("Editing in Cablebag works over SFTP; open the file with a program on this PC.".into());
+    }
+    files::read_text(&app, &tab, &path).await.map_err(err)
+}
+
+#[tauri::command]
+async fn sftp_write_text(app: AppHandle, tab: String, path: String, text: String, mtime: u64, backup: bool) -> CmdResult<u64> {
+    files::write_text(&app, &tab, &path, &text, mtime, backup).await.map_err(err)
+}
+
+#[tauri::command]
 async fn sftp_push_back(app: AppHandle, tab: String, local: String, remote: String) -> CmdResult<()> {
     (if is_ftp(&app, &tab) { ftp::push_back(&app, &tab, &local, &remote).await } else { files::push_back(&app, &tab, &local, &remote).await }).map_err(err)
 }
@@ -1022,6 +1035,8 @@ pub fn run() {
             sftp_upload,
             sftp_fetch_temp,
             sftp_push_back,
+            sftp_read_text,
+            sftp_write_text,
             file_modified,
             import_sources,
             import_sessions,

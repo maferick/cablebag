@@ -29,7 +29,7 @@ class Workspaces {
   specOf(t: Tab): TabSpec | null {
     if (t.session) return { kind: "session", title: t.title, session: $state.snapshot(t.session) as Session };
     if (t.local) return { kind: "local", title: t.title, local: $state.snapshot(t.local) as LocalSpec };
-    if (t.type === "tool" && t.tool) return { kind: "tool", title: t.title, tool: t.tool };
+    if (t.type === "tool" && t.tool && t.tool !== "editor") return { kind: "tool", title: t.title, tool: t.tool };
     return null;
   }
 

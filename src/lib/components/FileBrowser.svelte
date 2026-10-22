@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
   import { ask } from "../ask.svelte";
   import { onMount, onDestroy } from "svelte";
   import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -159,7 +160,18 @@
 
   function activate(e: Entry) {
     if (e.is_dir) load(e.path);
-    else openFile(e);
+    else editFile(e);
+  }
+
+  /** Text files open in Cablebag's editor; others (binary, larger than 2 MB, or over FTP) with a program here. */
+  async function editFile(e: Entry) {
+    if (tab.proto === "ftp" || e.size > 2 * 1024 * 1024) return openFile(e);
+    try {
+      await invoke("sftp_read_text", { tab: tab.id, path: e.path });
+      app.openEditor(tab.id, e.path);
+    } catch {
+      openFile(e);
+    }
   }
 
   function pastePath(e: Entry) {
@@ -176,7 +188,12 @@
   function rowMenu(ev: MouseEvent, e: Entry) {
     if (!selected.has(e.path)) selected = new Set([e.path]);
     menu.show(ev, [
-      { label: e.is_dir ? "Open folder" : "Open", icon: ExternalLink, action: () => activate(e) },
+      ...(e.is_dir
+        ? [{ label: "Open folder", icon: ExternalLink, action: () => activate(e) }]
+        : [
+            { label: "Edit in Cablebag", icon: Pencil, action: () => editFile(e) },
+            { label: "Open with a program on this PC", icon: ExternalLink, action: () => openFile(e) },
+          ]),
       { label: "Download", icon: Download, action: () => download() },
       "sep",
       { label: "Rename", icon: Pencil, action: () => rename(e) },

@@ -7,6 +7,7 @@
   import WakeView from "./WakeView.svelte";
   import KeyGenView from "./KeyGenView.svelte";
   import RunManyView from "./RunManyView.svelte";
+  import EditorView from "../EditorView.svelte";
   import SettingsDialog from "../SettingsDialog.svelte";
 
   let { tab, visible }: { tab: Tab; visible: boolean } = $props();
@@ -23,6 +24,8 @@
     <OpenPortsView />
   {:else if tab.tool === "wol"}
     <WakeView />
+  {:else if tab.tool === "editor"}
+    <EditorView {tab} visible={true} />
   {:else if tab.tool === "runmany"}
     {#key app.runManyFolder}<RunManyView />{/key}
   {:else if tab.tool === "keygen"}

@@ -6,6 +6,19 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.12.0 · 22 October 2026
+
+**Edit remote files in Cablebag**
+
+- **A double-click on a text file opens it in Cablebag's editor** (over SFTP): line numbers, Ctrl+S, and before
+  anything is written you see exactly what changes, removed lines in red and new ones in green. The version on
+  the server is kept as name.bak (as private as the file itself), and Cablebag refuses to overwrite a file that
+  changed on the server since you opened it. Larger or binary files open with a program on this PC, as before;
+  right-click offers both.
+- An editor tab with unsaved changes shows a dot and asks before it closes.
+- **Sync names its conflicts**: Settings, Sync lists the items that were changed on this PC and another one since
+  the last sync, and whose version was kept.
+
 ## 0.11.0 · 22 October 2026
 
 **More of Proxmox in the tree**

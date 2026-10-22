@@ -1,4 +1,4 @@
-import { Waypoints, Radar, ScanSearch, Network, Power, KeyRound, ListChecks } from "@lucide/svelte";
+import { Waypoints, Radar, ScanSearch, Network, Power, KeyRound, ListChecks, FileText } from "@lucide/svelte";
 
 export interface ToolInfo {
   id: string;
@@ -17,7 +17,10 @@ export const TOOLS: ToolInfo[] = [
   { id: "keygen", name: "SSH key generator", description: "Create a key and put it on a server", icon: KeyRound },
 ];
 
-export const toolInfo = (id: string) => TOOLS.find((t) => t.id === id) ?? TOOLS[0];
+/** Editor tabs are tool tabs too, but not in the Tools list. */
+const EDITOR: ToolInfo = { id: "editor", name: "Editor", description: "A remote file", icon: FileText };
+
+export const toolInfo = (id: string) => (id === "editor" ? EDITOR : (TOOLS.find((t) => t.id === id) ?? TOOLS[0]));
 
 /** Well-known ports with a readable name, used by the scanners. */
 export const KNOWN_PORTS: Record<number, string> = {

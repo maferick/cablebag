@@ -163,7 +163,7 @@
             }}
           />
         {:else}
-          <span class="title">{t.title}</span>
+          <span class="title">{t.title}</span>{#if app.unsaved.has(t.id)}<span class="unsaved" title="Not saved yet"></span>{/if}
         {/if}
         <button
           class="close"
@@ -195,6 +195,14 @@
 </div>
 
 <style>
+  .unsaved {
+    width: 7px;
+    height: 7px;
+    margin-left: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
   .top {
     display: flex;
     align-items: flex-end;

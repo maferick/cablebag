@@ -1,4 +1,5 @@
 import { ask } from "./ask.svelte";
+import { SvelteSet } from "svelte/reactivity";
 import { api, type Folder, type LocalShell, type PromptRequest, type ProxmoxSource, type Session } from "./api";
 import { kindInfo } from "./kinds";
 import { tiles } from "./tiles.svelte";
@@ -29,6 +30,8 @@ export interface Tab {
   reconnect?: number;
   /** Why the connection was lost, when it was not an ordinary end (for connecting again by itself). */
   lost?: string;
+  /** For an editor tab: the remote file, and the tab whose SFTP connection reads and writes it. */
+  edit?: { tab: string; path: string };
 }
 
 export interface Transfer {
@@ -157,6 +160,8 @@ class AppState {
   /** The Proxmox server dialog: "new", the server being edited, or closed. */
   proxmoxEditing = $state<ProxmoxSource | "new" | null>(null);
   folderEditing = $state<Folder | null>(null);
+  /** Tabs with changes that are not saved yet (editors): closing them asks first. */
+  unsaved = new SvelteSet<string>();
   /** Another dialog over the tabs (Proxmox snapshots or tasks), so remote screens step aside. */
   dialogOpen = $state(false);
   /** The folder "Run on many servers" starts with (from a folder's menu). */
@@ -398,7 +403,30 @@ class AppState {
     this.openSession(s);
   }
 
+  /** A remote file in Cablebag's editor (one tab per file). */
+  openEditor(sourceTab: string, path: string) {
+    const open = this.tabs.find((t) => t.edit?.tab === sourceTab && t.edit.path === path);
+    if (open) {
+      this.activeId = open.id;
+      return;
+    }
+    const src = this.tabs.find((t) => t.id === sourceTab);
+    this.push({ id: uid(), title: path.split("/").pop() || path, type: "tool", tool: "editor", proto: "none", edit: { tab: sourceTab, path }, status: "idle", color: src?.color, gen: 0 });
+  }
+
   closeTab(id: string) {
+    if (this.unsaved.has(id)) {
+      const t = this.tabs.find((x) => x.id === id);
+      ask
+        .confirm("Close without saving", `${t?.title ?? "This file"} has changes that are not saved. Close it anyway?`, { okLabel: "Close without saving", danger: true })
+        .then((ok) => {
+          if (ok) {
+            this.unsaved.delete(id);
+            this.closeTab(id);
+          }
+        });
+      return;
+    }
     const i = this.tabs.findIndex((t) => t.id === id);
     if (i < 0 || this.tabs[i].type === "home") return;
     const tab = this.tabs[i];

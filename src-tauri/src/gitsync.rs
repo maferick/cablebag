@@ -51,9 +51,34 @@ pub struct SyncResult {
     pub sent: usize,
     /// Items changed on both sides; this PC's version was kept.
     pub conflicts: usize,
+    /// Which items those were.
+    pub conflict_list: Vec<Conflict>,
     pub sessions: usize,
     pub folders: usize,
     pub error: String,
+}
+
+/// An item changed on this PC and elsewhere since the last sync.
+#[derive(Serialize, Clone, Debug)]
+pub struct Conflict {
+    /// What kind of item: session, folder, macro, tunnel, Proxmox server, memory note, workspace.
+    pub what: String,
+    pub name: String,
+    /// Whose version is kept now.
+    pub kept: String,
+}
+
+fn item_kind(collection: &str) -> &'static str {
+    match collection {
+        "folders" => "folder",
+        "sessions" => "session",
+        "macros" => "macro",
+        "tunnels" => "tunnel",
+        "proxmox" => "Proxmox server",
+        "memory" => "memory note",
+        "workspaces" => "workspace",
+        _ => "item",
+    }
 }
 
 fn setting(app: &AppHandle, key: &str) -> String {
@@ -111,9 +136,9 @@ fn local_from(store: &crate::store::Store) -> Result<Data> {
 }
 
 /// Three-way merge per item id. Without a base (the first sync) both sides are combined, this PC first.
-fn merge(base: Option<&Data>, mine: &Data, theirs: &Data) -> (Data, usize) {
+fn merge(base: Option<&Data>, mine: &Data, theirs: &Data) -> (Data, Vec<Conflict>) {
     let mut out = Data::new();
-    let mut conflicts = 0;
+    let mut conflicts = Vec::new();
     for (name, _) in FILES {
         let index = |d: Option<&Data>| -> BTreeMap<String, Value> {
             d.and_then(|d| d.get(name)).map(|l| l.iter().map(|v| (id_of(v), v.clone())).collect()).unwrap_or_default()
@@ -135,7 +160,13 @@ fn merge(base: Option<&Data>, mine: &Data, theirs: &Data) -> (Data, usize) {
                     lv
                 } else {
                     // Changed on both sides: keep this PC's version, or the other one when this PC deleted it.
-                    conflicts += 1;
+                    let v = lv.or(rv).cloned().unwrap_or(Value::Null);
+                    let label = ["name", "label", "text"].iter().find_map(|k| v.get(*k).and_then(|x| x.as_str())).unwrap_or(id.as_str());
+                    conflicts.push(Conflict {
+                        what: item_kind(name).to_string(),
+                        name: label.chars().take(80).collect(),
+                        kept: if lv.is_some() { "this PC" } else { "the other PC (this PC had deleted it)" }.to_string(),
+                    });
                     lv.or(rv)
                 }
             };
@@ -445,7 +476,8 @@ async fn sync_once(app: &AppHandle) -> Result<SyncResult> {
         at: crate::store::now(),
         received: x.received,
         sent: x.sent,
-        conflicts: x.conflicts,
+        conflicts: x.conflicts.len(),
+        conflict_list: x.conflicts,
         sessions: x.merged["sessions"].len(),
         folders: x.merged["folders"].len(),
         error: String::new(),
@@ -459,7 +491,7 @@ struct Exchange {
     received: usize,
     /// Items that changed in the repository.
     sent: usize,
-    conflicts: usize,
+    conflicts: Vec<Conflict>,
 }
 
 /// Reads the repository, merges it with this PC's data against the last synced state, and writes the
@@ -533,7 +565,7 @@ mod tests {
     fn first_sync_combines() {
         let (m, c) = merge(None, &data(&[("a", "mine"), ("b", "only mine")]), &data(&[("a", "theirs"), ("c", "only theirs")]));
         assert_eq!(names(&m), vec!["mine", "only mine", "only theirs"]);
-        assert_eq!(c, 0);
+        assert!(c.is_empty());
     }
 
     #[test]
@@ -543,7 +575,7 @@ mod tests {
         let theirs = data(&[("a", "a"), ("b", "b"), ("c", "c3"), ("e", "e")]);
         let (m, c) = merge(Some(&base), &mine, &theirs);
         assert_eq!(names(&m), vec!["a2", "c3", "e"]);
-        assert_eq!(c, 0);
+        assert!(c.is_empty());
         assert_eq!(differences(&mine, &m), 3);
         assert_eq!(differences(&theirs, &m), 2);
     }
@@ -553,7 +585,10 @@ mod tests {
         let base = data(&[("a", "a"), ("b", "b")]);
         let (m, c) = merge(Some(&base), &data(&[("a", "mine")]), &data(&[("a", "theirs"), ("b", "b2")]));
         assert_eq!(names(&m), vec!["mine", "b2"]);
-        assert_eq!(c, 2);
+        assert_eq!(c.len(), 2);
+        // Each one named, with whose version is kept.
+        assert_eq!((c[0].what.as_str(), c[0].name.as_str(), c[0].kept.as_str()), ("session", "mine", "this PC"));
+        assert_eq!((c[1].name.as_str(), c[1].kept.as_str()), ("b2", "the other PC (this PC had deleted it)"));
     }
 
     /// Two PCs against one real repository, encrypted:
@@ -586,7 +621,7 @@ mod tests {
             let x = exchange(remote, Some(key), &pc.data, pc.base.as_ref(), name).await.unwrap();
             pc.data = x.merged.clone();
             pc.base = Some(x.merged);
-            (x.received, x.sent, x.conflicts)
+            (x.received, x.sent, x.conflicts.len())
         }
 
         let mut a = Pc { data: set(vec![session("s1", "one"), session("s2", "two")]), base: None };

@@ -150,6 +150,16 @@
 
 {#if sync.last}
   <p class="state" class:bad={!!sync.last.error}>{when(sync.last.at)}: {sync.summary(sync.last)}</p>
+  {#if sync.last.conflict_list?.length}
+    <div class="conflicts">
+      <p>Changed on this PC and on another one since the last sync. The version named here is kept; change the item again if the other one was right.</p>
+      <ul>
+        {#each sync.last.conflict_list as c}
+          <li><span class="muted">{c.what}</span> <strong>{c.name}</strong>: {c.kept}'s version kept</li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
 {/if}
 
 <style>
@@ -179,6 +189,21 @@
     padding: 8px 10px;
     border-radius: 3px;
     background: var(--hover);
+  }
+  .conflicts {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .conflicts p {
+    margin: 0 0 4px;
+  }
+  .conflicts ul {
+    margin: 0;
+    padding-left: 18px;
   }
   .state.bad {
     color: var(--danger);

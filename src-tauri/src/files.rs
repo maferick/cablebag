@@ -257,6 +257,66 @@ pub async fn upload(app: &AppHandle, tab: &str, locals: &[String], remote_dir: &
     Ok(())
 }
 
+/// A remote text file opened in Cablebag's editor.
+#[derive(Serialize)]
+pub struct TextFile {
+    pub text: String,
+    /// The modification time when it was read, to notice a change on the server before saving.
+    pub mtime: u64,
+    pub size: u64,
+}
+
+/// Larger files are opened with a program on this PC instead.
+const EDIT_MAX: u64 = 2 * 1024 * 1024;
+
+pub async fn read_text(app: &AppHandle, tab: &str, path: &str) -> Result<TextFile> {
+    let s = sftp(app, tab).await?;
+    let meta = s.metadata(path).await?;
+    let size = meta.size.unwrap_or(0);
+    if size > EDIT_MAX {
+        return Err(anyhow!("It is larger than 2 MB; open it with a program on this PC instead."));
+    }
+    let mut f = s.open(path).await?;
+    let mut buf = Vec::new();
+    f.read_to_end(&mut buf).await?;
+    if buf.contains(&0) {
+        return Err(anyhow!("It is not a text file; open it with a program on this PC instead."));
+    }
+    let text = String::from_utf8(buf).map_err(|_| anyhow!("It is not UTF-8 text; open it with a program on this PC instead."))?;
+    Ok(TextFile { text, mtime: meta.mtime.unwrap_or(0) as u64, size })
+}
+
+/// Saves the editor's text. Refuses when the file changed on the server since it was read; with `backup`, the
+/// version on the server is kept first as name.bak. The file keeps its owner and permissions (it is written in
+/// place). Returns the new modification time.
+pub async fn write_text(app: &AppHandle, tab: &str, path: &str, text: &str, read_mtime: u64, backup: bool) -> Result<u64> {
+    let s = sftp(app, tab).await?;
+    if let Ok(meta) = s.metadata(path).await {
+        if meta.mtime.unwrap_or(0) as u64 != read_mtime {
+            return Err(anyhow!("The file changed on the server since you opened it. Open it again to see that version."));
+        }
+        if backup {
+            let mut old = Vec::new();
+            s.open(path).await?.read_to_end(&mut old).await?;
+            let bak_path = format!("{path}.bak");
+            let mut bak = s.open_with_flags(&bak_path, OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE).await?;
+            bak.write_all(&old).await?;
+            bak.shutdown().await?;
+            // The copy is as private as the file itself (a key or password file must not become readable).
+            if let Some(mode) = meta.permissions {
+                if let Ok(mut m) = s.metadata(&bak_path).await {
+                    m.permissions = Some(mode);
+                    let _ = s.set_metadata(&bak_path, m).await;
+                }
+            }
+        }
+    }
+    let mut f = s.open_with_flags(path, OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE).await?;
+    f.write_all(text.as_bytes()).await?;
+    f.shutdown().await?;
+    Ok(s.metadata(path).await.ok().and_then(|m| m.mtime).unwrap_or(0) as u64)
+}
+
 /// Downloads one file into a private temp folder so it can be opened locally.
 pub async fn fetch_temp(app: &AppHandle, tab: &str, remote: &str) -> Result<PathBuf> {
     let s = sftp(app, tab).await?;
