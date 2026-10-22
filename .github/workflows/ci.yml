@@ -25,10 +25,10 @@ jobs:
         os: [windows-latest, ubuntu-latest]
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: lts/*
           cache: npm
@@ -56,7 +56,7 @@ jobs:
       # checks that resources exist while compiling the backend, so the helper is built first on Windows.
       - name: Set up .NET 8 SDK (Windows)
         if: runner.os == 'Windows'
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
 
