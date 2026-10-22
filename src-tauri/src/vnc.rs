@@ -81,6 +81,7 @@ async fn run_inner(app: &AppHandle, session: &Session, out: &TermOut, rx: &mut m
     let mut _fwd = None;
     if let Some(gw) = session.data.get("ssh_gateway").filter(|g| !s(g, "host").is_empty()) {
         let hop = Hop {
+            via_wg: crate::wg::of(&session).unwrap_or_default(),
             agent_forward: false,
             host: s(gw, "host"),
             port: gw.get("port").and_then(|p| p.as_u64()).unwrap_or(22) as u16,
@@ -94,7 +95,12 @@ async fn run_inner(app: &AppHandle, session: &Session, out: &TermOut, rx: &mut m
         let f = tunnel::local_forward(conn, 0, host.clone(), port).await?;
         host = "127.0.0.1".into();
         port = f.port;
-        _fwd = Some(f);
+        _fwd = Some(Box::new(f) as Box<dyn std::any::Any + Send + Sync>);
+    } else if let Some(wg) = crate::wg::of(&session) {
+        let f = crate::wg::local_forward(app, &wg, &host, port).await?;
+        host = "127.0.0.1".into();
+        port = f.port;
+        _fwd = Some(Box::new(f));
     }
 
     let tcp = tokio::time::timeout(Duration::from_secs(15), TcpStream::connect((host.as_str(), port)))

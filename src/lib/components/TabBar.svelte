@@ -189,7 +189,7 @@
   <button class="icon-btn" title="Layout: {layoutName}" onclick={layoutMenu}>
     <LayoutIcon size={16} />
   </button>
-  <button class="icon-btn" title="Settings (Ctrl+,)" onclick={() => app.openSettings()}>
+  <button class="icon-btn" title="Settings (Ctrl+,)" onclick={() => app.toggleTool("settings", "Settings")}>
     <Settings size={16} />
   </button>
 </div>

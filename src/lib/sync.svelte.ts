@@ -2,6 +2,7 @@
 import { api, type SyncResult } from "./api";
 import { app } from "./state.svelte";
 import { proxmox } from "./proxmox.svelte";
+import { wireguard } from "./wireguard.svelte";
 
 class SyncStore {
   busy = $state(false);
@@ -23,6 +24,7 @@ class SyncStore {
       app.settings["tunnels"],
       proxmox.sources.map(({ has_secret, ...s }) => s),
       app.settings["ai.memory"],
+      wireguard.synced(),
     ]);
   }
 

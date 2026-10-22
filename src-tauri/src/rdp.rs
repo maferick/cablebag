@@ -5,7 +5,7 @@ use crate::prompt::{button, field, PromptRequest};
 use crate::ssh::{self, Hop};
 use crate::store::Session;
 use crate::term::Sink;
-use crate::tunnel::{self, LocalForward};
+use crate::tunnel;
 use crate::AppState;
 use anyhow::{anyhow, Result};
 use parking_lot::Mutex;
@@ -21,7 +21,8 @@ use tauri::{AppHandle, Emitter, Manager};
 pub struct RdpProc {
     stdin: Mutex<ChildStdin>,
     child: Mutex<Child>,
-    _tunnel: Option<LocalForward>,
+    /// The SSH gateway or WireGuard port the control connects through, kept open as long as the session.
+    _tunnel: Option<Box<dyn std::any::Any + Send + Sync>>,
 }
 
 impl RdpProc {
@@ -206,6 +207,7 @@ pub async fn open(app: AppHandle, id: String, session: Session, geo: Geometry) -
     let mut fwd = None;
     if let Some(gw) = session.data.get("ssh_gateway").filter(|g| !s(g, "host").is_empty()) {
         let hop = Hop {
+            via_wg: crate::wg::of(&session).unwrap_or_default(),
             agent_forward: false,
             host: s(gw, "host"),
             port: gw.get("port").and_then(|p| p.as_u64()).unwrap_or(22) as u16,
@@ -221,7 +223,14 @@ pub async fn open(app: AppHandle, id: String, session: Session, geo: Geometry) -
         let f = tunnel::local_forward(conn, 0, host.clone(), port).await?;
         host = "127.0.0.1".into();
         port = f.port;
-        fwd = Some(f);
+        fwd = Some(Box::new(f) as Box<dyn std::any::Any + Send + Sync>);
+    } else if let Some(wg) = crate::wg::of(&session) {
+        let log = Log { app: &app, id: &id };
+        log.info("Opening the WireGuard tunnel...");
+        let f = crate::wg::local_forward(&app, &wg, &host, port).await?;
+        host = "127.0.0.1".into();
+        port = f.port;
+        fwd = Some(Box::new(f));
     }
 
     // Password: from a linked Vaultwarden item, saved in Cablebag, or asked once.

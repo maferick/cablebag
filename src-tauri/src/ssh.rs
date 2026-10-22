@@ -32,6 +32,9 @@ pub type Forwards = Arc<parking_lot::Mutex<std::collections::HashMap<u32, (Strin
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Hop {
+    /// WireGuard network to reach this host through (only the first hop of a session).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub via_wg: String,
     /// Lets the server use this PC's SSH agent while connected (only the last hop of a session).
     #[serde(default)]
     pub agent_forward: bool,
@@ -563,10 +566,21 @@ pub async fn connect_chain(app: &AppHandle, hops: &[Hop], keepalive: bool, out: 
     let mut jumps = Vec::new();
     for (i, hop) in hops.iter().enumerate() {
         let via = if i + 1 < hops.len() { " (jump host)" } else { "" };
+        if i == 0 && !hop.via_wg.is_empty() {
+            let t = crate::wg::tunnel(app, &hop.via_wg).await?;
+            out.info(&format!("Through the WireGuard network {}.", t.name()));
+            if !t.warning().is_empty() {
+                out.error(&t.warning());
+            }
+        }
         out.info(&format!("Connecting to {}:{}{}...", hop.host, hop.port, via));
         let handler = Client { app: app.clone(), host: hop.host.clone(), port: hop.port, forwards: forwards.clone(), agent_forward: hop.agent_forward };
         let fut = async {
             match &prev {
+                None if !hop.via_wg.is_empty() => {
+                    let stream = crate::wg::connect(app, &hop.via_wg, &hop.host, hop.port).await.map_err(|e| russh::Error::IO(std::io::Error::other(e.to_string())))?;
+                    client::connect_stream(config.clone(), stream, handler).await
+                }
                 None => client::connect(config.clone(), (hop.host.as_str(), hop.port), handler).await,
                 Some(p) => {
                     let ch = p.channel_open_direct_tcpip(hop.host.clone(), hop.port as u32, "127.0.0.1", 0).await?;
@@ -609,6 +623,7 @@ pub fn hops_for(s: &Session) -> Vec<Hop> {
         .filter(|h| !h.host.trim().is_empty())
         .collect();
     hops.push(Hop {
+        via_wg: String::new(),
         agent_forward: bool_of(&s.data, "agent_forward", false),
         host: s.host.trim().to_string(),
         port: if s.port > 0 { s.port as u16 } else { 22 },
@@ -618,6 +633,9 @@ pub fn hops_for(s: &Session) -> Vec<Hop> {
         session_id: s.id.clone(),
         name: s.name.clone(),
     });
+    if let (Some(first), Some(wg)) = (hops.first_mut(), crate::wg::of(s)) {
+        first.via_wg = wg;
+    }
     hops
 }
 

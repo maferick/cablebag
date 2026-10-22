@@ -4,6 +4,7 @@
   import { ask } from "../../ask.svelte";
   import type { TunnelDef } from "../../api";
   import Modal from "../Modal.svelte";
+  import WireGuardList from "./WireGuardList.svelte";
   import { Play, Square, Plus, Pencil, Trash2, Waypoints } from "@lucide/svelte";
   import "./tool.css";
 
@@ -81,7 +82,7 @@
     <Waypoints size={20} />
     <div>
       <h2>Tunnels</h2>
-      <p class="muted">Port forwards over SSH that keep running while you work in other tabs.</p>
+      <p class="muted">Port forwards over SSH that keep running while you work in other tabs, and WireGuard networks for sessions.</p>
     </div>
     <span class="grow"></span>
     <button class="btn" onclick={() => tunnels.startAll()} disabled={!tunnels.list.length}><Play size={14} /> Start all</button>
@@ -129,6 +130,8 @@
       {/each}
     </div>
   {/if}
+
+  <WireGuardList />
 </div>
 
 {#if editing}

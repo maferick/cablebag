@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use tauri::{AppHandle, Emitter, Manager};
 
 /// What is synced: collection name, file in the repository.
-const FILES: [(&str, &str); 7] = [
+const FILES: [(&str, &str); 8] = [
     ("folders", "folders.json"),
     ("sessions", "sessions.json"),
     ("macros", "macros.json"),
@@ -25,6 +25,7 @@ const FILES: [(&str, &str); 7] = [
     ("proxmox", "proxmox.json"),
     ("memory", "memory.json"),
     ("workspaces", "workspaces.json"),
+    ("wireguard", "wireguard.json"),
 ];
 
 /// Settings that hold the synced lists.
@@ -35,6 +36,7 @@ fn setting_key(collection: &str) -> Option<&'static str> {
         "proxmox" => Some("proxmox.sources"),
         "memory" => Some("ai.memory"),
         "workspaces" => Some("workspaces"),
+        "wireguard" => Some("wireguard.profiles"),
         _ => None,
     }
 }
@@ -77,6 +79,7 @@ fn item_kind(collection: &str) -> &'static str {
         "proxmox" => "Proxmox server",
         "memory" => "memory note",
         "workspaces" => "workspace",
+        "wireguard" => "WireGuard network",
         _ => "item",
     }
 }

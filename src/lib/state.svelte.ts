@@ -107,6 +107,7 @@ export const FOLDER_DEFAULTS: { key: string; label: string; kinds: string[] }[] 
   { key: "key_path", label: "key file", kinds: ["ssh", "sftp"] },
   { key: "vault_item", label: "vault login", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet", "ftp"] },
   { key: "jump_hosts", label: "jump hosts", kinds: ["ssh", "sftp"] },
+  { key: "wireguard", label: "WireGuard network", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet"] },
   { key: "tab_color", label: "tab colour", kinds: [] },
 ];
 
@@ -362,6 +363,24 @@ class AppState {
     this.openTool("settings", "Settings");
   }
 
+  /** The tab that was active when a tool was opened with its button, to go back to when the button closes it. */
+  private toolFrom: Record<string, string> = {};
+
+  /** For the buttons of Settings and Tunnels: the first press opens the tool, a press while it shows closes it. */
+  toggleTool(id: string, title: string) {
+    const open = this.tabs.find((t) => t.type === "tool" && t.tool === id);
+    if (open && this.activeId === open.id) {
+      const back = this.toolFrom[id];
+      delete this.toolFrom[id];
+      this.closeTab(open.id);
+      if (back && this.tabs.some((t) => t.id === back)) this.activeId = back;
+      return;
+    }
+    this.toolFrom[id] = this.activeId;
+    if (id === "settings") this.openSettings();
+    else this.openTool(id, title);
+  }
+
   /** Interface size one step up (1) or down (-1). */
   setScale(step: number) {
     const cur = Number(this.settings["ui.scale"]) || 100;
@@ -523,7 +542,11 @@ class AppState {
     const from: Record<string, string> = {};
     for (const f of chain) {
       for (const { key } of FOLDER_DEFAULTS) {
-        if (filled(f.data?.[key])) {
+        if (key === "wireguard" && f.data?.wireguard === "none") {
+          // A folder that goes directly ends the network a folder above gives.
+          delete values.wireguard;
+          delete from.wireguard;
+        } else if (filled(f.data?.[key])) {
           values[key] = f.data![key];
           from[key] = f.name;
         }

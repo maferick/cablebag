@@ -6,6 +6,25 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.13.0 · 22 October 2026
+
+**WireGuard per session**
+
+- **Cablebag runs WireGuard itself**, only for the sessions that choose it. Each WireGuard network is its own
+  small network inside Cablebag, so two VPNs whose machines have the same addresses work at the same time.
+  Nothing changes in Windows: no adapter, no routes, no admin rights.
+- **Tunnels, WireGuard networks:** import the .conf you use in the WireGuard app, or fill it in. The private key
+  is kept in Cablebag's vault (or comes from a Vaultwarden item). **Test** shakes hands with the server, and while
+  a network runs you see its open connections, last handshake and data.
+- **Network** in a session (SSH, SFTP, RDP, VNC, telnet) or a folder picks the WireGuard network. A folder's
+  choice goes to its sessions, and a session or subfolder can still go directly.
+- The same .conf can be used in Cablebag and in the WireGuard app, just not both switched on at once (the server
+  talks to one of them). Cablebag warns when it sees the WireGuard app has the same tunnel on. For both at once,
+  **New key pair** makes a key of Cablebag's own; its public key goes on the server as an extra peer.
+- WireGuard networks travel with Sync; their keys do not.
+- **Settings and Tunnels close again** when you press their button a second time, and you are back in the tab
+  you came from.
+
 ## 0.12.1 · 22 October 2026
 
 - **Disconnect no longer reports an error**: ending a remote desktop session with Disconnect said "An internal

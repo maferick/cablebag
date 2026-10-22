@@ -145,7 +145,24 @@ pub async fn run(app: AppHandle, session: Session, mut cols: u16, mut rows: u16,
     let port = if session.port > 0 { session.port as u16 } else { 23 };
     out.status("connecting", "");
     out.info(&format!("Connecting to {host}:{port}..."));
-    let tcp = match tokio::time::timeout(Duration::from_secs(15), tokio::net::TcpStream::connect((host.as_str(), port))).await {
+    // Through WireGuard: a local port that leads into the tunnel, kept open while the session runs.
+    let mut _wg = None;
+    let (to_host, to_port) = match crate::wg::of(&session) {
+        Some(wg) => match crate::wg::local_forward(&app, &wg, &host, port).await {
+            Ok(f) => {
+                let p = f.port;
+                _wg = Some(f);
+                ("127.0.0.1".to_string(), p)
+            }
+            Err(e) => {
+                out.error(&e.to_string());
+                out.status("failed", &e.to_string());
+                return;
+            }
+        },
+        None => (host.clone(), port),
+    };
+    let tcp = match tokio::time::timeout(Duration::from_secs(15), tokio::net::TcpStream::connect((to_host.as_str(), to_port))).await {
         Ok(Ok(t)) => t,
         Ok(Err(e)) => {
             out.error(&format!("Could not connect to {host}:{port}: {e}"));

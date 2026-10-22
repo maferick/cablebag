@@ -28,6 +28,8 @@ local shells, Proxmox consoles and an AI assistant, all as tabs in one window.
   learns per server, and hides passwords and secrets before anything is sent to the AI.
 - **Tunnels and network tools.** SSH port forwards (local, remote, SOCKS), a network and port scanner, Wake on LAN
   and an SSH key generator that puts the key on the server in one step.
+- **WireGuard per session.** Cablebag runs WireGuard itself, only for the sessions (or folders) that choose a
+  network, so two VPNs with the same address ranges work at the same time. No adapter, routes or admin rights.
 
 ## Install
 

@@ -12,6 +12,8 @@
   import { Plus, Trash2, ArrowUp, ArrowDown, FolderOpen, Info, ServerCog, ChevronRight } from "@lucide/svelte";
   import ProxmoxSettings from "./ProxmoxSettings.svelte";
   import MemoryList from "./MemoryList.svelte";
+  import WireGuardPicker from "./WireGuardPicker.svelte";
+  import { wireguard } from "../wireguard.svelte";
 
   let { session }: { session: Session } = $props();
   const initial = untrack(() => session);
@@ -65,7 +67,8 @@
       .filter((d) => (d.key === "username" ? !s.username : !(Array.isArray(s.data[d.key]) ? s.data[d.key].length : s.data[d.key])))
       .map((d) => {
         const v = folderValues.values[d.key];
-        const shown = d.key === "jump_hosts" ? v.map((j: any) => j.host).join(", ") : d.key === "vault_item" ? "set" : d.key === "tab_color" ? "" : v;
+        const shown =
+          d.key === "jump_hosts" ? v.map((j: any) => j.host).join(", ") : d.key === "vault_item" ? "set" : d.key === "tab_color" ? "" : d.key === "wireguard" ? wireguard.name(v) : v;
         return `${d.label}${shown ? ` ${shown}` : ""} (${folderValues.from[d.key]})`;
       }),
   );
@@ -301,6 +304,11 @@
       {#if s.kind === "ssh" || s.kind === "rdp" || s.kind === "sftp" || s.kind === "vnc" || s.kind === "telnet" || s.kind === "ftp"}
         <div class="field"><span>Login from the vault</span>
           <VaultPicker bind:itemId={s.data.vault_item} hint={s.host} />
+        </div>
+      {/if}
+      {#if s.kind === "ssh" || s.kind === "rdp" || s.kind === "sftp" || s.kind === "vnc" || s.kind === "telnet"}
+        <div class="field"><span>Network</span>
+          <WireGuardPicker bind:value={s.data.wireguard} inherited={folderValues.values.wireguard} from={`the folder ${folderValues.from.wireguard ?? ""}`} />
         </div>
       {/if}
       {#if s.kind === "ssh" || s.kind === "sftp"}

@@ -24,6 +24,7 @@ mod tunnels;
 mod updater;
 mod vault;
 mod vnc;
+mod wg;
 
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -50,6 +51,7 @@ pub struct AppState {
     /// One Gitea sync at a time.
     pub sync_lock: tokio::sync::Mutex<()>,
     pub ftps: ftp::Ftps,
+    pub wg: wg::Tunnels,
 }
 
 type CmdResult<T> = Result<T, String>;
@@ -542,6 +544,36 @@ fn proxmox_sources(app: AppHandle) -> Vec<ProxmoxSourceInfo> {
 }
 
 #[tauri::command]
+fn wireguard_profiles(app: AppHandle) -> Vec<wg::ProfileInfo> {
+    wg::infos(&app)
+}
+
+#[tauri::command]
+fn wireguard_save(app: AppHandle, profile: wg::Profile, private_key: Option<String>, preshared_key: Option<String>) -> CmdResult<wg::Profile> {
+    wg::save(&app, profile, private_key, preshared_key).map_err(err)
+}
+
+#[tauri::command]
+fn wireguard_delete(app: AppHandle, id: String) -> CmdResult<()> {
+    wg::delete(&app, &id).map_err(err)
+}
+
+#[tauri::command]
+fn wireguard_import(app: AppHandle, path: String) -> CmdResult<wg::Profile> {
+    wg::import(&app, &path).map_err(err)
+}
+
+#[tauri::command]
+fn wireguard_keypair() -> (String, String) {
+    wg::keypair()
+}
+
+#[tauri::command]
+async fn wireguard_test(app: AppHandle, id: String) -> CmdResult<wg::Status> {
+    wg::test(&app, &id).await.map_err(err)
+}
+
+#[tauri::command]
 fn proxmox_save_source(app: AppHandle, source: proxmox::Source, secret: Option<String>) -> CmdResult<proxmox::Source> {
     proxmox::save_source(&app, source, secret).map_err(err)
 }
@@ -968,6 +1000,7 @@ pub fn run() {
             vncs: Mutex::new(HashMap::new()),
             sync_lock: tokio::sync::Mutex::new(()),
             ftps: ftp::Ftps::default(),
+            wg: wg::Tunnels::default(),
         })
         .setup(|app| {
             if let Some(w) = app.get_webview_window("main") {
@@ -1075,6 +1108,12 @@ pub fn run() {
             net_reach,
             proxmox_sources,
             proxmox_save_source,
+            wireguard_profiles,
+            wireguard_save,
+            wireguard_delete,
+            wireguard_import,
+            wireguard_test,
+            wireguard_keypair,
             proxmox_delete_source,
             proxmox_list,
             proxmox_power,

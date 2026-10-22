@@ -66,7 +66,7 @@
   <button class="item" title="Find an open tab" onclick={() => (app.paletteOpen = true)}>
     <span class="dot" class:on={connected > 0}></span>{connected} connected
   </button>
-  <button class="item" title="Port forwarding over SSH" onclick={() => app.openTool("tunnels", "Tunnels")}>
+  <button class="item" title="Port forwarding over SSH" onclick={() => app.toggleTool("tunnels", "Tunnels")}>
     <Waypoints size={13} />Tunnels: {running ? `${running} running` : "none"}
   </button>
   <button class="item" class:warn={vault.status.configured && !vault.status.unlocked} title="Passwords from Vaultwarden" onclick={vaultMenu}>

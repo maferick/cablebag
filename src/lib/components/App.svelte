@@ -29,6 +29,7 @@
   import { vault } from "../vault.svelte";
   import { reach } from "../reach.svelte";
   import { proxmox } from "../proxmox.svelte";
+  import { wireguard } from "../wireguard.svelte";
   import { sync } from "../sync.svelte";
   import { update } from "../update.svelte";
   import type { TunnelStatus } from "../api";
@@ -270,6 +271,7 @@
       listen("sync-applied", async () => {
         await app.load();
         await proxmox.load();
+        await wireguard.load();
       }),
     );
 
@@ -278,6 +280,7 @@
       .then(() => tunnels.init())
       .then(() => vault.refresh())
       .then(() => proxmox.load())
+      .then(() => wireguard.load())
       .finally(() => {
         ready = true;
         reach.start();
@@ -340,7 +343,7 @@
       app.filesOpen = !app.filesOpen;
     } else if (e.key === "," && !e.shiftKey && !e.altKey) {
       e.preventDefault();
-      app.openSettings();
+      app.toggleTool("settings", "Settings");
     } else if (e.shiftKey && (e.code === "Equal" || e.code === "NumpadAdd" || e.key === "+")) {
       e.preventDefault();
       app.setScale(1);

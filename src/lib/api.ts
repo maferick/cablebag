@@ -180,6 +180,39 @@ export interface ProxmoxSource {
   has_secret?: boolean;
 }
 
+export interface WireGuardProfile {
+  id: string;
+  name: string;
+  /** This side's addresses in the tunnel, "10.8.0.2/32". */
+  address: string;
+  dns: string;
+  mtu: number;
+  /** The server's public key. */
+  public_key: string;
+  endpoint: string;
+  allowed_ips: string;
+  keepalive: number;
+  vault_item: string;
+}
+
+export interface WireGuardStatus {
+  /** Seconds since the last handshake; null = none yet. */
+  handshake: number | null;
+  sent: number;
+  received: number;
+  connections: number;
+  warning: string;
+}
+
+/** A profile in a listing: with whether its keys are there and, while it runs, its state. */
+export interface WireGuardInfo extends WireGuardProfile {
+  has_key: boolean;
+  has_preshared: boolean;
+  /** This side's public key, from the private key Cablebag keeps. */
+  own_public_key: string;
+  status: WireGuardStatus | null;
+}
+
 export interface ProxmoxGuest {
   vmid: number;
   name: string;
@@ -342,6 +375,13 @@ export const api = {
     invoke<void>("sync_configure", { ...c, token: c.token || null, passphrase: c.passphrase || null }),
   syncHasToken: () => invoke<boolean>("sync_has_token"),
   syncHasPassphrase: () => invoke<boolean>("sync_has_passphrase"),
+  wireguardProfiles: () => invoke<WireGuardInfo[]>("wireguard_profiles"),
+  wireguardSave: (profile: WireGuardProfile, privateKey?: string, presharedKey?: string) =>
+    invoke<WireGuardProfile>("wireguard_save", { profile, privateKey: privateKey ?? null, presharedKey: presharedKey ?? null }),
+  wireguardDelete: (id: string) => invoke<void>("wireguard_delete", { id }),
+  wireguardImport: (path: string) => invoke<WireGuardProfile>("wireguard_import", { path }),
+  wireguardKeypair: () => invoke<[string, string]>("wireguard_keypair"),
+  wireguardTest: (id: string) => invoke<WireGuardStatus>("wireguard_test", { id }),
   proxmoxSources: () => invoke<ProxmoxSource[]>("proxmox_sources"),
   proxmoxSaveSource: (source: ProxmoxSource, secret?: string) => invoke<ProxmoxSource>("proxmox_save_source", { source, secret: secret || null }),
   proxmoxDeleteSource: (id: string) => invoke<void>("proxmox_delete_source", { id }),

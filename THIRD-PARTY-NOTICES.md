@@ -40,6 +40,7 @@ Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 | svelte (JavaScript) | 5.57.2 | MIT | https://www.npmjs.com/package/svelte |
 | zimmerframe (JavaScript) | 1.1.5 | MIT | https://www.npmjs.com/package/zimmerframe |
 | adler2 (Rust) | 2.0.1 | 0BSD OR MIT OR Apache-2.0 | https://github.com/oyvindln/adler2 |
+| aead (Rust) | 0.5.2 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
 | aead (Rust) | 0.6.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
 | aes (Rust) | 0.8.4 | MIT OR Apache-2.0 | https://github.com/RustCrypto/block-ciphers |
 | aes (Rust) | 0.9.3 | MIT OR Apache-2.0 | https://github.com/RustCrypto/block-ciphers |
@@ -54,6 +55,7 @@ Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 | atomic-waker (Rust) | 1.1.2 | Apache-2.0 OR MIT | https://github.com/smol-rs/atomic-waker |
 | autocfg (Rust) | 1.5.1 | Apache-2.0 OR MIT | https://github.com/cuviper/autocfg |
 | base16ct (Rust) | 1.0.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
+| base64 (Rust) | 0.13.1 | MIT/Apache-2.0 | https://github.com/marshallpierce/rust-base64 |
 | base64 (Rust) | 0.22.1 | MIT OR Apache-2.0 | https://github.com/marshallpierce/rust-base64 |
 | base64 (Rust) | 0.23.1 | MIT OR Apache-2.0 | https://github.com/marshallpierce/rust-base64 |
 | base64ct (Rust) | 1.8.3 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
@@ -62,12 +64,14 @@ Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 | bit-vec (Rust) | 0.8.0 | Apache-2.0 OR MIT | https://github.com/contain-rs/bit-vec |
 | bitflags (Rust) | 1.3.2 | MIT/Apache-2.0 | https://github.com/bitflags/bitflags |
 | bitflags (Rust) | 2.13.2 | MIT OR Apache-2.0 | https://github.com/bitflags/bitflags |
+| blake2 (Rust) | 0.10.6 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
 | blake2 (Rust) | 0.11.0 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
 | block-buffer (Rust) | 0.10.4 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | block-buffer (Rust) | 0.12.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | block-padding (Rust) | 0.3.3 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | block-padding (Rust) | 0.4.2 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | blowfish (Rust) | 0.10.0 | MIT OR Apache-2.0 | https://github.com/RustCrypto/block-ciphers |
+| boringtun (Rust) | 0.6.0 | BSD-3-Clause | https://github.com/cloudflare/boringtun |
 | brotli (Rust) | 9.0.0 | BSD-3-Clause AND MIT | https://github.com/dropbox/rust-brotli |
 | brotli-decompressor (Rust) | 6.0.1 | BSD-3-Clause/MIT | https://github.com/dropbox/rust-brotli-decompressor |
 | bs58 (Rust) | 0.5.1 | MIT/Apache-2.0 | https://github.com/Nullus157/bs58-rs |
@@ -84,6 +88,8 @@ Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 | cfg_aliases (Rust) | 0.1.1 | MIT | https://github.com/katharostech/cfg_aliases |
 | cfg-if (Rust) | 1.0.5 | MIT OR Apache-2.0 | https://github.com/rust-lang/cfg-if |
 | chacha20 (Rust) | 0.10.2 | MIT OR Apache-2.0 | https://github.com/RustCrypto/stream-ciphers |
+| chacha20 (Rust) | 0.9.1 | Apache-2.0 OR MIT | https://github.com/RustCrypto/stream-ciphers |
+| chacha20poly1305 (Rust) | 0.10.1 | Apache-2.0 OR MIT | https://github.com/RustCrypto/AEADs/tree/master/chacha20poly1305 |
 | chrono (Rust) | 0.4.45 | MIT OR Apache-2.0 | https://github.com/chronotope/chrono |
 | cipher (Rust) | 0.4.4 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
 | cipher (Rust) | 0.5.2 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
@@ -106,6 +112,7 @@ Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 | ctor (Rust) | 1.0.13 | Apache-2.0 OR MIT | https://github.com/mmastrac/linktime |
 | ctr (Rust) | 0.10.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/block-modes |
 | ctutils (Rust) | 0.4.3 | Apache-2.0 OR MIT | https://github.com/RustCrypto/utils |
+| curve25519-dalek (Rust) | 4.0.0-rc.3 | BSD-3-Clause | https://github.com/dalek-cryptography/curve25519-dalek |
 | curve25519-dalek (Rust) | 5.0.0 | BSD-3-Clause | https://github.com/dalek-cryptography/curve25519-dalek/tree/main/curve25519-dalek |
 | curve25519-dalek-derive (Rust) | 0.1.1 | MIT/Apache-2.0 | https://github.com/dalek-cryptography/curve25519-dalek |
 | darling (Rust) | 0.24.1 | MIT | https://github.com/TedDriggs/darling |
@@ -173,10 +180,12 @@ Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 | glob (Rust) | 0.3.4 | MIT OR Apache-2.0 | https://github.com/rust-lang/glob |
 | group (Rust) | 0.14.0 | MIT/Apache-2.0 | https://github.com/zkcrypto/group |
 | h2 (Rust) | 0.4.20 | MIT | https://github.com/hyperium/h2 |
+| hash32 (Rust) | 0.3.1 | MIT OR Apache-2.0 | https://github.com/japaric/hash32 |
 | hashbrown (Rust) | 0.12.3 | MIT OR Apache-2.0 | https://github.com/rust-lang/hashbrown |
 | hashbrown (Rust) | 0.14.5 | MIT OR Apache-2.0 | https://github.com/rust-lang/hashbrown |
 | hashbrown (Rust) | 0.17.1 | MIT OR Apache-2.0 | https://github.com/rust-lang/hashbrown |
 | hashlink (Rust) | 0.12.2 | MIT OR Apache-2.0 | https://github.com/djc/hashlink |
+| heapless (Rust) | 0.9.3 | MIT OR Apache-2.0 | https://github.com/rust-embedded/heapless |
 | heck (Rust) | 0.5.0 | MIT OR Apache-2.0 | https://github.com/withoutboats/heck |
 | hex (Rust) | 0.4.3 | MIT OR Apache-2.0 | https://github.com/KokaKiwi/rust-hex |
 | hex-literal (Rust) | 1.1.0 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
@@ -210,6 +219,9 @@ Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 | infer (Rust) | 0.22.0 | MIT | https://github.com/bojand/infer |
 | inout (Rust) | 0.1.4 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | inout (Rust) | 0.2.5 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
+| ip_network (Rust) | 0.4.1 | BSD-2-Clause | https://github.com/JakubOnderka/ip_network |
+| ip_network_table (Rust) | 0.2.0 | BSD-2-Clause | https://github.com/JakubOnderka/ip_network_table |
+| ip_network_table-deps-treebitmap (Rust) | 0.5.0 | MIT | https://github.com/JakubOnderka/treebitmap |
 | ipnet (Rust) | 2.12.2 | MIT OR Apache-2.0 | https://github.com/krisprice/ipnet |
 | itoa (Rust) | 1.0.18 | MIT OR Apache-2.0 | https://github.com/dtolnay/itoa |
 | jiff (Rust) | 0.2.38 | Unlicense OR MIT | https://github.com/BurntSushi/jiff |
@@ -231,6 +243,7 @@ Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 | lock_api (Rust) | 0.4.14 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
 | lock_api (Rust) | 0.5.0 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
 | log (Rust) | 0.4.34 | MIT OR Apache-2.0 | https://github.com/rust-lang/log |
+| managed (Rust) | 0.8.0 | 0BSD | https://github.com/m-labs/rust-managed.git |
 | markup5ever (Rust) | 0.39.0 | MIT OR Apache-2.0 | https://github.com/servo/html5ever |
 | md-5 (Rust) | 0.11.0 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
 | md5 (Rust) | 0.8.1 | Apache-2.0 OR MIT | https://github.com/stainless-steel/md5 |
@@ -255,6 +268,7 @@ Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 | num-iter (Rust) | 0.1.46 | MIT OR Apache-2.0 | https://github.com/rust-num/num-iter |
 | num-traits (Rust) | 0.2.19 | MIT OR Apache-2.0 | https://github.com/rust-num/num-traits |
 | once_cell (Rust) | 1.21.4 | MIT OR Apache-2.0 | https://github.com/matklad/once_cell |
+| opaque-debug (Rust) | 0.3.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | open (Rust) | 5.4.4 | MIT | https://github.com/Byron/open-rs |
 | option-ext (Rust) | 0.2.0 | MPL-2.0 | https://github.com/soc/option-ext.git |
 | p256 (Rust) | 0.14.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/elliptic-curves |
@@ -286,8 +300,10 @@ Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 | pkcs8 (Rust) | 0.10.2 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats/tree/master/pkcs8 |
 | pkcs8 (Rust) | 0.11.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
 | pkg-config (Rust) | 0.3.34 | MIT OR Apache-2.0 | https://github.com/rust-lang/pkg-config-rs |
+| platforms (Rust) | 3.12.0 | Apache-2.0 OR MIT | https://github.com/rustsec/rustsec |
 | plist (Rust) | 1.10.3 | MIT | https://github.com/ebarnard/rust-plist/ |
 | png (Rust) | 0.18.1 | MIT OR Apache-2.0 | https://github.com/image-rs/image-png |
+| poly1305 (Rust) | 0.8.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/universal-hashes |
 | poly1305 (Rust) | 0.9.1 | Apache-2.0 OR MIT | https://github.com/RustCrypto/universal-hashes |
 | polyval (Rust) | 0.7.3 | Apache-2.0 OR MIT | https://github.com/RustCrypto/universal-hashes |
 | portable-pty (Rust) | 0.9.0 | MIT | https://github.com/wezterm/wezterm |
@@ -318,6 +334,7 @@ Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 | reqwest (Rust) | 0.13.5 | MIT OR Apache-2.0 | https://github.com/seanmonstar/reqwest |
 | rfc6979 (Rust) | 0.6.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/signatures |
 | rfd (Rust) | 0.16.0 | MIT | https://github.com/PolyMeilex/rfd |
+| ring (Rust) | 0.16.20 | see the project | https://github.com/briansmith/ring |
 | ring (Rust) | 0.17.14 | Apache-2.0 AND ISC | https://github.com/briansmith/ring |
 | rsa (Rust) | 0.10.0-rc.18 | MIT OR Apache-2.0 | https://github.com/RustCrypto/RSA |
 | rsa (Rust) | 0.9.10 | MIT OR Apache-2.0 | https://github.com/RustCrypto/RSA |
@@ -379,8 +396,10 @@ Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 | siphasher (Rust) | 1.0.4 | MIT OR Apache-2.0 | https://github.com/jedisct1/rust-siphash |
 | slab (Rust) | 0.4.12 | MIT | https://github.com/tokio-rs/slab |
 | smallvec (Rust) | 1.16.3 | MIT OR Apache-2.0 | https://github.com/servo/rust-smallvec |
+| smoltcp (Rust) | 0.14.0 | 0BSD | https://github.com/smoltcp-rs/smoltcp.git |
 | socket2 (Rust) | 0.6.5 | MIT OR Apache-2.0 | https://github.com/rust-lang/socket2 |
 | softbuffer (Rust) | 0.4.8 | MIT OR Apache-2.0 | https://github.com/rust-windowing/softbuffer |
+| spin (Rust) | 0.5.2 | MIT | https://github.com/mvdnes/spin-rs.git |
 | spin (Rust) | 0.9.9 | MIT | https://github.com/mvdnes/spin-rs.git |
 | spki (Rust) | 0.7.3 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats/tree/master/spki |
 | spki (Rust) | 0.8.1 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
@@ -450,7 +469,9 @@ Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 | typenum (Rust) | 1.20.1 | MIT OR Apache-2.0 | https://github.com/paholg/typenum |
 | unicode-ident (Rust) | 1.0.27 | (MIT OR Apache-2.0) AND Unicode-3.0 | https://github.com/dtolnay/unicode-ident |
 | unicode-segmentation (Rust) | 1.13.3 | MIT OR Apache-2.0 | https://github.com/unicode-rs/unicode-segmentation |
+| universal-hash (Rust) | 0.5.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
 | universal-hash (Rust) | 0.6.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
+| untrusted (Rust) | 0.7.1 | ISC | https://github.com/briansmith/untrusted |
 | untrusted (Rust) | 0.9.0 | ISC | https://github.com/briansmith/untrusted |
 | url (Rust) | 2.5.8 | MIT OR Apache-2.0 | https://github.com/servo/rust-url |
 | urlpattern (Rust) | 0.6.0 | MIT | https://github.com/denoland/rust-urlpattern |
@@ -499,12 +520,14 @@ Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 | wnaf (Rust) | 0.14.1 | Apache-2.0 OR MIT | https://github.com/RustCrypto/elliptic-curves |
 | writeable (Rust) | 0.6.4 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | wry (Rust) | 0.57.0 | Apache-2.0 OR MIT | https://github.com/tauri-apps/wry |
+| x25519-dalek (Rust) | 2.0.0-rc.3 | BSD-3-Clause | https://github.com/dalek-cryptography/x25519-dalek |
 | yoke (Rust) | 0.8.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | yoke-derive (Rust) | 0.8.4 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | zerocopy (Rust) | 0.8.63 | BSD-2-Clause OR Apache-2.0 OR MIT | https://github.com/google/zerocopy |
 | zerofrom (Rust) | 0.1.8 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | zerofrom-derive (Rust) | 0.1.8 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | zeroize (Rust) | 1.9.1 | Apache-2.0 OR MIT | https://github.com/RustCrypto/utils |
+| zeroize_derive (Rust) | 1.5.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/utils |
 | zerotrie (Rust) | 0.2.5 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | zerovec (Rust) | 0.11.8 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | zerovec-derive (Rust) | 0.11.6 | Unicode-3.0 | https://github.com/unicode-org/icu4x |

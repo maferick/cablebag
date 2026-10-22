@@ -3,6 +3,8 @@
   // own, such as one customer's user name, key, vault login and jump host.
   import Modal from "./Modal.svelte";
   import VaultPicker from "./VaultPicker.svelte";
+  import WireGuardPicker from "./WireGuardPicker.svelte";
+  import { wireguard } from "../wireguard.svelte";
   import { app, FOLDER_DEFAULTS } from "../state.svelte";
   import { api, type Folder } from "../api";
   import { TAB_COLORS } from "../tabColors";
@@ -37,7 +39,7 @@
     app.notify(`Settings of ${folder.name} saved`);
   }
 
-  const from = (key: string) => (above.from[key] ? `From ${above.from[key]}: ${key === "jump_hosts" ? above.values[key].map((j: any) => j.host).join(", ") : above.values[key]}` : "");
+  const from = (key: string) => (above.from[key] ? `From ${above.from[key]}: ${key === "jump_hosts" ? above.values[key].map((j: any) => j.host).join(", ") : key === "wireguard" ? wireguard.name(above.values[key]) : above.values[key]}` : "");
 </script>
 
 <Modal title={`Folder ${folder.name}`} width={620} onclose={() => (app.folderEditing = null)}>
@@ -56,6 +58,9 @@
     <div class="field"><span>Login from the vault</span>
       <VaultPicker bind:itemId={d.vault_item} />
       {#if !d.vault_item && from("vault_item")}<span class="muted small">{from("vault_item")}</span>{/if}
+    </div>
+    <div class="field"><span>Network (SSH, RDP, VNC, telnet)</span>
+      <WireGuardPicker bind:value={d.wireguard} inherited={above.values.wireguard} from={above.from.wireguard ?? ""} />
     </div>
     <div class="field">
       <span>Jump hosts (SSH)</span>
