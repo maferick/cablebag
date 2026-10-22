@@ -14,6 +14,7 @@ import {
   Server,
   Network,
   Plug,
+  SquareChevronRight,
 } from "@lucide/svelte";
 
 export interface KindInfo {
@@ -33,6 +34,7 @@ export const KINDS: KindInfo[] = [
   { id: "ssh", label: "SSH", description: "Secure shell with file browser", icon: Terminal, defaultPort: 22, ready: true, needsHost: true },
   { id: "rdp", label: "RDP", description: "Windows remote desktop", icon: Monitor, defaultPort: 3389, ready: true, needsHost: true },
   { id: "vnc", label: "VNC", description: "Remote screen", icon: MonitorSmartphone, defaultPort: 5900, ready: true, needsHost: true },
+  { id: "winrm", label: "PowerShell remoting", description: "Remote PowerShell on a Windows server", icon: SquareChevronRight, defaultPort: 5985, ready: true, needsHost: true },
   { id: "telnet", label: "Telnet", description: "Unencrypted terminal", icon: Plug, defaultPort: 23, ready: true, needsHost: true },
   { id: "sftp", label: "SFTP", description: "Remote files only", icon: FolderLock, defaultPort: 22, ready: true, needsHost: true },
   { id: "ftp", label: "FTP", description: "File transfer, with optional TLS", icon: FolderUp, defaultPort: 21, ready: true, needsHost: true },

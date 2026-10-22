@@ -72,10 +72,12 @@ regex = "1"
 boringtun = { version = "0.7", default-features = false }
 smoltcp = { version = "0.14", default-features = false, features = ["std", "log", "medium-ip", "proto-ipv4", "proto-ipv6", "socket-tcp", "socket-dns", "socket-tcp-cubic"] }
 socket2 = "0.6"
+native-tls = "0.2.18"
+tokio-native-tls = "0.3.1"
 
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62.2", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_System_Memory", "Win32_System_Time", "Win32_UI_WindowsAndMessaging", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_WinRT", "Security_Credentials_UI", "Foundation"] }
+windows = { version = "0.62.2", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_System_Memory", "Win32_System_Pipes", "Win32_System_Time", "Win32_UI_WindowsAndMessaging", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_WinRT", "Security_Credentials_UI", "Foundation"] }
 windows-future = "0.3"
 webview2-com = "0.39"
 windows-registry = "0.100"

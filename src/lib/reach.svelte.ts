@@ -13,7 +13,7 @@ export interface ReachResult {
   at: number;
 }
 
-const NETWORK_KINDS = new Set(["ssh", "sftp", "rdp", "vnc", "telnet", "ftp", "mosh", "rsh"]);
+const NETWORK_KINDS = new Set(["ssh", "sftp", "rdp", "vnc", "telnet", "ftp", "winrm", "mosh", "rsh"]);
 
 /** The host:port to check for a session, or null when this PC cannot reach it directly (local, or through a gateway). */
 export function reachKey(s: Session): string | null {
