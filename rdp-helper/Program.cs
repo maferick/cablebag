@@ -183,7 +183,6 @@ class HostForm : Form, IMsTscAxEvents
     bool userEnded;
     int lastW, lastH;
     readonly System.Windows.Forms.Timer resizeTimer = new() { Interval = 400 };
-    JsonObject? pending;
 
     public HostForm(IntPtr parent)
     {
@@ -465,7 +464,6 @@ class HostForm : Form, IMsTscAxEvents
             if (S(gw, "user") != "") t.GatewayUsername = S(gw, "user");
         }
 
-        pending = null;
         Out.Send("connecting");
         r.Connect();
     }
