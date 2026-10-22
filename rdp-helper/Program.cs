@@ -36,6 +36,36 @@ static class Native
     [DllImport("user32.dll")]
     public static extern bool IsWindow(IntPtr hwnd);
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT { public int Left, Top, Right, Bottom; }
+
+    [DllImport("user32.dll")]
+    public static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+
+    [DllImport("user32.dll")]
+    public static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
+
+    [DllImport("user32.dll")]
+    public static extern bool PostMessage(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern int MapWindowPoints(IntPtr from, IntPtr to, ref Point pt, int count);
+
+    public delegate bool EnumProc(IntPtr hwnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumChildWindows(IntPtr parent, EnumProc proc, IntPtr lParam);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetClassName(IntPtr hwnd, System.Text.StringBuilder name, int max);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern short VkKeyScan(char ch);
+
+    [DllImport("user32.dll")]
+    public static extern uint MapVirtualKey(uint code, uint mapType);
+
+
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr SetWindowLongPtr(IntPtr hwnd, int index, IntPtr value);
 
@@ -283,6 +313,20 @@ class HostForm : Form, IMsTscAxEvents
                 case "cad":
                     SendCtrlAltDel();
                     break;
+                case "snapshot":
+                    Snapshot(S(cmd, "req"));
+                    break;
+                case "mouse":
+                    Mouse(cmd);
+                    Out.Send("reply", new { req = S(cmd, "req") });
+                    break;
+                case "keys":
+                    PressKeys(S(cmd, "keys"));
+                    Out.Send("reply", new { req = S(cmd, "req") });
+                    break;
+                case "type":
+                    Out.Send("reply", new { req = S(cmd, "req"), skipped = TypeText(S(cmd, "text")) });
+                    break;
                 case "disconnect":
                     Disconnect();
                     break;
@@ -294,7 +338,9 @@ class HostForm : Form, IMsTscAxEvents
         }
         catch (Exception e)
         {
-            Out.Send("error", new { text = e.Message });
+            // A request from the assistant gets its error back; anything else shows in the tab.
+            if (cmd["req"] is not null) Out.Send("reply", new { req = S(cmd, "req"), error = e.Message });
+            else Out.Send("error", new { text = e.Message });
         }
     }
 
@@ -440,12 +486,186 @@ class HostForm : Form, IMsTscAxEvents
     void SendCtrlAltDel()
     {
         if (rdp == null || !connected) return;
-        var ns = (IMsRdpClientNonScriptable)rdp;
-        // Scan codes: Ctrl 0x1D, Alt 0x38, Delete 0x53 (extended). Press all three, then release.
-        bool[] keyUp = { false, false, false, true, true, true };
-        int[] keys = { 0x1D, 0x38, 0x53, 0x53, 0x38, 0x1D };
+        // Scan codes: Ctrl 0x1D, Alt 0x38, Delete 0x53. Press all three, then release.
         ax?.Focus();
-        ns.SendKeys(6, ref keyUp[0], ref keys[0]);
+        SendScanCodes(new() { (0x1D, false), (0x38, false), (0x53, false), (0x53, true), (0x38, true), (0x1D, true) });
+    }
+
+    /// A picture of the remote screen for the assistant, as it shows in Cablebag now. Windows renders the whole
+    /// Cablebag window (also when other windows cover it, and with the control's DirectX drawing), and only
+    /// this pane is cut out of it: a copy of the screen could hold another program's window instead.
+    void Snapshot(string req)
+    {
+        if (!connected || !Visible || parentHwnd == IntPtr.Zero)
+        {
+            Out.Send("reply", new { req, error = "The remote screen is not showing." });
+            return;
+        }
+        var r = RectangleToScreen(ClientRectangle);
+        Native.GetWindowRect(parentHwnd, out var w);
+        using var window = new Bitmap(Math.Max(1, w.Right - w.Left), Math.Max(1, w.Bottom - w.Top));
+        using (var g = Graphics.FromImage(window))
+        {
+            var hdc = g.GetHdc();
+            const uint PW_RENDERFULLCONTENT = 2;
+            var ok = Native.PrintWindow(parentHwnd, hdc, PW_RENDERFULLCONTENT);
+            g.ReleaseHdc(hdc);
+            if (!ok)
+            {
+                Out.Send("reply", new { req, error = "Windows did not give a picture of the window." });
+                return;
+            }
+        }
+        using var full = window.Clone(Rectangle.Intersect(new Rectangle(r.X - w.Left, r.Y - w.Top, r.Width, r.Height), new Rectangle(Point.Empty, window.Size)), window.PixelFormat);
+        // At most 1600 pixels wide or high: enough to read the screen, and the request stays small.
+        var scale = Math.Min(1.0, 1600.0 / Math.Max(full.Width, full.Height));
+        using var img = new Bitmap(Math.Max(1, (int)(full.Width * scale)), Math.Max(1, (int)(full.Height * scale)));
+        using (var g = Graphics.FromImage(img))
+        {
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            g.DrawImage(full, 0, 0, img.Width, img.Height);
+        }
+        using var ms = new MemoryStream();
+        var jpeg = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == System.Drawing.Imaging.ImageFormat.Jpeg.Guid);
+        using var p = new System.Drawing.Imaging.EncoderParameters(1);
+        p.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 85L);
+        img.Save(ms, jpeg, p);
+        Out.Send("reply", new { req, image = Convert.ToBase64String(ms.ToArray()) });
+    }
+
+    /// The remote screen's input window: the control turns its mouse messages into input for the remote computer.
+    IntPtr InputWindow()
+    {
+        var found = IntPtr.Zero;
+        Native.EnumChildWindows(Handle, (h, _) =>
+        {
+            var name = new System.Text.StringBuilder(64);
+            Native.GetClassName(h, name, 64);
+            if (name.ToString() != "IHWindowClass") return true;
+            found = h;
+            return false;
+        }, IntPtr.Zero);
+        return found;
+    }
+
+    /// A click, double click, move or scroll at a point given from 0 to 1000 across and down the screen.
+    void Mouse(JsonObject cmd)
+    {
+        var ih = InputWindow();
+        if (rdp == null || !connected || ih == IntPtr.Zero) throw new Exception("The remote screen is not connected.");
+        var pt = new Point(
+            Math.Clamp((int)Math.Round(I(cmd, "x") / 1000.0 * ClientSize.Width), 0, ClientSize.Width - 1),
+            Math.Clamp((int)Math.Round(I(cmd, "y") / 1000.0 * ClientSize.Height), 0, ClientSize.Height - 1));
+        Native.MapWindowPoints(Handle, ih, ref pt, 1);
+        var at = new IntPtr((pt.Y << 16) | (pt.X & 0xFFFF));
+        var (down, up, held) = S(cmd, "button", "left") switch
+        {
+            "right" => (0x204u, 0x205u, 0x2),
+            "middle" => (0x207u, 0x208u, 0x10),
+            _ => (0x201u, 0x202u, 0x1),
+        };
+        Native.PostMessage(ih, 0x200, IntPtr.Zero, at);
+        var action = S(cmd, "action", "click");
+        if (action == "scroll")
+        {
+            // The wheel message takes screen coordinates; one notch is 120, up is positive.
+            var sp = new Point(pt.X, pt.Y);
+            Native.MapWindowPoints(ih, IntPtr.Zero, ref sp, 1);
+            var notches = I(cmd, "amount", -3);
+            Native.PostMessage(ih, 0x20A, new IntPtr((notches * 120) << 16), new IntPtr((sp.Y << 16) | (sp.X & 0xFFFF)));
+            return;
+        }
+        var clicks = action switch { "double" => 2, "move" => 0, _ => 1 };
+        for (int i = 0; i < clicks; i++)
+        {
+            Native.PostMessage(ih, down, new IntPtr(held), at);
+            Native.PostMessage(ih, up, IntPtr.Zero, at);
+        }
+    }
+
+    /// Scan codes of named keys; 0x100 marks an extended key.
+    static readonly Dictionary<string, int> KeyCodes = new()
+    {
+        ["ctrl"] = 0x1D, ["control"] = 0x1D, ["shift"] = 0x2A, ["alt"] = 0x38, ["win"] = 0x15B, ["windows"] = 0x15B,
+        ["enter"] = 0x1C, ["return"] = 0x1C, ["esc"] = 0x01, ["escape"] = 0x01, ["tab"] = 0x0F, ["space"] = 0x39,
+        ["backspace"] = 0x0E, ["delete"] = 0x153, ["del"] = 0x153, ["insert"] = 0x152, ["home"] = 0x147, ["end"] = 0x14F,
+        ["pageup"] = 0x149, ["pagedown"] = 0x151, ["up"] = 0x148, ["down"] = 0x150, ["left"] = 0x14B, ["right"] = 0x14D,
+        ["f1"] = 0x3B, ["f2"] = 0x3C, ["f3"] = 0x3D, ["f4"] = 0x3E, ["f5"] = 0x3F, ["f6"] = 0x40, ["f7"] = 0x41,
+        ["f8"] = 0x42, ["f9"] = 0x43, ["f10"] = 0x44, ["f11"] = 0x57, ["f12"] = 0x58,
+    };
+
+    /// The scan code of one character on this PC's keyboard layout and whether it needs Shift; null when no key types it.
+    static (int code, bool shift)? CharKey(char ch)
+    {
+        var vk = Native.VkKeyScan(ch);
+        if (vk == -1 || (vk & 0x600) != 0) return null;
+        var code = (int)Native.MapVirtualKey((uint)(vk & 0xFF), 0);
+        return code == 0 ? null : (code, (vk & 0x100) != 0);
+    }
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate int SendKeysFn(IntPtr self, int numKeys, short[] keyUp, int[] keyData);
+
+    /// Presses and releases scan codes through the control, in one call: keys held down (Ctrl, Shift) are let go
+    /// at the end of each call. The call goes straight to the control, because its up flags are 2-byte values
+    /// and the .NET wrapper passes a bool array with one byte per flag, which only works for a single key.
+    void SendScanCodes(List<(int code, bool up)> keys)
+    {
+        if (rdp == null || !connected) throw new Exception("The remote screen is not connected.");
+        if (keys.Count == 0) return;
+        var unknown = Marshal.GetIUnknownForObject(rdp);
+        var iid = typeof(IMsRdpClientNonScriptable).GUID;
+        try
+        {
+            Marshal.ThrowExceptionForHR(Marshal.QueryInterface(unknown, ref iid, out var self));
+            try
+            {
+                // The wrapper lists every method of the interface in table order, after IUnknown's three.
+                var methods = typeof(IMsRdpClientNonScriptable).GetMethods().Select(m => m.Name).ToList();
+                var slot = 3 + methods.IndexOf("SendKeys");
+                var table = Marshal.ReadIntPtr(self);
+                var send = Marshal.GetDelegateForFunctionPointer<SendKeysFn>(Marshal.ReadIntPtr(table, slot * IntPtr.Size));
+                var up = keys.Select(k => (short)(k.up ? -1 : 0)).ToArray();
+                var codes = keys.Select(k => k.code).ToArray();
+                Marshal.ThrowExceptionForHR(send(self, keys.Count, up, codes));
+            }
+            finally { Marshal.Release(self); }
+        }
+        finally { Marshal.Release(unknown); }
+    }
+
+    /// A key or combination such as "enter", "ctrl+l" or "win+r": the modifiers go down first and up last.
+    void PressKeys(string combo)
+    {
+        var codes = new List<int>();
+        foreach (var raw in combo.ToLowerInvariant().Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (KeyCodes.TryGetValue(raw, out var c)) codes.Add(c);
+            else if (raw.Length == 1 && CharKey(raw[0]) is { } k) codes.Add(k.code);
+            else throw new Exception($"Unknown key \"{raw}\".");
+        }
+        var seq = codes.Select(c => (c, false)).Concat(Enumerable.Reverse(codes).Select(c => (c, true))).ToList();
+        SendScanCodes(seq);
+    }
+
+    /// Types text as key presses. Returns the characters this keyboard layout cannot type.
+    string TypeText(string text)
+    {
+        var skipped = new System.Text.StringBuilder();
+        // One call per character, so Shift is held for exactly that character.
+        foreach (var ch in text.Replace("\r\n", "\n"))
+        {
+            if (ch == '\n') { SendScanCodes(new() { (0x1C, false), (0x1C, true) }); continue; }
+            if (ch == '\t') { SendScanCodes(new() { (0x0F, false), (0x0F, true) }); continue; }
+            if (CharKey(ch) is not { } k) { skipped.Append(ch); continue; }
+            var seq = new List<(int, bool)>();
+            if (k.shift) seq.Add((0x2A, false));
+            seq.Add((k.code, false));
+            seq.Add((k.code, true));
+            if (k.shift) seq.Add((0x2A, true));
+            SendScanCodes(seq);
+        }
+        return skipped.ToString();
     }
 
     void Disconnect()

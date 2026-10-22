@@ -251,6 +251,16 @@ fn redact_value(v: &mut Value, secrets: &[String]) {
     }
 }
 
+/// The messages for the log: a picture is noted, not stored.
+fn without_images(v: &Value) -> Value {
+    match v {
+        Value::String(s) if s.starts_with("data:image/") => Value::String("[picture of the screen]".into()),
+        Value::Array(a) => Value::Array(a.iter().map(without_images).collect()),
+        Value::Object(o) => Value::Object(o.iter().map(|(k, x)| (k.clone(), without_images(x))).collect()),
+        _ => v.clone(),
+    }
+}
+
 /// Hides secrets in the messages, except Cablebag's own instructions (the system message).
 fn redact_messages(messages: &mut Value, secrets: &[String]) {
     for m in messages.as_array_mut().into_iter().flatten() {
@@ -309,7 +319,7 @@ pub async fn chat(app: AppHandle, req: ChatRequest, out: Channel<ChatEvent>) -> 
     if let Some(t) = req.tools.filter(|t| t.as_array().is_some_and(|a| !a.is_empty())) {
         body["tools"] = t;
     }
-    log(&app, &h, &req.model, &req.about, "sent", &body["messages"].to_string());
+    log(&app, &h, &req.model, &req.about, "sent", &without_images(&body["messages"]).to_string());
 
     let (tx, mut stopped) = watch::channel(false);
     app.state::<Arc<Chats>>().stop.lock().insert(req.request_id.clone(), tx);

@@ -301,6 +301,8 @@ export const api = {
   rdpVisible: (id: string, on: boolean) => invoke<void>("rdp_visible", { id, on }),
   rdpCommand: (id: string, cmd: "cad" | "focus" | "disconnect") => invoke<void>("rdp_command", { id, cmd }),
   rdpClose: (id: string) => invoke<void>("rdp_close", { id }),
+  /** A picture of the remote screen as it shows now (a JPEG data URL). */
+  rdpSnapshot: (id: string) => invoke<string>("rdp_snapshot", { id }),
   vaultStatus: () => invoke<VaultStatus>("vault_status"),
   vaultConfigure: (server: string, email: string) => invoke<void>("vault_configure", { server, email }),
   vaultUnlock: () => invoke<void>("vault_unlock"),

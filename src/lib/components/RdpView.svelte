@@ -50,8 +50,14 @@
       if (["auth-warning", "connected", "login", "logon-error"].includes(e.payload.event)) nativeUp = true;
     });
     message = "";
-    api
-      .rdpOpen(tab.id, $state.snapshot(tab.session!), rect(), Math.round((window.devicePixelRatio || 1) * 100))
+    // The remote desktop gets the size of the pane when it connects, and not every server can change it later:
+    // wait (up to 3 seconds) until the pane is laid out, or a new pane would ask for a tiny desktop.
+    const laidOut = async () => {
+      const until = Date.now() + 3000;
+      while ((area.offsetWidth < 100 || area.offsetHeight < 100) && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
+    };
+    laidOut()
+      .then(() => api.rdpOpen(tab.id, $state.snapshot(tab.session!), rect(), Math.round((window.devicePixelRatio || 1) * 100)))
       .then(() => (opened = true))
       .catch((e) => {
         message = String(e);

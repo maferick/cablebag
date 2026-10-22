@@ -61,7 +61,17 @@ run("git", [...AUTHOR, "tag", "-f", `v${version}`]);
 // 2. Build, signed. Paths of this PC are taken out of the programs.
 step("Build");
 const key = JSON.parse(
-  out("ssh", ["-o", "BatchMode=yes", VAULT_HOST, `export PATH=$PATH:/snap/bin; timeout 40 bw get item ${VAULT_ITEM} --session "$(cat ~/.bw_session)" </dev/null`], { timeout: 90_000 }),
+  // A fresh vault session every time: a stale one makes bw ask for the master password instead.
+  out(
+    "ssh",
+    [
+      "-o",
+      "BatchMode=yes",
+      VAULT_HOST,
+      `export PATH=$PATH:/snap/bin; S=$(BW_PASSWORD="$(cat ~/.bw_master)" timeout 60 bw unlock --passwordenv BW_PASSWORD --raw </dev/null) && timeout 40 bw get item ${VAULT_ITEM} --session "$S" </dev/null`,
+    ],
+    { timeout: 150_000 },
+  ),
 );
 const env = {
   ...process.env,

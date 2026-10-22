@@ -130,6 +130,11 @@ class Tiles {
     }
     if (this.zoomed && !open.has(this.zoomed)) this.zoomed = null;
     if (placed.has(focused)) this.lastFocus = focused;
+    // A pane that fills the area hands that over to the tab you switch to; otherwise the switch shows nothing.
+    if (this.zoomed && placed.has(focused) && focused !== this.zoomed) {
+      this.zoomed = focused;
+      this.changed();
+    }
     if (root !== this.root) {
       this.root = root;
       this.changed();

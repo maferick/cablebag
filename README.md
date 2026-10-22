@@ -23,8 +23,8 @@ local shells, Proxmox consoles and an AI assistant, all as tabs in one window.
 - **Your sessions follow you.** Import from MobaXterm, PuTTY, KiTTY, WinSCP, the OpenSSH config and `.rdp` files; sync sessions,
   folders, macros and tunnels through a private git repository, encrypted, passwords never included.
 - **An assistant that works on your servers.** Ask about what is on screen; in an SSH tab it investigates by itself,
-  asks before every change, remembers what it learns per server, and hides passwords and secrets before anything is
-  sent to the AI.
+  and on a Remote Desktop or VNC screen it looks, clicks and types. It asks before every change, remembers what it
+  learns per server, and hides passwords and secrets before anything is sent to the AI.
 - **Tunnels and network tools.** SSH port forwards (local, remote, SOCKS), a network and port scanner, Wake on LAN
   and an SSH key generator that puts the key on the server in one step.
 

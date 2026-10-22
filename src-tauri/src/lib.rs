@@ -370,6 +370,20 @@ fn reveal_secret(state: State<AppState>, id: String) -> CmdResult<String> {
 
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
+async fn rdp_snapshot(state: State<'_, AppState>, id: String) -> CmdResult<String> {
+    state.rdp.snapshot(&id).await.map_err(err)
+}
+
+/// An action of the assistant on a remote screen that the user approved: a click, keys or text.
+#[tauri::command]
+async fn rdp_input(state: State<'_, AppState>, id: String, action: serde_json::Value) -> CmdResult<serde_json::Value> {
+    if !matches!(action["cmd"].as_str(), Some("mouse" | "keys" | "type")) {
+        return Err("Unknown screen action.".into());
+    }
+    state.rdp.request(&id, action).await.map_err(err)
+}
+
+#[tauri::command]
 async fn rdp_open(app: AppHandle, id: String, session: Session, x: i32, y: i32, w: i32, h: i32, scale: u32) -> CmdResult<()> {
     if !session.id.is_empty() {
         let _ = app.state::<AppState>().store.lock().touch_session(&session.id);
@@ -922,6 +936,8 @@ pub fn run() {
             write_text_file,
             default_log_dir,
             rdp_open,
+            rdp_snapshot,
+            rdp_input,
             rdp_bounds,
             rdp_visible,
             rdp_command,

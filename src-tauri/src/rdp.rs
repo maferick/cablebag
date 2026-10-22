@@ -44,6 +44,8 @@ impl Drop for RdpProc {
 #[derive(Default)]
 pub struct Rdps {
     map: Mutex<HashMap<String, Arc<RdpProc>>>,
+    /// Requests from the assistant (a picture, a click, keys), by id, waiting for the helper's reply.
+    pending: Mutex<HashMap<String, tokio::sync::oneshot::Sender<Value>>>,
 }
 
 impl Rdps {
@@ -55,6 +57,40 @@ impl Rdps {
     pub fn remove(&self, id: &str) {
         self.map.lock().remove(id);
     }
+    /// Sends a request from the assistant to the helper and waits for its reply.
+    pub async fn request(&self, id: &str, mut cmd: Value) -> Result<Value> {
+        let req = uuid::Uuid::new_v4().to_string();
+        cmd["req"] = json!(req);
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        {
+            let map = self.map.lock();
+            let p = map.get(id).ok_or_else(|| anyhow!("This Remote Desktop tab is not open."))?;
+            self.pending.lock().insert(req.clone(), tx);
+            p.send(&cmd);
+        }
+        let got = tokio::time::timeout(std::time::Duration::from_secs(15), rx).await;
+        self.pending.lock().remove(&req);
+        let v = got
+            .map_err(|_| anyhow!("The remote screen did not answer in time."))?
+            .map_err(|_| anyhow!("The Remote Desktop tab closed."))?;
+        if let Some(e) = v["error"].as_str() {
+            return Err(anyhow!(e.to_string()));
+        }
+        Ok(v)
+    }
+
+    /// A picture of the remote screen as it shows now (a JPEG data URL), for the assistant.
+    pub async fn snapshot(&self, id: &str) -> Result<String> {
+        let v = self.request(id, json!({"cmd": "snapshot"})).await?;
+        Ok(format!("data:image/jpeg;base64,{}", s(&v, "image")))
+    }
+
+    fn replied(&self, v: Value) {
+        if let Some(tx) = self.pending.lock().remove(&s(&v, "req")) {
+            let _ = tx.send(v);
+        }
+    }
+
     /// Ends every helper (each one quits and is stopped as it is dropped), before an update replaces its file.
     pub fn close_all(&self) {
         self.map.lock().clear();
@@ -294,6 +330,11 @@ pub async fn open(app: AppHandle, id: String, session: Session, geo: Geometry) -
             let Ok(line) = line else { break };
             let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
             let ev = s(&v, "event");
+            // A reply to the assistant goes to whoever asked for it, not to the window as an event.
+            if ev == "reply" {
+                app2.state::<AppState>().rdp.replied(v);
+                continue;
+            }
             match ev.as_str() {
                 "connecting" => status(&app2, &id2, "connecting", ""),
                 "connected" | "login" => status(&app2, &id2, "connected", ""),

@@ -6,6 +6,20 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.6.0 · 22 October 2026
+
+**The assistant on Remote Desktop and VNC**
+
+- **It sees the remote screen.** Every question in a Remote Desktop or VNC tab takes a picture of the screen along
+  (switch it off with **Send the screen with it**). The picture comes from Cablebag's own window, also when another
+  program covers it, so no other window can end up in it.
+- **It can click, scroll, type and press keys** on that screen, to do what you ask. Every action waits for your
+  **Do it**, or **Always on this screen**; after its actions it gets a new picture and checks the result.
+- **A Remote Desktop session gets the size of its pane** when it connects, also for a new pane that is still being
+  laid out. Some servers cannot change the size later and stayed tiny.
+- **Switching tabs while a pane fills the area** now shows the tab you pick (also Settings), instead of nothing.
+- Ctrl+Alt+Del in a Remote Desktop tab sends the three keys reliably.
+
 ## 0.5.4 · 22 October 2026
 
 - **The assistant asks for a sudo password only when it needs one.** On servers where sudo works without a

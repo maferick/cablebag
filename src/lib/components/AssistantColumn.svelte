@@ -137,6 +137,7 @@
             <div class="q">
               {m.text}
               {#if m.screen}<details class="screen"><summary>Screen sent with it</summary><pre>{m.screen}</pre></details>{/if}
+              {#if m.image}<details class="screen"><summary>Picture of the screen sent with it</summary><img src={m.image} alt="The remote screen as it was sent" /></details>{/if}
             </div>
           {:else}
             <div class="a">
@@ -163,7 +164,7 @@
               {#each m.steps ?? [] as st}
                 <div class="step {st.verdict.effect} {st.state}">
                   <div class="shead">
-                    <span class="eff">{EFFECT[st.verdict.effect]}</span>
+                    <span class="eff">{st.verdict.kind === "screen" ? "Acts on the screen" : EFFECT[st.verdict.effect]}</span>
                     {#if st.verdict.root}<span class="tag">root</span>{/if}
                     <span class="grow"></span>
                     <span class="sstate">{STATE[st.state]}{#if st.state === "done" && st.exit != null}, exit {st.exit}{/if}</span>
@@ -174,9 +175,9 @@
                   {#if st.note && st.state !== "done"}<p class="note">{st.note}</p>{/if}
                   {#if st.state === "asking" && tab}
                     <div class="sbar">
-                      <button class="btn primary small" onclick={() => assistant.decide(tab.id, st, "once")}>Run it</button>
+                      <button class="btn primary small" onclick={() => assistant.decide(tab.id, st, "once")}>{st.verdict.kind === "screen" ? "Do it" : "Run it"}</button>
                       {#if st.verdict.effect === "changes" && st.verdict.kind && !prot}
-                        <button class="btn small" title="Run commands like this on {tab.session?.host} without asking from now on (Settings, Assistant shows the rules)" onclick={() => assistant.decide(tab.id, st, "always")}>Always "{st.verdict.kind}" here</button>
+                        <button class="btn small" title={st.verdict.kind === "screen" ? `Let the assistant act on the screen of ${tab.session?.host} without asking from now on (Settings, Assistant shows the rules)` : `Run commands like this on ${tab.session?.host} without asking from now on (Settings, Assistant shows the rules)`} onclick={() => assistant.decide(tab.id, st, "always")}>{st.verdict.kind === "screen" ? "Always on this screen" : `Always "${st.verdict.kind}" here`}</button>
                       {/if}
                       <button class="btn small" onclick={() => assistant.decide(tab.id, st, "no")}>Refuse</button>
                     </div>
@@ -314,6 +315,13 @@
     font-size: 11px;
     color: var(--muted);
     cursor: pointer;
+  }
+  .screen img {
+    display: block;
+    max-width: 100%;
+    margin-top: 6px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
   }
   .screen pre {
     max-height: 200px;

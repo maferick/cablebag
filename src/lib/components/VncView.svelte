@@ -155,6 +155,7 @@
   <div class="area" class:fit bind:this={area}>
     <canvas
       bind:this={canvas}
+      data-screen={tab.id}
       style:width="{view.w}px"
       style:height="{view.h}px"
       tabindex="0"
