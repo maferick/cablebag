@@ -49,9 +49,7 @@ export const DEFAULT_SETTINGS: Record<string, any> = {
   "term.pasteWarning": true,
   "ssh.agent.pageant": false,
   "ssh.agent.openssh": false,
-  "ssh.keepalive": true,
   "ssh.autoFiles": true,
-  "tabs.plusOpens": "terminal",
   "shell.default": "",
   "term.syntax": "keywords",
   "log.enabled": false,
@@ -88,6 +86,7 @@ export const SETTINGS_PAGES = [
   { id: "assistant", label: "Assistant" },
   { id: "passwords", label: "Saved passwords" },
   { id: "hosts", label: "Trusted servers" },
+  { id: "keyboard", label: "Keyboard shortcuts" },
   { id: "about", label: "About Cablebag" },
 ];
 
@@ -223,12 +222,7 @@ class AppState {
   }
 
   private push(tab: Tab) {
-    const cur = this.tabs.findIndex((t) => t.id === this.activeId);
-    if (this.tabs[cur]?.type === "home" && this.tabs.length === 1) {
-      this.tabs.push(tab);
-    } else {
-      this.tabs.push(tab);
-    }
+    this.tabs.push(tab);
     this.activeId = tab.id;
   }
 
@@ -258,11 +252,14 @@ class AppState {
       this.push({ id: uid(), title, type: "terminal", proto: s.kind, session: s, status: "connecting", color, gen: 0 });
     } else if (s.kind === "ftp") {
       this.push({ id: uid(), title, type: "files", proto: "ftp", session: s, status: "connecting", color, gen: 0 });
+    } else if (s.kind === "browser" && !s.host && s.data?.target) {
+      // Imported by an older Cablebag, which kept the address apart.
+      this.openSession({ ...s, host: s.data.target });
     } else if (s.kind === "browser") {
       this.push({ id: uid(), title: s.name || s.host, type: "browser", proto: "browser", session: s, status: "connecting", color, gen: 0 });
     } else if (s.kind === "file") {
       // A file or folder opens in its own Windows program; links in the web browser.
-      const target = (s.host || s.data?.path || "").trim();
+      const target = (s.host || s.data?.target || s.data?.path || "").trim();
       if (!target) return this.notify("This session has no path.", "error");
       api.fileOpen(target).catch((e) => this.notify(String(e), "error"));
     } else if (s.kind === "vnc") {
@@ -356,7 +353,7 @@ class AppState {
     if (saved) return this.openSession(saved);
     let kind = "ssh";
     let rest = t;
-    const m = t.match(/^(ssh|rdp|vnc|telnet|sftp|ftp|mosh)(:\/\/|\s+)(.+)$/i);
+    const m = t.match(/^(ssh|rdp|vnc|telnet|sftp|ftp)(:\/\/|\s+)(.+)$/i);
     if (m) {
       kind = m[1].toLowerCase();
       rest = m[3].trim();

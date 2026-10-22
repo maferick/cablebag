@@ -52,10 +52,18 @@ const READ_PROGRAMS: &[&str] = &[
 fn dangerous(words: &[&str], line: &str) -> Option<&'static str> {
     let w0 = words.first().copied().unwrap_or("");
     let has = |x: &str| words.iter().any(|w| *w == x);
-    let rec = words.iter().any(|w| w.starts_with('-') && !w.starts_with("--") && (w.contains('r') || w.contains('R')));
-    let force = words.iter().any(|w| w.starts_with('-') && !w.starts_with("--") && w.contains('f'));
+    let rec = words.iter().any(|w| (w.starts_with('-') && !w.starts_with("--") && (w.contains('r') || w.contains('R'))) || *w == "--recursive");
+    let force = words.iter().any(|w| (w.starts_with('-') && !w.starts_with("--") && w.contains('f')) || *w == "--force");
+    // Only temporary folders may be cleared without a red card; a variable could be empty and hit the root.
+    let only_temp = {
+        let paths: Vec<&&str> = words.iter().skip(1).filter(|w| !w.starts_with('-')).collect();
+        !paths.is_empty()
+            && paths.iter().all(|p| {
+                (p.starts_with("/tmp/") || p.starts_with("/var/tmp/")) && p.len() > 9 && !p.contains("..") && !p.contains('$')
+            })
+    };
     match w0 {
-        "rm" if rec && force => Some("removes files and folders without asking"),
+        "rm" if rec && force && !only_temp => Some("removes files and folders without asking"),
         "rm" if words.iter().any(|w| matches!(*w, "/" | "/*" | "~" | "/etc" | "/var" | "/home" | "/usr" | "/boot" | "/root")) => Some("removes a system folder"),
         "mkfs" | "mkswap" | "wipefs" | "fdisk" | "sfdisk" | "parted" | "sgdisk" => Some("changes disks or partitions"),
         w if w.starts_with("mkfs.") => Some("formats a disk"),
@@ -65,7 +73,8 @@ fn dangerous(words: &[&str], line: &str) -> Option<&'static str> {
         "systemctl" if words.iter().any(|w| matches!(*w, "stop" | "disable" | "mask")) && words.iter().any(|w| w.starts_with("ssh")) => Some("may cut off this SSH connection"),
         "iptables" | "ip6tables" | "nft" if has("-F") || has("flush") => Some("removes firewall rules, which can cut off this connection"),
         "ufw" if has("enable") || has("reset") => Some("changes the firewall, which can cut off this connection"),
-        "userdel" | "deluser" | "passwd" | "chpasswd" | "usermod" => Some("changes user accounts or passwords"),
+        "passwd" if has("-S") || has("--status") => None,
+        "userdel" | "deluser" | "passwd" | "chpasswd" => Some("removes user accounts or changes passwords"),
         "chmod" | "chown" if rec && words.iter().any(|w| *w == "/" || *w == "/etc" || *w == "/usr" || *w == "/var") => Some("changes rights on a whole system folder"),
         "zpool" if has("destroy") || has("labelclear") => Some("destroys a storage pool"),
         "zfs" if has("destroy") || has("rollback") => Some("destroys or rolls back a dataset"),
@@ -95,6 +104,7 @@ fn reads(words: &[&str]) -> bool {
         },
         "journalctl" => !rest.iter().any(|w| w.starts_with("--vacuum") || *w == "--rotate" || *w == "--flush"),
         "ip" => !rest.iter().any(|w| matches!(*w, "add" | "del" | "delete" | "set" | "change" | "replace" | "flush" | "append")),
+        "docker" | "podman" if rest.first() == Some(&"compose") => rest.get(1).is_some_and(|s| matches!(*s, "ps" | "logs" | "config" | "images" | "top" | "ls" | "version")),
         "docker" | "podman" => rest.first().is_some_and(|s| matches!(*s, "ps" | "logs" | "inspect" | "images" | "stats" | "top" | "version" | "info" | "port" | "diff" | "history")),
         "docker-compose" => rest.first().is_some_and(|s| matches!(*s, "ps" | "logs" | "config" | "images" | "top")),
         "kubectl" => rest.first().is_some_and(|s| matches!(*s, "get" | "describe" | "logs" | "top" | "version" | "explain" | "api-resources" | "cluster-info")),
@@ -121,6 +131,8 @@ fn reads(words: &[&str]) -> bool {
         // `command -v x` only looks up where a program is; `command x` would run it.
         "command" => rest.first().is_some_and(|s| *s == "-v" || *s == "-V"),
         "test" | "[" | "[[" => true,
+        "passwd" => has("-S") || has("--status"),
+        "chage" => has("-l") || has("--list"),
         _ => READ_PROGRAMS.contains(&w0),
     }
 }
@@ -407,8 +419,8 @@ pub struct ExecResult {
     pub truncated: bool,
 }
 
-/// At most this much output goes back to the model.
-const MAX_OUTPUT: usize = 48 * 1024;
+/// At most this much output is kept from one command; Settings, Assistant decides how much of it the model gets.
+const MAX_OUTPUT: usize = 256 * 1024;
 
 /// The password sudo asks for: the session's vault login, a saved password, a login the vault holds for this
 /// server, or a question to the user. Also says whether the user wants a typed password remembered.
@@ -590,6 +602,24 @@ mod tests {
         for c in ["Restart-Computer -Force", "Remove-Item C:/Data -Recurse -Force", "Format-Volume -DriveLetter D", "Clear-Disk -Number 1 -RemoveData", "shutdown /r /t 0"] {
             assert_eq!(p(c), Effect::Dangerous, "{c}");
         }
+    }
+
+    #[test]
+    fn edges() {
+        assert_eq!(e("rm -rf /tmp/build"), Effect::Changes);
+        assert_eq!(e("rm -rf /var/tmp/cache/x"), Effect::Changes);
+        assert_eq!(e("rm -rf /tmp"), Effect::Dangerous);
+        assert_eq!(e("rm -rf /tmp/$DIR"), Effect::Dangerous);
+        assert_eq!(e("rm -rf /tmp/../etc"), Effect::Dangerous);
+        assert_eq!(e("rm --recursive --force /srv/data"), Effect::Dangerous);
+        assert_eq!(e("rm -rf build"), Effect::Dangerous);
+        assert_eq!(e("docker compose ps"), Effect::Reads);
+        assert_eq!(e("docker compose logs --tail 50 web"), Effect::Reads);
+        assert_eq!(e("docker compose up -d"), Effect::Changes);
+        assert_eq!(e("passwd -S root"), Effect::Reads);
+        assert_eq!(e("chage -l root"), Effect::Reads);
+        assert_eq!(e("passwd root"), Effect::Dangerous);
+        assert_eq!(e("usermod -aG docker ana"), Effect::Changes);
     }
 
     #[test]

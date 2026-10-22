@@ -106,6 +106,10 @@ interface Conv {
   stopped: boolean;
   /** Commands waiting for a click, by step. */
   waiting: Map<Step, (ok: "once" | "always" | "no") => void>;
+  /** For questions sent with terminal text: the question alone, to send instead once it is older. */
+  bare: Map<object, string>;
+  /** Older parts were left out to save room (said once in the instructions). */
+  trimmed: boolean;
 }
 
 type ChatEvent =
@@ -115,11 +119,21 @@ type ChatEvent =
   | { type: "done"; finish: string }
   | { type: "error"; message: string };
 
-/** How many lines of a terminal go with a question. */
-export const SCREEN_LINES = 300;
-/** Limits for one question: commands and minutes. */
-export const MAX_STEPS = 25;
-const MAX_MINUTES = 15;
+/** The limits from Settings, Assistant: terminal lines sent with a question, commands and minutes per question,
+ *  and how much command output goes back to the model. */
+export function aiLimits() {
+  const n = (key: string, def: number, min: number, max: number) => {
+    const v = Number(app.settings[key]);
+    return Number.isFinite(v) && v > 0 ? Math.min(max, Math.max(min, Math.round(v))) : def;
+  };
+  return {
+    screenLines: n("ai.screenLines", 300, 20, 5000),
+    maxSteps: n("ai.maxSteps", 25, 1, 200),
+    maxMinutes: n("ai.maxMinutes", 15, 1, 120),
+    outputKB: n("ai.outputKB", 48, 4, 256),
+    contextChars: n("ai.contextChars", 120_000, 10_000, 2_000_000),
+  };
+}
 
 const TOOLS = [
   {
@@ -127,7 +141,7 @@ const TOOLS = [
     function: {
       name: "run_command",
       description:
-        "Run one shell command on the server of this tab (or inside its Proxmox guest) and get its output and exit code. Non-interactive only (no editors, pagers or prompts; use flags such as --no-pager, -y only when the user asked for changes). Commands that only read run at once; anything that changes the server waits for the user's approval.",
+        "Run one shell command on the server of this tab (or inside its Proxmox guest) and get its output and exit code. Non-interactive only (no editors, pagers or prompts; use flags such as --no-pager, -y only when the user asked for changes). Commands that do not end by themselves (ping without -c, top without -b, tail -f, watch) run until the time limit. Commands that only read run at once; anything that changes the server waits for the user's approval.",
       parameters: {
         type: "object",
         properties: {
@@ -175,6 +189,39 @@ const MEMORY_TOOLS = [
 
 class Assistant {
   hosts = $state<AiHost[]>([]);
+  /** Every model each host offers, once asked for (the model menu). */
+  models = $state<Record<string, string[]>>({});
+
+  async loadModels() {
+    for (const h of this.hosts) {
+      if (this.models[h.id]) continue;
+      this.models[h.id] = [];
+      this.models[h.id] = await invoke<AiModel[]>("ai_models", { id: h.id })
+        .then((list) => list.map((m) => m.id))
+        .catch(() => []);
+    }
+  }
+
+  /** The conversation of a tab as plain text, for saving. */
+  transcript(tabId: string): string {
+    const c = this.convs[tabId];
+    if (!c) return "";
+    const t = app.tabs.find((x) => x.id === tabId);
+    const lines = [`Cablebag assistant, ${this.describe(t)}, ${new Date().toLocaleString()}`, ""];
+    for (const m of c.msgs) {
+      if (m.role === "user") lines.push(`You: ${m.text}`, "");
+      else {
+        if (m.text.trim()) lines.push(`Assistant: ${m.text.trim()}`, "");
+        for (const s of m.steps ?? []) {
+          lines.push(`  $ ${s.command}  (${s.state}${s.exit != null ? `, exit ${s.exit}` : ""})`);
+          if (s.output) lines.push(...s.output.trimEnd().split("\n").map((l) => `    ${l}`));
+          lines.push("");
+        }
+        if (m.error) lines.push(`Error: ${m.error}`, "");
+      }
+    }
+    return lines.join("\r\n");
+  }
   convs = $state<Record<string, Conv>>({});
   /** The column beside the tab area. */
   open = $state(false);
@@ -187,8 +234,10 @@ class Assistant {
   /** The conversation of a tab, made on first use with the first host and its model. */
   conv(tabId: string): Conv {
     if (!this.convs[tabId]) {
-      const h = this.hosts[0];
-      this.convs[tabId] = { hostId: h?.id ?? "", model: h?.model ?? "", msgs: [], api: [], busy: false, requestId: "", root: false, stopped: false, waiting: new Map() };
+      // In a protected folder, the first host that may see it.
+      const t = app.tabs.find((x) => x.id === tabId);
+      const h = this.isProtected(t?.session) ? (this.hosts.find((x) => x.protected_ok) ?? this.hosts[0]) : this.hosts[0];
+      this.convs[tabId] = { hostId: h?.id ?? "", model: h?.model ?? "", msgs: [], api: [], busy: false, requestId: "", root: false, stopped: false, waiting: new Map(), bare: new Map(), trimmed: false };
     }
     return this.convs[tabId];
   }
@@ -208,7 +257,7 @@ class Assistant {
 
   screenOf(t: Tab | undefined): string {
     if (!t || t.type !== "terminal") return "";
-    return bufferText(t.id, SCREEN_LINES).trimEnd();
+    return bufferText(t.id, aiLimits().screenLines).trimEnd();
   }
 
   /** A picture of a Remote Desktop or VNC screen as it shows now, or "" for other tabs. */
@@ -229,6 +278,33 @@ class Assistant {
 
   /** Adds a picture of the screen to the conversation. Only the newest picture goes along; earlier ones become a
    *  note, so the conversation stays small. */
+  /** Keeps the conversation within the size from Settings: older questions lose their terminal text, and when
+   *  that is not enough the oldest turns are left out (the instructions then say so). */
+  private trim(c: Conv) {
+    const lastUser = c.api.findLastIndex((m) => m.role === "user");
+    c.api.forEach((m, i) => {
+      const q = c.bare.get(m);
+      if (q === undefined || i === lastUser) return;
+      const note = `(The terminal text sent with this question is left out.)\n\n${q}`;
+      if (Array.isArray(m.content)) m.content = m.content.map((p: any) => (p.type === "text" ? { type: "text", text: note } : p));
+      else m.content = note;
+      c.bare.delete(m);
+    });
+    const size = () => c.api.reduce((n, m) => n + JSON.stringify(m, (k, v) => (k === "url" ? "" : v)).length, 0);
+    const limit = aiLimits().contextChars;
+    while (size() > limit) {
+      // From the first question to the next one: a whole turn with its commands and answers.
+      const from = c.api.findIndex((m, i) => i > 0 && m.role === "user");
+      const to = c.api.findIndex((m, i) => i > from && m.role === "user");
+      if (from < 0 || to < 0 || to >= c.api.findLastIndex((m) => m.role === "user")) break;
+      c.api.splice(from, to - from);
+      if (!c.trimmed) {
+        c.trimmed = true;
+        c.api[0].content += " Earlier parts of this conversation were left out to save room; ask the user when you need them.";
+      }
+    }
+  }
+
   private pushPicture(c: Conv, text: string, image: string) {
     for (const m of c.api) {
       if (Array.isArray(m.content)) m.content = m.content.map((p: any) => (p.type === "image_url" ? { type: "text", text: "(an earlier picture of the screen)" } : p));
@@ -352,6 +428,7 @@ class Assistant {
     const text = screen ? `The screen of this tab now (last lines):\n\`\`\`\n${screen}\n\`\`\`\n\n${question.trim()}` : question.trim();
     if (image) this.pushPicture(c, text, image);
     else c.api.push({ role: "user", content: noImage ? `(No picture of the screen this time: ${noImage})\n\n${text}` : text });
+    if (screen) c.bare.set(c.api[c.api.length - 1], question.trim());
     c.busy = true;
     c.stopped = false;
     const started = Date.now();
@@ -372,8 +449,8 @@ class Assistant {
         for (const call of calls) {
           let result: string;
           if (c.stopped) result = "The user stopped the assistant.";
-          else if (++steps > MAX_STEPS) result = `Stopped: the limit of ${MAX_STEPS} commands for one question is reached. Explain where you are.`;
-          else if (Date.now() - started > MAX_MINUTES * 60_000) result = `Stopped: the limit of ${MAX_MINUTES} minutes for one question is reached. Explain where you are.`;
+          else if (++steps > aiLimits().maxSteps) result = `Stopped: the limit of ${aiLimits().maxSteps} commands for one question is reached. Explain where you are.`;
+          else if (Date.now() - started > aiLimits().maxMinutes * 60_000) result = `Stopped: the limit of ${aiLimits().maxMinutes} minutes for one question is reached. Explain where you are.`;
           else result = await this.runCall(c, msg, t!, call, prot);
           c.api.push({ role: "tool", tool_call_id: call.id, content: result });
         }
@@ -395,6 +472,7 @@ class Assistant {
     return new Promise((resolve) => {
       const calls: { id: string; name: string; arguments: string }[] = [];
       c.requestId = crypto.randomUUID();
+      this.trim(c);
       const ch = new Channel<ChatEvent>();
       ch.onmessage = (e) => {
         if (e.type === "text") msg.text += e.text;
@@ -481,7 +559,10 @@ class Assistant {
       s.output = r.output;
       s.exit = r.exit;
       noteLocal(t.id, `[assistant] exit ${r.exit ?? "?"}${r.timed_out ? " (time limit)" : ""}`);
-      return JSON.stringify({ exit: r.exit, timed_out: r.timed_out, truncated: r.truncated, output: r.output });
+      // The output limit from Settings; the rest stays visible in the card.
+      const max = aiLimits().outputKB * 1024;
+      const cut = r.output.length > max;
+      return JSON.stringify({ exit: r.exit, timed_out: r.timed_out, truncated: r.truncated || cut, output: cut ? r.output.slice(0, max) : r.output });
     } catch (e) {
       s.state = "failed";
       s.note = String(e);

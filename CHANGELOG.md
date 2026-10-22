@@ -6,6 +6,30 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.8.0 · 22 October 2026
+
+**Rough edges smoothed, and more in About**
+
+- **Keyboard shortcuts** has its own page in Settings (also from the search box), with every shortcut and the
+  macros that have one.
+- **About Cablebag** can back up all your data to one file and restore such a backup (it takes the place of the
+  current data at the next start, which is kept). **Copy details** puts the version, Windows, WebView2 and .NET
+  versions on the clipboard for a problem report, and the page says so when Remote Desktop's .NET 8 runtime is
+  missing. It also shows when updates were last checked.
+- **Assistant limits are settings now** (Settings, Assistant, Limits): terminal lines per question, commands and
+  minutes per question, how much command output it reads, how much memory goes along, and the conversation size.
+- **Long assistant conversations keep working.** Older questions lose their terminal text, and above the size limit
+  the oldest turns are left out, so the AI host does not run out of room.
+- **The model menu lists every model of the host**, and a conversation can be saved as a text file.
+- **What was sent** can be filtered by server or word, shows more on request, and can be cleared.
+- In a protected folder the assistant picks an AI host that may see it.
+- Safer and fewer cards: `rm -rf` inside `/tmp` or `/var/tmp` is an ordinary change, `rm --recursive --force` is
+  caught like `rm -rf`, `docker compose ps` and `logs` only read, as do `passwd -S` and `chage -l`; `usermod` is a
+  change instead of dangerous.
+- File and web sessions imported from MobaXterm open again (they said the session had no path).
+- The session editor no longer shows serial and address fields twice, and X11 forwarding says plainly it is not
+  available yet.
+
 ## 0.7.2 · 22 October 2026
 
 - **About Cablebag**, in Settings and in the search box (Ctrl+K): the version, updates, what the licence

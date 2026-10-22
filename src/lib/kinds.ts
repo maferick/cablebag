@@ -24,8 +24,6 @@ export interface KindInfo {
   defaultPort: number;
   /** Whether Cablebag can open this session type yet. */
   ready: boolean;
-  /** The plan phase that delivers it, shown when it is not ready yet. */
-  phase?: string;
   needsHost: boolean;
   /** Not offered for new sessions; imported ones stay saved. */
   hidden?: boolean;
@@ -41,13 +39,13 @@ export const KINDS: KindInfo[] = [
   { id: "serial", label: "Serial", description: "COM port of a switch or other device", icon: Cable, defaultPort: 0, ready: true, needsHost: false },
   { id: "shell", label: "Local shell", description: "PowerShell, cmd, Git Bash", icon: TerminalSquare, defaultPort: 0, ready: true, needsHost: false },
   { id: "wsl", label: "WSL", description: "Linux distribution on this PC", icon: Boxes, defaultPort: 0, ready: true, needsHost: false },
-  { id: "mosh", label: "Mosh", description: "Mobile shell over UDP", icon: Smartphone, defaultPort: 22, ready: false, phase: "Other session types", hidden: true, needsHost: true },
-  { id: "rsh", label: "Rsh", description: "Legacy remote shell", icon: Server, defaultPort: 514, ready: false, phase: "Other session types", hidden: true, needsHost: true },
-  { id: "xdmcp", label: "XDMCP", description: "Remote Unix desktop", icon: Network, defaultPort: 177, ready: false, phase: "X server", hidden: true, needsHost: true },
+  { id: "mosh", label: "Mosh", description: "Mobile shell over UDP", icon: Smartphone, defaultPort: 22, ready: false, hidden: true, needsHost: true },
+  { id: "rsh", label: "Rsh", description: "Legacy remote shell", icon: Server, defaultPort: 514, ready: false, hidden: true, needsHost: true },
+  { id: "xdmcp", label: "XDMCP", description: "Remote Unix desktop", icon: Network, defaultPort: 177, ready: false, hidden: true, needsHost: true },
   { id: "browser", label: "Browser", description: "Web page in a tab", icon: Globe, defaultPort: 0, ready: true, needsHost: false },
   { id: "file", label: "File or folder", description: "Open a path or link", icon: FileText, defaultPort: 0, ready: true, needsHost: false },
-  { id: "s3", label: "AWS S3", description: "Bucket browser", icon: Cloud, defaultPort: 0, ready: false, phase: "Other session types", hidden: true, needsHost: false },
+  { id: "s3", label: "AWS S3", description: "Bucket browser", icon: Cloud, defaultPort: 0, ready: false, hidden: true, needsHost: false },
 ];
 
 export const kindInfo = (id: string): KindInfo =>
-  KINDS.find((k) => k.id === id) ?? { id, label: id, description: "", icon: Server, defaultPort: 0, ready: false, phase: "a later phase", needsHost: true };
+  KINDS.find((k) => k.id === id) ?? { id, label: id, description: "", icon: Server, defaultPort: 0, ready: false, needsHost: true };

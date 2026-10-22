@@ -19,8 +19,11 @@ export interface Memory {
 }
 
 const KEY = "ai.memory";
-/** At most this much memory goes along with a conversation (newest first per level). */
-const BUDGET = 6000;
+/** At most this much memory goes along with a conversation (newest first per level); Settings, Assistant. */
+const budget = () => {
+  const v = Number(app.settings["ai.memoryChars"]);
+  return Number.isFinite(v) && v >= 500 ? Math.min(50_000, Math.round(v)) : 6000;
+};
 
 class MemoryStore {
   get all(): Memory[] {
@@ -56,7 +59,7 @@ class MemoryStore {
     const out: Memory[] = [];
     let used = 0;
     for (const m of list) {
-      if (used + m.text.length > BUDGET) continue;
+      if (used + m.text.length > budget()) continue;
       used += m.text.length;
       out.push(m);
     }

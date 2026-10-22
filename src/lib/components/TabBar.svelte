@@ -1,5 +1,6 @@
 <script lang="ts">
   // The one strip at the top: sidebar toggle, the tabs, the + menu, the search box, Layout and Settings.
+  import { TAB_COLORS } from "../tabColors";
   import { app, type Tab } from "../state.svelte";
   import { menu, type MenuEntry } from "../menu.svelte";
   import { tiles } from "../tiles.svelte";
@@ -32,16 +33,7 @@
     }
   }
 
-  const COLORS = [
-    { name: "No colour", value: "" },
-    { name: "Brick", value: "#bd4a3e" },
-    { name: "Ochre", value: "#ad791c" },
-    { name: "Moss", value: "#748427" },
-    { name: "Pine", value: "#3f8a55" },
-    { name: "Steel", value: "#4f7fa6" },
-    { name: "Plum", value: "#8f5e9d" },
-    { name: "Stone", value: "#7b7a74" },
-  ];
+  const COLORS = TAB_COLORS;
 
   let renaming = $state<string | null>(null);
   let renameText = $state("");

@@ -7,6 +7,7 @@
   import VaultPicker from "./VaultPicker.svelte";
   import MemoryList from "./MemoryList.svelte";
   import SettingsSection from "./SettingsSection.svelte";
+  import SettingsRow from "./SettingsRow.svelte";
   import { memory } from "../memory.svelte";
   import { Plus, Pencil, Trash2, RefreshCw, ChevronRight, X } from "@lucide/svelte";
 
@@ -16,6 +17,14 @@
   let testError = $state<Record<string, string>>({});
   let log = $state<AiLogEntry[]>([]);
   let openLog = $state<number | null>(null);
+  let logFilter = $state("");
+  let logLimit = $state(100);
+
+  async function clearLog() {
+    if (!(await ask.confirm("Clear the log", "Remove everything listed in What was sent? The conversations themselves are not affected.", { okLabel: "Clear", danger: true }))) return;
+    await invoke("ai_log_clear").catch((e) => app.notify(String(e), "error"));
+    loadLog();
+  }
   let error = $state("");
   const protectedFolders = $derived(app.folders.filter((f) => ((app.settings["ai.protected"] as string[] | undefined) ?? []).includes(f.id)));
 
@@ -25,7 +34,7 @@
   });
 
   async function loadLog() {
-    log = await invoke<AiLogEntry[]>("ai_log", { limit: 100 }).catch(() => []);
+    log = await invoke<AiLogEntry[]>("ai_log", { limit: logLimit, filter: logFilter }).catch(() => []);
   }
 
   function blank() {
@@ -182,6 +191,21 @@
   </div>
 </SettingsSection>
 
+<SettingsSection title="Limits" desc="How much goes to the AI and how far the assistant may go on one question. Larger values cost more and fill the model's memory sooner.">
+  {#each [
+    { key: "ai.screenLines", label: "Terminal lines sent with a question", help: "The last lines of the terminal you are in.", def: 300 },
+    { key: "ai.maxSteps", label: "Commands per question", help: "It stops and explains where it is when it reaches this.", def: 25 },
+    { key: "ai.maxMinutes", label: "Minutes per question", help: "Also a stop with an explanation.", def: 15 },
+    { key: "ai.outputKB", label: "Command output it reads (KB)", help: "Per command; you always see all of it in the card.", def: 48 },
+    { key: "ai.memoryChars", label: "Memory that goes along (characters)", help: "What it remembers about this connection, its folder and in general, newest first.", def: 6000 },
+    { key: "ai.contextChars", label: "Conversation size (characters)", help: "Above this, older questions lose their terminal text and the oldest turns are left out. Raise it for models with a large context.", def: 120000 },
+  ] as l}
+    <SettingsRow label={l.label} help={l.help}>
+      <input type="number" min="1" value={app.settings[l.key] ?? l.def} onchange={(e) => app.setSetting(l.key, Number((e.target as HTMLInputElement).value) || l.def)} />
+    </SettingsRow>
+  {/each}
+</SettingsSection>
+
 <SettingsSection title="Protected folders" desc="Every command asks first, dangerous commands are refused, and only AI hosts that may see protected folders are used. Protect a folder with a right-click on it in the tree.">
   <div class="inner">
 {#if protectedFolders.length}
@@ -210,8 +234,12 @@
   </div>
 </SettingsSection>
 
-<SettingsSection title="What was sent" desc="Every question with the screen text that went with it, every answer and every command that ran.">
+<SettingsSection title="What was sent" desc="Every question with the screen text that went with it, every answer and every command that ran. The newest 2000 are kept.">
   <div class="inner">
+  <div class="logbar">
+    <input placeholder="Show only a server, host or word" bind:value={logFilter} oninput={() => loadLog()} />
+    <button class="btn" disabled={!log.length} onclick={clearLog}>Clear the log</button>
+  </div>
 {#if !log.length}
   <p class="muted small">Nothing yet. Every question, with the screen text that went with it, and every answer is listed here.</p>
 {:else}
@@ -226,11 +254,25 @@
       {#if openLog === i}<pre class="ltext">{l.text}</pre>{/if}
     {/each}
   </div>
+  {#if log.length >= logLimit}
+    <button class="btn more" onclick={() => { logLimit += 200; loadLog(); }}>Show more</button>
+  {/if}
 {/if}
   </div>
 </SettingsSection>
 
 <style>
+  .logbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .logbar input {
+    flex: 1;
+  }
+  .more {
+    margin-top: 8px;
+  }
   .modes {
     display: flex;
     flex-direction: column;

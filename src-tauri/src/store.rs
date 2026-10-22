@@ -114,6 +114,39 @@ pub struct Store {
     conn: Connection,
 }
 
+/// A backup chosen in Settings, About waits next to the database until the next start, when nothing has the
+/// database open. The database it replaces is kept beside it.
+fn take_pending_restore(db: &std::path::Path) -> Result<()> {
+    let pending = db.with_extension("db.restore");
+    if !pending.exists() {
+        return Ok(());
+    }
+    let keep = db.with_file_name(format!("cablebag-before-restore-{}.db", now()));
+    if db.exists() {
+        std::fs::rename(db, &keep).context("putting the current database aside")?;
+        for ext in ["-wal", "-shm"] {
+            let side = PathBuf::from(format!("{}{ext}", db.display()));
+            if side.exists() {
+                let _ = std::fs::rename(&side, PathBuf::from(format!("{}{ext}", keep.display())));
+            }
+        }
+    }
+    std::fs::rename(&pending, db).context("putting the backup in place")?;
+    Ok(())
+}
+
+/// Checks that a file is a Cablebag database and stores it to take its place at the next start. Returns how
+/// many sessions it holds.
+pub fn stage_restore(from: &std::path::Path) -> Result<i64> {
+    let check = Connection::open_with_flags(from, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).context("opening the backup")?;
+    let sessions: i64 = check
+        .query_row("SELECT count(*) FROM sessions", [], |r| r.get(0))
+        .map_err(|_| anyhow::anyhow!("This file is not a Cablebag backup."))?;
+    drop(check);
+    std::fs::copy(from, data_dir().join("cablebag.db.restore")).context("copying the backup")?;
+    Ok(sessions)
+}
+
 pub fn now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -122,9 +155,19 @@ pub fn now() -> i64 {
 }
 
 impl Store {
+    /// A consistent copy of the whole database, also while Cablebag uses it.
+    pub fn backup_to(&self, to: &std::path::Path) -> Result<()> {
+        if to.exists() {
+            std::fs::remove_file(to).context("replacing the old backup file")?;
+        }
+        self.conn.execute("VACUUM INTO ?1", params![to.to_string_lossy()]).context("writing the backup")?;
+        Ok(())
+    }
+
     pub fn open() -> Result<Self> {
         adopt_old_data();
         let path = data_dir().join("cablebag.db");
+        take_pending_restore(&path)?;
         let conn = Connection::open(&path).with_context(|| format!("opening {}", path.display()))?;
         conn.execute_batch(
             "PRAGMA journal_mode=WAL;
@@ -359,12 +402,22 @@ impl Store {
         Ok(())
     }
 
-    pub fn ai_log(&self, limit: usize) -> Result<Vec<AiLogEntry>> {
-        let mut st = self.conn.prepare("SELECT at, host, model, about, direction, text FROM ai_log ORDER BY rowid DESC LIMIT ?1")?;
-        let rows = st.query_map(params![limit as i64], |r| {
+    /// The newest entries; with a filter, only those whose server, host or text contains it.
+    pub fn ai_log(&self, limit: usize, filter: &str) -> Result<Vec<AiLogEntry>> {
+        let mut st = self.conn.prepare(
+            "SELECT at, host, model, about, direction, text FROM ai_log
+             WHERE ?2 = '' OR instr(lower(about || ' ' || host || ' ' || text), lower(?2)) > 0
+             ORDER BY rowid DESC LIMIT ?1",
+        )?;
+        let rows = st.query_map(params![limit as i64, filter], |r| {
             Ok(AiLogEntry { at: r.get(0)?, host: r.get(1)?, model: r.get(2)?, about: r.get(3)?, direction: r.get(4)?, text: r.get(5)? })
         })?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    pub fn ai_log_clear(&self) -> Result<()> {
+        self.conn.execute("DELETE FROM ai_log", [])?;
+        Ok(())
     }
 
     // ---------- secrets (values are encrypted by the vault before they get here) ----------
@@ -460,5 +513,31 @@ impl Store {
             params![k, v],
         )?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod restore_tests {
+    use super::*;
+
+    #[test]
+    fn pending_backup_takes_the_place_of_the_database() {
+        let dir = std::env::temp_dir().join(format!("cablebag-restore-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("cablebag.db");
+        std::fs::write(&db, b"old").unwrap();
+        std::fs::write(dir.join("cablebag.db-wal"), b"old wal").unwrap();
+        std::fs::write(db.with_extension("db.restore"), b"backup").unwrap();
+        take_pending_restore(&db).unwrap();
+        assert_eq!(std::fs::read(&db).unwrap(), b"backup");
+        assert!(!db.with_extension("db.restore").exists());
+        let kept: Vec<String> = std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.file_name().to_string_lossy().to_string()).collect();
+        assert!(kept.iter().any(|n| n.starts_with("cablebag-before-restore-") && n.ends_with(".db")), "{kept:?}");
+        assert!(kept.iter().any(|n| n.ends_with(".db-wal") && n.starts_with("cablebag-before-restore-")), "{kept:?}");
+        // Nothing waiting: nothing changes.
+        take_pending_restore(&db).unwrap();
+        assert_eq!(std::fs::read(&db).unwrap(), b"backup");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

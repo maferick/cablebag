@@ -10,7 +10,11 @@
   import { BUILTIN_SYNTAX, type SyntaxSet } from "../highlight";
   import { vault } from "../vault.svelte";
   import { update } from "../update.svelte";
-  import { open as openDialog } from "@tauri-apps/plugin-dialog";
+  import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+  import { writeText } from "../clipboard";
+  import { ask } from "../ask.svelte";
+  import { macros } from "../macros.svelte";
+  import { SHORTCUTS } from "../shortcutList";
   import { Trash2, Eye, FolderOpen, Lock, LockOpen, RefreshCw, Search, ExternalLink } from "@lucide/svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import Logo from "./Logo.svelte";
@@ -56,13 +60,15 @@
     terminal: "Font, colours, cursor and copying in every terminal.",
     highlighting: "Words such as error and warning in colour, so they stand out in output.",
     logging: "Keep what terminals show in files.",
-    ssh: "Keys and the remote files of SSH sessions.",
+    ssh: "Keys from an SSH agent.",
     vault: "Logins from your Vaultwarden or Bitwarden-compatible vault.",
     proxmox: "Proxmox servers whose machines show in the session tree.",
     sync: "The same sessions on every PC, through a git repository.",
     assistant: "The AI assistant: its hosts, its memory and what it may do.",
     passwords: "Passwords and key passphrases Cablebag keeps on this PC.",
     hosts: "The SSH servers whose identity you confirmed.",
+    keyboard: "Every shortcut, and the macros that have one.",
+    about: "Your version, updates, the licence, and where your data is.",
   };
 
   /** Words a page answers to in "Find a setting", besides its name and intro. */
@@ -78,7 +84,8 @@
     assistant: "ai llm model openai litellm ollama memory protected folders rules always log",
     passwords: "saved secrets passphrase",
     hosts: "known hosts fingerprint trusted",
-    about: "version update licence license changelog what's new data folder issues",
+    about: "version update licence license changelog what's new data folder issues backup restore problem report dotnet",
+    keyboard: "shortcuts keys hotkeys ctrl alt tiling",
   };
   let find = $state("");
   const shownPages = $derived(
@@ -98,6 +105,49 @@
   let secrets = $state<SecretInfo[]>([]);
   let revealed = $state<Record<string, string>>({});
   let dataFolder = $state("");
+  let sys = $state<{ version: string; windows: string; webview: string; dotnet: string } | null>(null);
+  const details = $derived(
+    sys ? [`Cablebag ${sys.version}`, sys.windows, `WebView2 ${sys.webview}`, `.NET 8 Desktop Runtime: ${sys.dotnet || "not installed"}`].join("\n") : "",
+  );
+  // A clock for "checked ... ago".
+  let nowMs = $state(Date.now());
+  $effect(() => {
+    const t = setInterval(() => (nowMs = Date.now()), 30_000);
+    return () => clearInterval(t);
+  });
+  const ago = (t: number) => {
+    const m = Math.round((nowMs - t) / 60_000);
+    return m < 1 ? "just now" : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`;
+  };
+
+  async function backup() {
+    const day = new Date().toISOString().slice(0, 10);
+    const path = await saveDialog({ title: "Back up Cablebag's data", defaultPath: `cablebag-backup-${day}.db`, filters: [{ name: "Cablebag backup", extensions: ["db"] }] });
+    if (!path) return;
+    try {
+      await api.backupData(path);
+      app.notify(`Backed up to ${path}`);
+    } catch (e) {
+      app.notify(String(e), "error");
+    }
+  }
+
+  async function restore() {
+    const path = await openDialog({ title: "Choose a Cablebag backup", filters: [{ name: "Cablebag backup", extensions: ["db"] }] });
+    if (!path || Array.isArray(path)) return;
+    try {
+      const n = await api.restoreData(path);
+      const now = await ask.confirm(
+        "Restore the backup",
+        `The backup holds ${n} sessions. It takes the place of the current data when Cablebag starts again; the current data is kept in the data folder. Start again now?`,
+        { okLabel: "Start again now" },
+      );
+      if (now) await api.restartApp();
+      else app.notify("The backup is used the next time Cablebag starts.");
+    } catch (e) {
+      app.notify(String(e), "error");
+    }
+  }
 
   /** A page of the official project on GitHub. */
   const site = (path: string) => openUrl(`https://github.com/maferick/cablebag${path}`).catch((e) => app.notify(String(e), "error"));
@@ -113,7 +163,10 @@
   $effect(() => {
     if (page === "hosts") api.knownHosts().then((h) => (hosts = h));
     if (page === "passwords") api.secrets().then((s) => (secrets = s));
-    if (page === "about") api.dataFolder().then((d) => (dataFolder = d));
+    if (page === "about") {
+      api.dataFolder().then((d) => (dataFolder = d));
+      api.systemInfo().then((i) => (sys = i));
+    }
     if (page === "proxmox") proxmox.load();
     if (page === "vault")
       vault.refresh().then(() => {
@@ -387,6 +440,21 @@
             </div>
           {/each}
         </SettingsSection>
+      {:else if page === "keyboard"}
+        {#each SHORTCUTS as g}
+          <SettingsSection title={g.group}>
+            {#each g.items as k}
+              <SettingsRow label={k.what}><span class="keys">{k.keys}</span></SettingsRow>
+            {/each}
+          </SettingsSection>
+        {/each}
+        <SettingsSection title="Macros" desc="A macro can have its own shortcut; set it in the macro (Macros in the sidebar).">
+          {#each macros.list.filter((m) => m.hotkey) as m}
+            <SettingsRow label={m.name}><span class="keys">{m.hotkey}</span></SettingsRow>
+          {:else}
+            <SettingsRow><span class="muted">No macro has a shortcut yet.</span></SettingsRow>
+          {/each}
+        </SettingsSection>
       {:else if page === "about"}
         <div class="hero">
           <Logo height={44} />
@@ -397,11 +465,12 @@
           <div class="btns">
             <button class="btn" onclick={() => site("/blob/main/CHANGELOG.md")}><ExternalLink size={14} /> What's new</button>
             <button class="btn" onclick={() => site("")}><ExternalLink size={14} /> Project page</button>
+            <button class="btn" onclick={() => app.openSettings("keyboard")}>Keyboard shortcuts</button>
           </div>
         </div>
 
         <SettingsSection title="Updates" desc="Only from the official page, github.com/maferick/cablebag, and only with the Cablebag signature.">
-          <SettingsRow label="Cablebag {update.current}" help={update.found ? `Version ${update.found.version} is available.` : update.lastChecked && !update.error ? "The newest version." : update.error || ""}>
+          <SettingsRow label="Check for a newer version" help={update.found ? `Version ${update.found.version} is available.` : update.error ? update.error : update.lastChecked ? `Checked ${ago(update.lastChecked)}: this is the newest version.` : ""}>
             <div class="btns">
               {#if update.found}<button class="btn primary" disabled={update.installing} onclick={() => update.install()}>Install and restart</button>{/if}
               <button class="btn" disabled={update.checking} onclick={() => update.check()}>{update.checking ? "Checking..." : "Check now"}</button>
@@ -429,9 +498,26 @@
           <SettingsRow label="Data folder" help={dataFolder}>
             <button class="btn" disabled={!dataFolder} onclick={() => api.fileOpen(dataFolder).catch((e) => app.notify(String(e), "error"))}><FolderOpen size={14} /> Open</button>
           </SettingsRow>
-          <SettingsRow label="Questions or problems" help="Open an issue on the project page.">
-            <button class="btn" onclick={() => site("/issues")}><ExternalLink size={14} /> Issues</button>
+          <SettingsRow label="Back up" help="A copy of everything in one file. Saved passwords in it only open on this PC, with your Windows account.">
+            <button class="btn" onclick={backup}>Back up...</button>
           </SettingsRow>
+          <SettingsRow label="Restore a backup" help="It takes the place of the current data when Cablebag starts again; the current data is kept.">
+            <button class="btn" onclick={restore}>Restore...</button>
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection title="Problems" desc="Open an issue on the project page and paste the details of this PC with it.">
+          <SettingsRow label="This PC" help={details.split("\n").join(", ")}>
+            <div class="btns">
+              <button class="btn" disabled={!details} onclick={() => writeText(details).then(() => app.notify("Details copied"))}>Copy details</button>
+              <button class="btn" onclick={() => site("/issues")}><ExternalLink size={14} /> Issues</button>
+            </div>
+          </SettingsRow>
+          {#if sys && !sys.dotnet}
+            <SettingsRow label="Remote Desktop needs .NET 8" help="The .NET 8 Desktop Runtime is not installed, so Remote Desktop tabs cannot open. Install it from Microsoft (x64).">
+              <button class="btn" onclick={() => openUrl("https://dotnet.microsoft.com/download/dotnet/8.0").catch(() => {})}><ExternalLink size={14} /> Download</button>
+            </SettingsRow>
+          {/if}
         </SettingsSection>
       {/if}
     </div>
@@ -542,6 +628,10 @@
   .ver {
     font-size: 13px;
     font-weight: 600;
+  }
+  .keys {
+    font-family: var(--font-mono);
+    font-size: 12px;
   }
   .lic p {
     margin: 0 0 6px;

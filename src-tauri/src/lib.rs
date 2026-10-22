@@ -798,8 +798,13 @@ exit {}{}
 }
 
 #[tauri::command]
-fn ai_log(state: State<AppState>, limit: Option<usize>) -> CmdResult<Vec<store::AiLogEntry>> {
-    state.store.lock().ai_log(limit.unwrap_or(100)).map_err(err)
+fn ai_log(state: State<AppState>, limit: Option<usize>, filter: Option<String>) -> CmdResult<Vec<store::AiLogEntry>> {
+    state.store.lock().ai_log(limit.unwrap_or(100), filter.as_deref().unwrap_or("").trim()).map_err(err)
+}
+
+#[tauri::command]
+fn ai_log_clear(state: State<AppState>) -> CmdResult<()> {
+    state.store.lock().ai_log_clear().map_err(err)
 }
 
 #[tauri::command]
@@ -820,6 +825,60 @@ async fn update_install(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 fn data_folder() -> String {
     store::data_dir().display().to_string()
+}
+
+#[derive(serde::Serialize)]
+struct SystemInfo {
+    version: String,
+    windows: String,
+    webview: String,
+    /// The .NET 8 Desktop Runtime that Remote Desktop tabs need, or empty when it is missing.
+    dotnet: String,
+}
+
+/// What a bug report needs to say about this PC.
+#[tauri::command]
+fn system_info(app: AppHandle) -> SystemInfo {
+    let windows = (|| -> Option<String> {
+        let k = windows_registry::LOCAL_MACHINE.open(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion").ok()?;
+        let build = k.get_string("CurrentBuild").unwrap_or_default();
+        let mut name = k.get_string("ProductName").unwrap_or_default();
+        // Windows 11 still calls itself Windows 10 in this key.
+        if build.parse::<u32>().unwrap_or(0) >= 22000 {
+            name = name.replacen("Windows 10", "Windows 11", 1);
+        }
+        let ubr = k.get_u32("UBR").map(|u| format!(".{u}")).unwrap_or_default();
+        Some(format!("{name} {} (build {build}{ubr})", k.get_string("DisplayVersion").unwrap_or_default()))
+    })()
+    .unwrap_or_else(|| "Windows (unknown version)".into());
+    let dotnet = std::env::var_os("ProgramFiles")
+        .map(|p| std::path::PathBuf::from(p).join(r"dotnet\shared\Microsoft.WindowsDesktop.App"))
+        .and_then(|d| std::fs::read_dir(d).ok())
+        .map(|it| it.flatten().map(|e| e.file_name().to_string_lossy().to_string()).filter(|n| n.starts_with("8.")).max().unwrap_or_default())
+        .unwrap_or_default();
+    SystemInfo {
+        version: app.package_info().version.to_string(),
+        windows,
+        webview: tauri::webview_version().unwrap_or_else(|_| "unknown".into()),
+        dotnet,
+    }
+}
+
+/// Writes a copy of all of Cablebag's data to a file the person chose.
+#[tauri::command]
+fn backup_data(state: State<AppState>, path: String) -> CmdResult<()> {
+    state.store.lock().backup_to(std::path::Path::new(&path)).map_err(err)
+}
+
+/// Puts a backup in place for the next start; returns how many sessions it holds.
+#[tauri::command]
+fn restore_data(path: String) -> CmdResult<i64> {
+    store::stage_restore(std::path::Path::new(&path)).map_err(err)
+}
+
+#[tauri::command]
+fn restart_app(app: AppHandle) {
+    app.restart();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -873,6 +932,7 @@ pub fn run() {
             ai_chat,
             ai_stop,
             ai_log,
+            ai_log_clear,
             agent_classify,
             ai_redact,
             agent_exec,
@@ -920,6 +980,10 @@ pub fn run() {
             delete_secret,
             reveal_secret,
             data_folder,
+            system_info,
+            backup_data,
+            restore_data,
+            restart_app,
             vnc_open,
             vnc_input,
             vnc_close,

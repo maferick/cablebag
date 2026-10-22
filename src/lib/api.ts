@@ -285,6 +285,10 @@ export const api = {
   deleteSecret: (id: string) => invoke<void>("delete_secret", { id }),
   revealSecret: (id: string) => invoke<string>("reveal_secret", { id }),
   dataFolder: () => invoke<string>("data_folder"),
+  systemInfo: () => invoke<{ version: string; windows: string; webview: string; dotnet: string }>("system_info"),
+  backupData: (path: string) => invoke<void>("backup_data", { path }),
+  restoreData: (path: string) => invoke<number>("restore_data", { path }),
+  restartApp: () => invoke<void>("restart_app"),
   filesOpen: (id: string, session: Session, onData: Channel<ArrayBuffer>) => invoke<void>("files_open", { id, session, onData }),
   openStream: (id: string, session: Session, cols: number, rows: number, log: LogSpec | undefined, onData: Channel<ArrayBuffer>) =>
     invoke<void>("term_open_stream", { id, session, cols, rows, log: log ?? null, onData }),

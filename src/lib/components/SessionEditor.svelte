@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { TAB_COLORS } from "../tabColors";
   import { untrack } from "svelte";
   import Modal from "./Modal.svelte";
   import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -167,7 +168,7 @@
   {#if !k.ready}
     <div class="notice">
       <Info size={15} />
-      <span>{k.label} sessions can be saved now and will open once the <em>{k.phase}</em> phase is built.</span>
+      <span>Cablebag cannot open {k.label} sessions yet; you can save one now and it opens once Cablebag can.</span>
     </div>
   {/if}
 
@@ -315,15 +316,6 @@
         <label class="field"><span>User name</span><input bind:value={s.username} placeholder="Default user of the distribution" /></label>
         <label class="field"><span>Start folder</span><input bind:value={s.data.startup_dir} placeholder="~" /></label>
       {/if}
-      {#if s.kind === "serial"}
-        <div class="row3">
-          <label class="field grow"><span>Serial port</span><input bind:value={s.data.com_port} placeholder="COM1 or \\.\pipe\name" /></label>
-          <label class="field"><span>Speed</span><input bind:value={s.data.speed} placeholder="9600" /></label>
-        </div>
-      {/if}
-      {#if s.kind === "browser" || s.kind === "file"}
-        <label class="field"><span>{s.kind === "browser" ? "Web address" : "File, folder or link"}</span><input bind:value={s.data.target} /></label>
-      {/if}
       {#if s.kind === "ssh"}
         <label class="field"><span>Run this command after login</span><input bind:value={s.data.command} placeholder="Nothing" /></label>
         <label class="field"><span>Remote files when this session connects</span>
@@ -339,7 +331,7 @@
         <label class="check"><input type="checkbox" bind:checked={s.data.compression} /> Compress traffic (helps on slow links)</label>
         <label class="check"><input type="checkbox" checked={s.data.keepalive !== false} onchange={(e) => (s.data.keepalive = (e.target as HTMLInputElement).checked)} /> Keep the connection alive when idle</label>
         <label class="check"><input type="checkbox" checked={s.data.stay_after_command !== false} onchange={(e) => (s.data.stay_after_command = (e.target as HTMLInputElement).checked)} /> Stay logged in after the command ends</label>
-        <label class="check" title="Arrives with the X server phase"><input type="checkbox" bind:checked={s.data.x11} /> X11 forwarding <em class="soon">with the X server phase</em></label>
+        <label class="check" title="Cablebag has no X server yet, so programs with windows cannot be shown"><input type="checkbox" disabled checked={!!s.data.x11} /> X11 forwarding <em class="soon">not available yet</em></label>
       </div>
       <label class="field"><span>Terminal type reported to the server</span>
         <select bind:value={s.data.term_type}>
@@ -440,14 +432,7 @@
       {/if}
       <label class="field"><span>Tab colour</span>
         <select bind:value={s.data.tab_color}>
-          <option value="">No colour</option>
-          <option value="#bd4a3e">Brick</option>
-          <option value="#ad791c">Ochre</option>
-          <option value="#748427">Moss</option>
-          <option value="#3f8a55">Pine</option>
-          <option value="#4f7fa6">Steel</option>
-          <option value="#8f5e9d">Plum</option>
-          <option value="#7b7a74">Stone</option>
+          {#each TAB_COLORS as c}<option value={c.value}>{c.name}</option>{/each}
         </select>
       </label>
     {/if}

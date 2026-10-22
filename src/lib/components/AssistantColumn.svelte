@@ -4,9 +4,11 @@
   import { tick } from "svelte";
   import { app } from "../state.svelte";
   import { api } from "../api";
-  import { assistant, parts, inline, SCREEN_LINES } from "../assistant.svelte";
+  import { assistant, parts, inline, aiLimits } from "../assistant.svelte";
   import { memory } from "../memory.svelte";
-  import { Sparkles, X, Square, Send, ClipboardPaste, Copy, Eraser } from "@lucide/svelte";
+  import { Sparkles, X, Square, Send, ClipboardPaste, Copy, Eraser, Download } from "@lucide/svelte";
+  import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+  import { invoke } from "@tauri-apps/api/core";
   import { writeText } from "../clipboard";
 
   const tab = $derived(app.active && app.active.type !== "home" ? app.active : undefined);
@@ -84,6 +86,16 @@
     app.notify("Pasted into the terminal; press Enter there to run it.");
   }
 
+  async function saveConversation() {
+    if (!tab) return;
+    const day = new Date().toISOString().slice(0, 10);
+    const path = await saveDialog({ title: "Save this conversation", defaultPath: `assistant-${(tab.title || "tab").replace(/[^a-z0-9.-]+/gi, "-")}-${day}.txt`, filters: [{ name: "Text", extensions: ["txt"] }] });
+    if (!path) return;
+    invoke("write_text_file", { path, text: assistant.transcript(tab.id) })
+      .then(() => app.notify(`Saved to ${path}`))
+      .catch((e) => app.notify(String(e), "error"));
+  }
+
   function pick(v: string) {
     if (!conv) return;
     const [h, ...m] = v.split("|");
@@ -99,14 +111,15 @@
       <Sparkles size={13} />
       <span class="t">Assistant</span>
       {#if conv && assistant.hosts.length}
-        <select class="model" value={`${conv.hostId}|${conv.model}`} onchange={(e) => pick((e.target as HTMLSelectElement).value)} title="AI host and model">
+        <select class="model" value={`${conv.hostId}|${conv.model}`} onfocus={() => assistant.loadModels()} onpointerdown={() => assistant.loadModels()} onchange={(e) => pick((e.target as HTMLSelectElement).value)} title="AI host and model">
           {#each assistant.hosts as h (h.id)}
-            {#each [...new Set([h.model, h.vision_model].filter(Boolean))] as m}
+            {#each [...new Set([h.model, h.vision_model, conv.hostId === h.id ? conv.model : "", ...(assistant.models[h.id] ?? [])].filter(Boolean))] as m}
               <option value={`${h.id}|${m}`}>{h.name} · {m}</option>
             {/each}
           {/each}
         </select>
       {/if}
+      <button class="icon-btn" title="Save this conversation as a text file" disabled={!conv?.msgs.length} onclick={saveConversation}><Download size={13} /></button>
       <button class="icon-btn" title="Start over" disabled={!conv?.msgs.length} onclick={() => tab && assistant.clear(tab.id)}><Eraser size={13} /></button>
       <button class="icon-btn" title="Hide the assistant (Ctrl+Shift+A)" onclick={() => (assistant.open = false)}><X size={13} /></button>
     </header>
@@ -131,7 +144,7 @@
         {#if !conv?.msgs.length}
           <p class="muted hint">
             Ask about what you see, for example "why does this service not start?" or "what does this error mean?".
-            {#if isTerminal}The last {SCREEN_LINES} lines of this terminal go with your question; passwords and other secrets are hidden first.{/if}
+            {#if isTerminal}The last {aiLimits().screenLines} lines of this terminal go with your question; passwords and other secrets are hidden first.{/if}
             Commands in an answer can be pasted at the prompt; nothing runs until you press Enter there.
           </p>
         {/if}

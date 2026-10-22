@@ -54,14 +54,19 @@ components inside are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
 | Ctrl+Shift+T | New local terminal |
 | Ctrl+Shift+N | New session |
 | Ctrl+Shift+W | Close tab |
+| Ctrl+Shift+D | Open the same session again in a new tab |
+| Ctrl+Shift+H | Home |
 | Ctrl+Tab, Ctrl+Shift+Tab | Next, previous tab |
 | Ctrl+Shift+E | Show or hide the remote files |
 | Ctrl+Shift+A | Show or hide the assistant |
 | Ctrl+Alt+arrows | Tiling: focus the pane in that direction (with Shift: move the pane there) |
+| Ctrl+Alt+Enter | Tiling: let the pane fill the area, or back |
 | Ctrl+Shift+C, Ctrl+Shift+V | Copy, paste in the terminal |
+| Ctrl+Shift+F | Find in the terminal |
 | Ctrl+comma | Settings |
 
-Every shortcut is listed in the app: open the search box and type `>`.
+All shortcuts, also for tiling, are in Settings, Keyboard shortcuts; in the search box, `>` lists the commands
+with their keys.
 
 ## Building from source
 

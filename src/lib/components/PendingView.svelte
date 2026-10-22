@@ -13,8 +13,8 @@
     <span class="ic"><k.icon size={28} /></span>
     <h2>{s.name || s.host}</h2>
     <p>
-      Opening <strong>{k.label}</strong> sessions is part of the <em>{k.phase}</em> phase of Cablebag, which is not built yet.
-      The session and all its settings are saved, so it will open here as soon as that phase lands.
+      Cablebag cannot open <strong>{k.label}</strong> sessions yet. The session and all its settings are kept, so it
+      opens here once Cablebag can.
     </p>
     <dl>
       <dt>Type</dt><dd>{k.label}</dd>

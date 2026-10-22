@@ -560,8 +560,7 @@ fn parse_value(value: &str) -> Option<(String, String, i64, String, Value, Strin
             user.clear();
         }
         "file" | "browser" => {
-            data["target"] = json!(host.clone());
-            host.clear();
+            // The path or address is the session's host, where opening it looks.
             user.clear();
         }
         _ => {}
