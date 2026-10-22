@@ -493,7 +493,7 @@ impl Tunnel {
 }
 
 /// A port on 127.0.0.1 that leads to host:port through a WireGuard tunnel, for programs that need an address
-/// (the RDP control, VNC, telnet).
+/// (the RDP control, VNC, telnet). Only Cablebag's own programs get through (see `own`).
 pub struct WgForward {
     pub port: u16,
     task: JoinHandle<()>,
@@ -513,9 +513,13 @@ pub async fn local_forward(app: &AppHandle, id: &str, host: &str, port: u16) -> 
     let local = listener.local_addr()?.port();
     let (app, id, host) = (app.clone(), id.to_string(), host.to_string());
     let task = tokio::spawn(async move {
-        while let Ok((mut sock, _)) = listener.accept().await {
+        while let Ok((mut sock, peer)) = listener.accept().await {
             let (app, id, host) = (app.clone(), id.clone(), host.clone());
             tokio::spawn(async move {
+                // Only Cablebag's own programs; anyone else is simply closed.
+                if !crate::own::is_ours(peer, local).await {
+                    return;
+                }
                 if let Ok(mut s) = connect(&app, &id, &host, port).await {
                     let _ = tokio::io::copy_bidirectional(&mut sock, &mut s).await;
                 }
@@ -547,7 +551,7 @@ async fn handshake(app: &AppHandle, id: &str) -> Result<Arc<Tunnel>> {
 }
 
 /// An HTTP proxy on 127.0.0.1 for Cablebag's own web tabs: every request goes through the tunnel, names are
-/// looked up the way sessions do (the tunnel's DNS, or else as usual). Not meant for other programs.
+/// looked up the way sessions do (the tunnel's DNS, or else as usual). Other programs on this PC get a 403.
 pub struct WebProxy {
     pub port: u16,
     task: JoinHandle<()>,
@@ -592,9 +596,13 @@ where
     let port = listener.local_addr()?.port();
     let tunnel = Arc::new(tunnel);
     let task = tokio::spawn(async move {
-        while let Ok((mut sock, _)) = listener.accept().await {
+        while let Ok((mut sock, peer)) = listener.accept().await {
             let tunnel = tunnel.clone();
             tokio::spawn(async move {
+                if !crate::own::is_ours(peer, port).await {
+                    let _ = forbidden(&mut sock).await;
+                    return;
+                }
                 match tunnel().await {
                     Ok(t) => {
                         let _ = proxy_one(sock, t).await;
@@ -686,6 +694,24 @@ fn split_host_port(target: &str, default: u16) -> (String, u16) {
         Some((h, p)) if !h.ends_with(':') && p.parse::<u16>().is_ok() => (h.trim_matches(|c| c == '[' || c == ']').to_string(), p.parse().unwrap()),
         _ => (target.trim_matches(|c| c == '[' || c == ']').to_string(), default),
     }
+}
+
+/// The answer to another program that tries the proxy. Its request is read first (briefly), so the answer is
+/// not lost in a reset.
+async fn forbidden(sock: &mut TcpStream) -> Result<()> {
+    let mut b = [0u8; 8192];
+    let _ = tokio::time::timeout(Duration::from_secs(1), sock.read(&mut b)).await;
+    let body = "This proxy is only for Cablebag's own web tabs.";
+    let head = format!("HTTP/1.1 403 Forbidden
+Content-Type: text/plain; charset=utf-8
+Content-Length: {}
+Connection: close
+
+", body.len());
+    sock.write_all(head.as_bytes()).await?;
+    sock.write_all(body.as_bytes()).await?;
+    sock.shutdown().await?;
+    Ok(())
 }
 
 async fn bad_gateway(sock: &mut TcpStream, msg: &str) -> Result<()> {
