@@ -37,11 +37,25 @@
     if (assistant.open) tick().then(() => input?.focus());
   });
 
-  // Keep the newest answer in view while it streams.
+  // Keep the newest part in view: streamed text, new commands, their state and memory lines.
+  const progress = $derived(
+    (conv?.msgs ?? []).map((m) => `${m.text.length}|${(m.steps ?? []).map((s) => s.state).join(",")}|${m.notes?.length ?? 0}`).join(";"),
+  );
   $effect(() => {
-    void conv?.msgs.at(-1)?.text;
+    void progress;
     tick().then(() => list && (list.scrollTop = list.scrollHeight));
   });
+
+  const memoryLine = $derived.by(() => {
+    const n = memory.relevant(tab?.session).length;
+    return n === 0 ? "nothing yet" : n === 1 ? "1 fact goes along" : `${n} facts go along`;
+  });
+
+  /** A command waiting for your OK, if any. */
+  const waiting = $derived((conv?.msgs ?? []).flatMap((m) => m.steps ?? []).find((s) => s.state === "asking"));
+  function showWaiting() {
+    list?.querySelector(".step.asking")?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
 
   function drag(e: PointerEvent) {
     const startX = e.clientX;
@@ -108,7 +122,7 @@
       <div class="about muted small">
         About: {assistant.describe(tab)}
         {#if works}<br />{prot ? "Protected folder: every command asks you first." : "Can work on this server: reads by itself, asks before every change."}{/if}
-        <br />Memory: {memory.relevant(tab.session).length || "nothing yet"}{memory.relevant(tab.session).length ? " facts go along" : ""}
+        <br />Memory: {memoryLine}
       </div>
       <div class="msgs" bind:this={list}>
         {#if !conv?.msgs.length}
@@ -177,6 +191,13 @@
           {/if}
         {/each}
       </div>
+      {#if waiting}
+        <button class="waitbar" onclick={showWaiting}>
+          <span class="smark connecting"></span>
+          <span>Waiting for your OK on <span class="mono">{waiting.command.length > 60 ? waiting.command.slice(0, 60) + "..." : waiting.command}</span></span>
+          <span class="go">Show it</span>
+        </button>
+      {/if}
       <div class="ask">
         <textarea
           bind:this={input}
@@ -461,6 +482,31 @@
   }
   .thinking {
     margin: 0;
+  }
+  .waitbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 7px 10px;
+    border: none;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+    background: var(--warn-soft);
+    color: var(--text);
+    font-size: 12px;
+    text-align: left;
+  }
+  .waitbar > span:nth-child(2) {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .waitbar .go {
+    color: var(--warn-text);
+    font-weight: 600;
   }
   .ask {
     border-top: 1px solid var(--border);

@@ -6,6 +6,13 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.5.2 · 22 October 2026
+
+- **You can see when the assistant waits for you.** The conversation now follows every new command and card,
+  and while a command waits for your OK, a bar above the question box says so, with **Show it**.
+- `systemctl` with options before the subcommand (such as `systemctl --no-pager --failed`) counts as reading
+  again, instead of as a change.
+
 ## 0.5.1 · 22 October 2026
 
 - **Import from MobaXterm is back under its own name.** It finds `MobaXterm.ini` by itself and shows how many

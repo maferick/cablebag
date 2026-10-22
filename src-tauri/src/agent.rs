@@ -88,7 +88,11 @@ fn reads(words: &[&str]) -> bool {
     match w0 {
         "find" => !rest.iter().any(|w| matches!(*w, "-delete" | "-exec" | "-execdir" | "-ok" | "-fprint" | "-fprintf" | "-fls")),
         "sed" => !rest.iter().any(|w| w.starts_with("-i") || *w == "--in-place"),
-        "systemctl" => rest.first().is_some_and(|s| matches!(*s, "status" | "is-active" | "is-enabled" | "is-failed" | "list-units" | "list-unit-files" | "list-timers" | "show" | "cat" | "list-dependencies" | "--failed")),
+        // Options may come before the subcommand (systemctl --no-pager --failed); without one it lists units.
+        "systemctl" => match rest.iter().find(|w| !w.starts_with('-')) {
+            Some(s) => matches!(*s, "status" | "is-active" | "is-enabled" | "is-failed" | "list-units" | "list-unit-files" | "list-timers" | "list-sockets" | "show" | "cat" | "list-dependencies"),
+            None => true,
+        },
         "journalctl" => !rest.iter().any(|w| w.starts_with("--vacuum") || *w == "--rotate" || *w == "--flush"),
         "ip" => !rest.iter().any(|w| matches!(*w, "add" | "del" | "delete" | "set" | "change" | "replace" | "flush" | "append")),
         "docker" | "podman" => rest.first().is_some_and(|s| matches!(*s, "ps" | "logs" | "inspect" | "images" | "stats" | "top" | "version" | "info" | "port" | "diff" | "history")),
@@ -365,6 +369,8 @@ mod tests {
             "qm list",
             "ss -tlnp 2>/dev/null | head -40; command -v nginx caddy haproxy && true",
             "test -f /etc/nginx/nginx.conf && echo yes",
+            "systemctl --no-pager --failed",
+            "systemctl --no-pager status nginx",
         ] {
             assert_eq!(e(c), Effect::Reads, "{c}");
         }
@@ -385,6 +391,7 @@ mod tests {
             "touch /tmp/x",
             "cat x | sh",
             "command rm -rf /tmp/x",
+            "systemctl --no-pager restart nginx",
         ] {
             assert_eq!(e(c), Effect::Changes, "{c}");
         }
