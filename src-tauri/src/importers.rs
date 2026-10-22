@@ -1,5 +1,5 @@
 //! Importing sessions from other programs and files: PuTTY and KiTTY saved sessions, WinSCP sites, the
-//! OpenSSH config file, Remote Desktop (.rdp) files and session files (.ini or .mxtsessions, the format with
+//! OpenSSH config file, Remote Desktop (.rdp) files and MobaXterm (MobaXterm.ini or .mxtsessions, the format with
 //! one `Name= #icon#type%field1%field2...#terminal#start mode#comment#colour` line per session and the folder
 //! in each `[Bookmarks_N]` section's `SubRep=`).
 //!
@@ -86,10 +86,13 @@ pub fn sources() -> Vec<Source> {
             extensions: vec!["rdp"],
         },
         Source {
-            id: "sessionfile",
-            name: "Session file",
-            description: "An .ini or .mxtsessions file with sessions and folders.".into(),
-            found: None,
+            id: "mobaxterm",
+            name: "MobaXterm",
+            description: match mobaxterm_ini() {
+                Some(p) => format!("Sessions and folders from {}, or choose a .mxtsessions export.", p.display()),
+                None => "Sessions and folders from MobaXterm.ini or a .mxtsessions export (choose the file).".into(),
+            },
+            found: Some(mobaxterm_ini().map(|p| session_file(&p).map(|v| v.len()).unwrap_or(0)).unwrap_or(0)),
             extensions: vec!["ini", "mxtsessions"],
         },
     ]
@@ -112,9 +115,12 @@ pub fn import(store: &Store, source: &str, paths: &[String]) -> Result<Report> {
             }
             (Some("Remote Desktop files"), all, paths.join(", "))
         }
-        "sessionfile" => {
-            let p = paths.first().context("Choose a session file.")?;
-            (None, session_file(Path::new(p))?, p.clone())
+        "mobaxterm" | "sessionfile" => {
+            let p = match paths.first() {
+                Some(p) => PathBuf::from(p),
+                None => mobaxterm_ini().context("MobaXterm.ini was not found on this PC; choose the file.")?,
+            };
+            (None, session_file(&p)?, p.display().to_string())
         }
         _ => bail!("Unknown import source {source}."),
     };
@@ -449,7 +455,17 @@ fn rdp_file(path: &Path) -> Result<Item> {
     })
 }
 
-// ---- Session files (.ini, .mxtsessions) ----
+// ---- MobaXterm: MobaXterm.ini (installed or portable copy) and .mxtsessions exports ----
+
+/// Where MobaXterm keeps its settings: %APPDATA%\MobaXterm for the installed version, Documents\MobaXterm for
+/// some setups.
+fn mobaxterm_ini() -> Option<PathBuf> {
+    [dirs::config_dir(), dirs::document_dir()]
+        .into_iter()
+        .flatten()
+        .map(|d| d.join("MobaXterm").join("MobaXterm.ini"))
+        .find(|p| p.exists())
+}
 
 fn kind_of(t: &str) -> &'static str {
     match t {

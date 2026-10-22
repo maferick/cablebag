@@ -20,7 +20,7 @@ local shells, Proxmox consoles and an AI assistant, all as tabs in one window.
   Remote Desktop, SSH or the console, and you can start, shut down and reboot from the tree.
 - **Logins from Vaultwarden**, unlocked with Windows Hello. Passwords kept on this PC are encrypted under your
   Windows account and never leave it.
-- **Your sessions follow you.** Import from PuTTY, KiTTY, WinSCP, the OpenSSH config and `.rdp` files; sync sessions,
+- **Your sessions follow you.** Import from MobaXterm, PuTTY, KiTTY, WinSCP, the OpenSSH config and `.rdp` files; sync sessions,
   folders, macros and tunnels through a private git repository, encrypted, passwords never included.
 - **An assistant that works on your servers.** Ask about what is on screen; in an SSH tab it investigates by itself,
   asks before every change, remembers what it learns per server, and hides passwords and secrets before anything is

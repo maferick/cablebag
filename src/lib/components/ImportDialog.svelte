@@ -23,12 +23,12 @@
   });
 
   const source = $derived(sources.find((s) => s.id === chosen));
-  const ready = $derived(!!source && (source.found === null ? (files[source.id]?.length ?? 0) > 0 : source.found > 0));
+  const ready = $derived(!!source && ((files[source.id]?.length ?? 0) > 0 || (source.found ?? 0) > 0));
 
   async function browse(s: ImportSource) {
     const many = s.id === "rdp";
     const f = await openDialog({
-      title: many ? "Choose Remote Desktop files" : "Choose a session file",
+      title: many ? "Choose Remote Desktop files" : `Choose a ${s.name} file`,
       multiple: many,
       filters: [{ name: s.name, extensions: s.extensions }],
     });
@@ -65,14 +65,15 @@
           <span class="txt">
             <span class="nm">{s.name}</span>
             <span class="muted small">{s.description}</span>
-            {#if s.found === null && files[s.id]?.length}
+            {#if files[s.id]?.length}
               <span class="small files">{files[s.id].map(name).join(", ")}</span>
             {/if}
           </span>
-          {#if s.found === null}
-            <button class="btn" onclick={(e) => { e.stopPropagation(); browse(s); }}><FolderOpen size={14} /> Choose</button>
-          {:else}
+          {#if s.found !== null}
             <span class="count" class:zero={none}>{none ? "none on this PC" : `${s.found} found`}</span>
+          {/if}
+          {#if s.extensions.length}
+            <button class="btn" onclick={(e) => { e.stopPropagation(); browse(s); }}><FolderOpen size={14} /> Choose</button>
           {/if}
         </div>
       {/each}

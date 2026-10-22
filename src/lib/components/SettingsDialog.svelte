@@ -171,7 +171,7 @@
           <SettingsRow label="Ask before closing" help="When sessions are still connected.">
             <input type="checkbox" class="switch" checked={app.settings["ui.confirmClose"]} onchange={set("ui.confirmClose")} />
           </SettingsRow>
-          <SettingsRow label="Import sessions" help="From PuTTY, KiTTY, WinSCP, the OpenSSH config, Remote Desktop files or session files.">
+          <SettingsRow label="Import sessions" help="From MobaXterm, PuTTY, KiTTY, WinSCP, the OpenSSH config or Remote Desktop files.">
             <button class="btn" onclick={() => (app.importOpen = true)}>Import sessions...</button>
           </SettingsRow>
         </SettingsSection>

@@ -6,6 +6,11 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.5.1 · 22 October 2026
+
+- **Import from MobaXterm is back under its own name.** It finds `MobaXterm.ini` by itself and shows how many
+  sessions it holds; you can also choose an `.mxtsessions` export.
+
 ## 0.5.0 · 22 October 2026
 
 **The assistant remembers, and Settings you can read**

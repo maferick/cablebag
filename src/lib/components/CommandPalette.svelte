@@ -147,7 +147,7 @@
       },
       { group: "Actions", label: "Larger terminal text", keys: "Ctrl+plus", words: "font zoom", icon: AArrowUp, run: () => app.setSetting("term.fontSize", Math.min(40, Number(app.settings["term.fontSize"]) + 1)) },
       { group: "Actions", label: "Smaller terminal text", keys: "Ctrl+minus", words: "font zoom", icon: AArrowDown, run: () => app.setSetting("term.fontSize", Math.max(7, Number(app.settings["term.fontSize"]) - 1)) },
-      { group: "Actions", label: "Import sessions", words: "putty winscp kitty ssh config rdp ini", icon: Download, run: () => (app.importOpen = true) },
+      { group: "Actions", label: "Import sessions", words: "mobaxterm putty winscp kitty ssh config rdp ini", icon: Download, run: () => (app.importOpen = true) },
     );
     if (vault.status.configured) {
       if (vault.status.unlocked) {
