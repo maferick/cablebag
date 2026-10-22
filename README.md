@@ -54,8 +54,9 @@ tabs, at the same time.
 ## Sessions
 
 - **SSH**, with remote files beside the terminal, port forwards (local, remote, SOCKS), jump hosts, agent
-  forwarding (Pageant or the Windows OpenSSH agent, per session, off by default) and automatic reconnect in the
-  same terminal when the connection drops.
+  forwarding (Pageant or the Windows OpenSSH agent, per session, off by default), windows of Linux programs
+  shown on your PC (X11, with the X server that comes with Cablebag) and automatic reconnect in the same terminal
+  when the connection drops.
 - **Remote Desktop (RDP)**, sized to its pane, Ctrl+Alt+Del that works, and a clear message when a session ends.
 - **VNC**, **Telnet** and **serial ports**.
 - **SFTP and FTP** as file sessions.

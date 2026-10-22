@@ -26,6 +26,9 @@ for (const [path, p] of Object.entries(lock.packages)) {
   rows.push({ kind: "JavaScript", name, version: p.version, licence: p.license ?? "see the project", link: `https://www.npmjs.com/package/${name}` });
 }
 
+// Separate programs shipped unchanged next to Cablebag (Windows bundle).
+const xserver = JSON.parse(readFileSync("scripts/xserver.json", "utf8"));
+
 rows.sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
 const seen = new Set();
 const unique = rows.filter((r) => {
@@ -43,6 +46,27 @@ const out = [
   "",
   "The Remote Desktop helper uses only the .NET runtime (MIT) and the Remote Desktop control that is part of",
   "Windows. The window uses Microsoft Edge WebView2, which is part of Windows.",
+  "",
+  "## Programs shipped with Cablebag",
+  "",
+  `To show windows of Linux programs from SSH sessions (X11 forwarding), the Windows version comes with the X server`,
+  `${xserver.name} ${xserver.version}, in the folder vcxsrv next to Cablebag. It is a separate program, shipped`,
+  `unchanged from its official release: Cablebag only starts it and talks to it over the X protocol. ${xserver.name} is`,
+  `free software under the GNU General Public License version 3 (${xserver.licence}); its licence text is in`,
+  "vcxsrv\\COPYING, and its components (such as the X.Org server, Mesa, FreeType and OpenSSL) carry their own",
+  "notices in its source code. The licence of Cablebag does not apply to it: you may use, copy, change and pass it",
+  "on under the terms of the GPL.",
+  "",
+  `The complete corresponding source code of ${xserver.name} ${xserver.version} is at ${xserver.source}`,
+  `(archive: ${xserver.sourceArchive}). For at least three years after the last Cablebag release that`,
+  "contains this version, a copy of that source code is also available from the Cablebag maintainer at no charge",
+  "beyond the cost of providing it: ask in an issue at https://github.com/maferick/cablebag/issues.",
+  "",
+  "| Program | Version | Licence | Where |",
+  "| --- | --- | --- | --- |",
+  `| ${xserver.name} | ${xserver.version} | ${xserver.licence} | ${xserver.project} |`,
+  "",
+  "## Components built into Cablebag",
   "",
   "| Component | Version | Licence | Where |",
   "| --- | --- | --- | --- |",

@@ -1,0 +1,12 @@
+{
+  "name": "VcXsrv",
+  "version": "21.1.16.1",
+  "licence": "GPL-3.0",
+  "project": "https://github.com/marchaesen/vcxsrv",
+  "installer": "https://github.com/marchaesen/vcxsrv/releases/download/21.1.16.1/vcxsrv-64.21.1.16.1.installer.exe",
+  "installerSha256": "df7fed8f49665d0592528ab6be9d07111ea73c6848283d128b77690e05b8f90b",
+  "licenceText": "https://raw.githubusercontent.com/marchaesen/vcxsrv/21.1.16.1/COPYING",
+  "licenceTextSha256": "0b383d5a63da644f628d99c33976ea6487ed89aaa59f0b3257992deac1171e6b",
+  "source": "https://github.com/marchaesen/vcxsrv/tree/21.1.16.1",
+  "sourceArchive": "https://github.com/marchaesen/vcxsrv/archive/refs/tags/21.1.16.1.tar.gz"
+}

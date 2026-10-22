@@ -25,6 +25,7 @@ mod updater;
 mod vault;
 mod vnc;
 mod wg;
+mod x11;
 
 use parking_lot::Mutex;
 use serde::Serialize;
