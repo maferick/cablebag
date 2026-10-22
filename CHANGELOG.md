@@ -6,6 +6,12 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.14.2 · 22 October 2026
+
+- **WireGuard networks are made where you use them**: next to Network in a session or a folder there are
+  **Import .conf**, **New** and **Edit**. A network you add there is chosen for that session straight away. The
+  Tunnels page keeps the overview with their live state.
+
 ## 0.14.1 · 22 October 2026
 
 - **Edit session works again**: since 0.13.0, opening the editor of a session without a WireGuard network stopped
