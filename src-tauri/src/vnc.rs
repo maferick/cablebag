@@ -90,6 +90,7 @@ async fn run_inner(app: &AppHandle, session: &Session, out: &TermOut, rx: &mut m
             vault_item: s(gw, "vault_item"),
             session_id: String::new(),
             name: String::new(),
+            ..Default::default()
         };
         let conn = Arc::new(ssh::connect_chain(app, &[hop], true, &StatusSink(out)).await?);
         let f = tunnel::local_forward(conn, 0, host.clone(), port).await?;

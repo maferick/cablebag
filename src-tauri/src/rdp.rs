@@ -212,7 +212,47 @@ pub async fn open(app: AppHandle, id: String, session: Session, geo: Geometry) -
     let mut host = session.host.trim().to_string();
     let mut port = if session.port > 0 { session.port as u16 } else { 3389 };
     let mut user = session.username.clone();
+    let mut domain = s(&session.data, "domain");
+    let mut options = session.data.clone();
     status(&app, &id, "connecting", "");
+
+    // Through CyberArk PSM: the connection goes to the PSM server, which logs in to the target itself.
+    let mut psm_password = None;
+    // "none": directly, even when a folder above goes through PSM.
+    let psm = Some(s(&session.data, "psm")).filter(|p| p != "none").unwrap_or_default();
+    if !psm.is_empty() {
+        let (cfg, b) = state.creds.cyberark(&app, &psm)?;
+        let crate::sources::Backend::CyberArk(ca) = &*b else { anyhow::bail!("The PSM source is not a CyberArk source.") };
+        // The linked CyberArk account, when it is one of this source's.
+        let item = s(&session.data, "vault_item");
+        let account = match crate::sources::parse_ref(&item) {
+            (Some(src), a) if src == cfg.id && !a.is_empty() => Some(a.to_string()),
+            _ => None,
+        };
+        let mut target_user = user.clone();
+        if target_user.is_empty() && account.is_some() {
+            if let Some(i) = state.creds.items(&app).into_iter().find(|i| i.id == item) {
+                target_user = i.username;
+            }
+        }
+        let p = match crate::sources::cyberark::psm_rdp(ca, &app, &cfg, account.as_deref(), &target_user, &host).await {
+            Ok(p) => p,
+            Err(e) => {
+                status(&app, &id, "failed", &e.to_string());
+                return Ok(());
+            }
+        };
+        emit(&app, &id, "log", &format!("Through CyberArk PSM ({}).", p.host), Value::Null);
+        host = p.host;
+        port = if p.port > 0 { p.port } else { 3389 };
+        user = p.user;
+        domain = p.domain;
+        psm_password = Some(p.password);
+        if let Some(o) = options.as_object_mut() {
+            o.insert("remote_program".into(), Value::String(p.remote_program));
+            o.insert("load_balance_info".into(), Value::String(p.load_balance_info));
+        }
+    }
 
     // Optional SSH gateway: forward a local port to the RDP server through SSH first.
     let mut fwd = None;
@@ -227,6 +267,7 @@ pub async fn open(app: AppHandle, id: String, session: Session, geo: Geometry) -
             vault_item: s(gw, "vault_item"),
             session_id: String::new(),
             name: String::new(),
+            ..Default::default()
         };
         let log = Log { app: &app, id: &id };
         log.info(&format!("Opening SSH gateway {}...", hop.host));
@@ -244,11 +285,14 @@ pub async fn open(app: AppHandle, id: String, session: Session, geo: Geometry) -
         fwd = Some(Box::new(f));
     }
 
-    // Password: from a linked Vaultwarden item, saved in Cablebag, or asked once.
+    // Password: from a linked credential source login, saved in Cablebag, or asked once. Through PSM it is
+    // whatever PSM gave (often nothing: PSM asks, or logs in by itself).
     let vault_host = session.host.trim().to_string();
     let mut from_vw = None;
-    let item = s(&session.data, "vault_item");
-    if !item.is_empty() {
+    let item = if psm.is_empty() { s(&session.data, "vault_item") } else { String::new() };
+    if let Some(pw) = psm_password {
+        from_vw = Some(pw);
+    } else if !item.is_empty() {
         match state.creds.login(&app, &item).await {
             Ok((u, pw)) => {
                 if user.is_empty() {
@@ -266,7 +310,7 @@ pub async fn open(app: AppHandle, id: String, session: Session, geo: Geometry) -
         None => state.vault.password(&state.store.lock(), "rdp", &vault_host, session.port, &user).ok().flatten(),
     };
     // No linked login: the vault may still have one for this host.
-    if saved.is_none() && item.is_empty() {
+    if saved.is_none() && item.is_empty() && psm.is_empty() {
         match state.creds.pick_login(&app, "rdp", &vault_host, &user, &session.name).await {
             Ok(Some((found, name, u, pw))) if !pw.is_empty() => {
                 if user.is_empty() {
@@ -375,12 +419,12 @@ pub async fn open(app: AppHandle, id: String, session: Session, geo: Geometry) -
         "host": host,
         "port": port,
         "user": user,
-        "domain": s(&session.data, "domain"),
+        "domain": domain,
         "password": password,
         "width": geo.w,
         "height": geo.h,
         "scale": geo.scale,
-        "options": session.data,
+        "options": options,
     }));
     state.rdp.map.lock().insert(id, proc_);
     Ok(())

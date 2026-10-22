@@ -22,7 +22,9 @@
   let vaultItem = $state<string>(app.settings["sync.vault_item"] || "");
   let tokenFrom = $state<"vault" | "here">(app.settings["sync.vault_item"] || !app.settings["sync.url"] ? "vault" : "here");
   let token = $state("");
-  let encrypt = $state<string>(app.settings["sync.encrypt"] || (vault.status.configured ? "vault" : "passphrase"));
+  /** The vaults whose account key can encrypt the sync. */
+  const keyVaults = $derived(vault.sources.filter((s) => s.kind === "vaultwarden" && s.configured));
+  let encrypt = $state<string>(app.settings["sync.encrypt"] || (vault.sources.some((s) => s.kind === "vaultwarden" && s.configured) ? "vault" : "passphrase"));
   let passphrase = $state("");
   let hasToken = $state(false);
   let hasPassphrase = $state(false);
@@ -97,7 +99,7 @@
   <div class="field">
     <span>Access token, with read and write on repositories (GitHub: a fine-grained token with Contents; GitLab: api scope)</span>
     <div class="choice">
-      <label class="check"><input type="radio" bind:group={tokenFrom} value="vault" /> From a Vaultwarden item (password = token)</label>
+      <label class="check"><input type="radio" bind:group={tokenFrom} value="vault" /> From a credential source (password = token)</label>
       <label class="check"><input type="radio" bind:group={tokenFrom} value="here" /> Type it here, kept encrypted on this PC</label>
     </div>
   </div>
@@ -112,11 +114,18 @@
 
 <label class="field"><span>Encryption of the files in the repository</span>
   <select bind:value={encrypt}>
-    <option value="vault" disabled={!vault.status.configured}>Encrypted with a key from your vault (the same on every PC with this vault){vault.status.configured ? "" : " - set up the vault first"}</option>
+    <option value="vault" disabled={!keyVaults.length}>Encrypted with a key from your vault (the same on every PC with this vault){keyVaults.length ? "" : ", once a Vaultwarden source is set up"}</option>
     <option value="passphrase">Encrypted with a passphrase (type the same one on every PC)</option>
     <option value="off">Not encrypted (readable in the repository)</option>
   </select>
 </label>
+{#if encrypt === "vault" && keyVaults.length > 1}
+  <label class="field"><span>The vault whose key it is (choose the same one on every PC)</span>
+    <select value={app.settings["sync.keySource"] || keyVaults[0].id} onchange={(e) => app.setSetting("sync.keySource", (e.target as HTMLSelectElement).value)}>
+      {#each keyVaults as v (v.id)}<option value={v.id}>{v.name} ({v.account})</option>{/each}
+    </select>
+  </label>
+{/if}
 {#if encrypt === "passphrase"}
   <input type="password" bind:value={passphrase} placeholder={hasPassphrase ? "Leave empty to keep the saved passphrase" : "At least 8 characters"} autocomplete="off" />
 {/if}

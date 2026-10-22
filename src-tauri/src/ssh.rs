@@ -30,7 +30,7 @@ pub struct SshConn {
 
 pub type Forwards = Arc<parking_lot::Mutex<std::collections::HashMap<u32, (String, u16)>>>;
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Hop {
     /// WireGuard network to reach this host through (only the first hop of a session).
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -54,6 +54,12 @@ pub struct Hop {
     /// The session's name, which can also find its login in the vault.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
+    /// The CyberArk source to connect through PSM for SSH with (only the last hop of a session); empty = directly.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub psm: String,
+    /// A private key held in memory only (the key PSM for SSH accepts after single sign-on).
+    #[serde(skip)]
+    pub key_pem: Option<Arc<String>>,
 }
 
 fn default_port() -> u16 {
@@ -381,7 +387,20 @@ async fn authenticate(h: &mut Handle, hop: &Hop, app: &AppHandle, out: &impl Sin
         }
     }
 
-    // 2. Private key file.
+    // 2. A key held in memory (from CyberArk, for PSM for SSH), then the private key file.
+    if let (Some(pem), true) = (&hop.key_pem, offers(MethodKind::PublicKey)) {
+        match keys::decode_secret_key(pem, None) {
+            Ok(k) => {
+                let hash = h.best_supported_rsa_hash().await?.flatten();
+                if h.authenticate_publickey(&user, PrivateKeyWithHashAlg::new(Arc::new(k), hash)).await?.success() {
+                    out.info("Logged in with the key from CyberArk.");
+                    return Ok(());
+                }
+                out.error("PSM for SSH did not accept the key from CyberArk.");
+            }
+            Err(_) => out.error("The key from CyberArk could not be read."),
+        }
+    }
     if !hop.key_path.trim().is_empty() && offers(MethodKind::PublicKey) {
         let path = expand_path(hop.key_path.trim());
         let key = match keys::load_secret_key(&path, None) {
@@ -568,6 +587,13 @@ pub async fn connect_chain(app: &AppHandle, hops: &[Hop], keepalive: bool, out: 
     let mut prev: Option<Arc<Handle>> = None;
     let mut jumps = Vec::new();
     for (i, hop) in hops.iter().enumerate() {
+        let through_psm;
+        let hop = if hop.psm.is_empty() {
+            hop
+        } else {
+            through_psm = psm_hop(app, hop, out).await?;
+            &through_psm
+        };
         let via = if i + 1 < hops.len() { " (jump host)" } else { "" };
         if i == 0 && !hop.via_wg.is_empty() {
             let t = crate::wg::tunnel(app, &hop.via_wg).await?;
@@ -635,11 +661,43 @@ pub fn hops_for(s: &Session) -> Vec<Hop> {
         vault_item: str_of(&s.data, "vault_item"),
         session_id: s.id.clone(),
         name: s.name.clone(),
+        psm: Some(str_of(&s.data, "psm")).filter(|p| p != "none").unwrap_or_default(),
+        key_pem: None,
     });
     if let (Some(first), Some(wg)) = (hops.first_mut(), crate::wg::of(s)) {
         first.via_wg = wg;
     }
     hops
+}
+
+/// The hop to PSM for SSH (PSMP) that takes the place of a hop to its target: PSMP's address, the combined
+/// login name (vault user, target user and target), and the key CyberArk gave after single sign-on. The
+/// target user comes from the session, or else from the CyberArk account linked to it.
+async fn psm_hop(app: &AppHandle, hop: &Hop, out: &impl Sink) -> Result<Hop> {
+    let state = app.state::<AppState>();
+    let (cfg, b) = state.creds.cyberark(app, &hop.psm)?;
+    let crate::sources::Backend::CyberArk(ca) = &*b else { bail!("The PSM source is not a CyberArk source.") };
+    let mut user = hop.user.trim().to_string();
+    if user.is_empty() && !hop.vault_item.trim().is_empty() {
+        if let Some(i) = state.creds.items(app).into_iter().find(|i| i.id == hop.vault_item.trim()) {
+            user = i.username;
+        }
+    }
+    let p = crate::sources::cyberark::psmp_login(ca, app, &cfg, &user, hop.host.trim(), hop.port).await?;
+    out.info(&format!("Through CyberArk PSM for SSH ({}).", p.host));
+    Ok(Hop {
+        host: p.host,
+        port: p.port,
+        user: p.user,
+        key_path: String::new(),
+        // The target's login stays with CyberArk; PSM for SSH asks for yours when it has no key.
+        vault_item: String::new(),
+        session_id: String::new(),
+        name: String::new(),
+        psm: String::new(),
+        key_pem: p.key.map(Arc::new),
+        ..hop.clone()
+    })
 }
 
 pub async fn run_terminal(

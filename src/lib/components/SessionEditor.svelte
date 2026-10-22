@@ -7,6 +7,7 @@
   import { KINDS, kindInfo } from "../kinds";
   import { BUILTIN_SYNTAX } from "../highlight";
   import VaultPicker from "./VaultPicker.svelte";
+  import PsmPicker from "./PsmPicker.svelte";
   import { vault } from "../vault.svelte";
   import { api, type Session } from "../api";
   import { Plus, Trash2, ArrowUp, ArrowDown, FolderOpen, Info, ServerCog, ChevronRight } from "@lucide/svelte";
@@ -68,7 +69,7 @@
       .map((d) => {
         const v = folderValues.values[d.key];
         const shown =
-          d.key === "jump_hosts" ? v.map((j: any) => j.host).join(", ") : d.key === "vault_item" ? "set" : d.key === "tab_color" ? "" : d.key === "wireguard" ? wireguard.name(v) : v;
+          d.key === "jump_hosts" ? v.map((j: any) => j.host).join(", ") : d.key === "vault_item" ? "set" : d.key === "tab_color" ? "" : d.key === "wireguard" ? wireguard.name(v) : d.key === "psm" ? (vault.source(v)?.name ?? "") : v;
         return `${d.label}${shown ? ` ${shown}` : ""} (${folderValues.from[d.key]})`;
       }),
   );
@@ -304,6 +305,11 @@
       {#if s.kind === "ssh" || s.kind === "rdp" || s.kind === "sftp" || s.kind === "vnc" || s.kind === "telnet" || s.kind === "ftp"}
         <div class="field"><span>Login from the vault</span>
           <VaultPicker bind:itemId={s.data.vault_item} hint={s.host} />
+        </div>
+      {/if}
+      {#if s.kind === "ssh" || s.kind === "rdp" || s.kind === "sftp"}
+        <div class="field"><span>CyberArk PSM</span>
+          <PsmPicker bind:value={s.data.psm} inherited={folderValues.values.psm} from={`the folder ${folderValues.from.psm ?? ""}`} />
         </div>
       {/if}
       {#if s.kind === "ssh" || s.kind === "rdp" || s.kind === "sftp" || s.kind === "vnc" || s.kind === "telnet" || s.kind === "browser"}

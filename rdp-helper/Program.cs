@@ -428,6 +428,9 @@ class HostForm : Form, IMsTscAxEvents
         sec.KeyboardHookMode = B(o, "forward_shortcuts", true) ? 1 : 2;
         var prog = S(o, "remote_program");
         if (prog != "") { sec.StartProgram = prog; }
+        // A connection through CyberArk PSM can carry a routing token for its load balancer.
+        var lbi = S(o, "load_balance_info");
+        if (lbi != "") { adv.LoadBalanceInfo = lbi; }
 
         try { adv.AudioCaptureRedirectionMode = B(o, "redirect_microphone", false); } catch { }
         try { adv.EnableSuperPan = false; } catch { }

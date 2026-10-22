@@ -3,6 +3,7 @@
   // own, such as one customer's user name, key, vault login and jump host.
   import Modal from "./Modal.svelte";
   import VaultPicker from "./VaultPicker.svelte";
+  import PsmPicker from "./PsmPicker.svelte";
   import WireGuardPicker from "./WireGuardPicker.svelte";
   import { wireguard } from "../wireguard.svelte";
   import { app, FOLDER_DEFAULTS } from "../state.svelte";
@@ -58,6 +59,9 @@
     <div class="field"><span>Login from the vault</span>
       <VaultPicker bind:itemId={d.vault_item} />
       {#if !d.vault_item && from("vault_item")}<span class="muted small">{from("vault_item")}</span>{/if}
+    </div>
+    <div class="field"><span>CyberArk PSM (SSH, SFTP, RDP)</span>
+      <PsmPicker bind:value={d.psm} inherited={above.values.psm} from={above.from.psm ?? ""} />
     </div>
     <div class="field"><span>Network (SSH, RDP, VNC, telnet, web)</span>
       <WireGuardPicker bind:value={d.wireguard} inherited={above.values.wireguard} from={above.from.wireguard ?? ""} />

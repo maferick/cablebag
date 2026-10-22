@@ -157,14 +157,15 @@
       { group: "Actions", label: "About Cablebag", words: "version licence license update changelog what's new data folder", icon: Info, run: () => app.openSettings("about") },
       { group: "Actions", label: "Import sessions", words: "mobaxterm putty winscp kitty ssh config rdp ini", icon: Download, run: () => (app.importOpen = true) },
     );
-    if (vault.status.configured) {
-      if (vault.status.unlocked) {
+    for (const s of vault.sources.filter((x) => x.configured)) {
+      const words = `vault credential source ${s.kind} ${s.kind === "vaultwarden" ? "bitwarden" : s.kind === "cyberark" ? "privilege cloud pvwa" : "secret server thycotic"}`;
+      if (s.unlocked) {
         a.push(
-          { group: "Actions", label: "Sync the vault", words: "vaultwarden bitwarden", icon: RefreshCw, run: () => vault.sync() },
-          { group: "Actions", label: "Lock the vault", words: "vaultwarden bitwarden", icon: Lock, run: () => vault.lock() },
+          { group: "Actions", label: `Sync ${s.name}`, words, icon: RefreshCw, run: () => vault.sync(s.id) },
+          { group: "Actions", label: `${s.kind === "vaultwarden" ? "Lock" : "Sign out of"} ${s.name}`, words, icon: Lock, run: () => vault.lock(s.id) },
         );
       } else {
-        a.push({ group: "Actions", label: "Unlock the vault", words: "vaultwarden bitwarden", icon: LockOpen, run: () => vault.unlock() });
+        a.push({ group: "Actions", label: `${s.kind === "vaultwarden" ? "Unlock" : "Sign in to"} ${s.name}`, words, icon: LockOpen, run: () => vault.unlock(s.id) });
       }
     }
     return a;
