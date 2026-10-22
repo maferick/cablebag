@@ -571,7 +571,7 @@ dependencies = [
  "anyhow",
  "argon2",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "boringtun",
  "cbc 0.1.2",
  "cipher 0.4.4",
