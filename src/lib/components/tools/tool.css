@@ -1,0 +1,65 @@
+/* Shared layout for tool tabs; everything is under .tool-view so nothing leaks into other screens. */
+.tool-view {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 20px 28px;
+  background: var(--bg);
+}
+.tool-view > header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.tool-view > header svg {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.tool-view h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.tool-view > header p {
+  margin: 2px 0 0;
+}
+.tool-view .grow {
+  flex: 1;
+}
+.tool-view .empty {
+  max-width: 560px;
+  line-height: 1.55;
+}
+.tool-view .small {
+  font-size: 12px;
+}
+.tool-view table.grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+.tool-view table.grid th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+}
+.tool-view table.grid td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.tool-view .controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.tool-view progress {
+  accent-color: var(--accent);
+}

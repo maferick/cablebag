@@ -1,0 +1,80 @@
+[package]
+name = "cablebag"
+version = "0.2.1"
+description = "Cablebag: all-in-one remote access workstation"
+license-file = "../LICENSE"
+authors = ["maferick"]
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "cablebag_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["unstable"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1.54.0", features = ["full"] }
+portable-pty = "0.9.0"
+russh = { version = "0.64.1", default-features = false, features = ["flate2", "ring", "rsa"] }
+russh-sftp = "3.0.1"
+anyhow = "1.0.104"
+thiserror = "2.0.21"
+async-trait = "0.1.92"
+base64 = "0.22"
+dirs = "7.0.0"
+log = "0.4.34"
+parking_lot = "0.13.0"
+futures = "0.3.34"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+argon2 = "0.6.0"
+aes-gcm = "0.11.1"
+rand = "0.10.3"
+uuid = { version = "1.28.0", features = ["v4"] }
+tauri-plugin-dialog = "2.8.3"
+md-5 = "0.11.0"
+hex = "0.4.3"
+windows = { version = "0.62.2", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_System_Memory", "Win32_System_Time", "Win32_UI_WindowsAndMessaging", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_WinRT", "Security_Credentials_UI", "Foundation"] }
+windows-future = "0.3"
+ssh-key = { version = "=0.7.0-rc.11", features = ["ed25519", "p256", "p384", "rsa", "encryption", "getrandom", "std"] }
+netstat2 = "0.11.2"
+sysinfo = "0.39.6"
+dns-lookup = "4.0.2"
+reqwest = { version = "0.12", default-features = false, features = ["native-tls", "rustls-tls-no-provider", "json", "http2"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+tokio-tungstenite = { version = "0.26", default-features = false, features = ["handshake"] }
+pbkdf2 = { version = "0.12", features = ["hmac"] }
+hkdf = "0.12"
+hmac = "0.12"
+sha2 = "0.10"
+sha1 = "0.10"
+aes = "0.8"
+cbc = "0.1"
+rsa = { version = "0.9", features = ["sha1"] }
+cipher = { version = "0.4", features = ["std"] }
+vnc-rs = "0.6"
+suppaftp = { version = "12.2.1", default-features = false, features = ["tokio", "tokio-rustls-ring", "deprecated"] }
+serialport = { version = "4.10.1", default-features = false }
+webview2-com = "0.39"
+tauri-plugin-updater = "2"
+windows-registry = "0.6"
+
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

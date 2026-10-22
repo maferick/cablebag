@@ -1,0 +1,253 @@
+/* Cablebag look: warm graphite and paper, one rust accent for what is yours (focused, selected, open,
+   the primary action) and four state colours for what the remote side does. Two surfaces: chrome (sidebar,
+   strips, status line, pane headers) and work (terminal, tools, Settings). Rules: docs/layout-review/COLOURS.md. */
+:root {
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+
+  --bg: #faf9f5;
+  --chrome: #ebe8e1;
+  --chrome-2: #dedad1;
+  --panel: var(--chrome);
+  --panel-2: var(--chrome-2);
+  --raised: var(--chrome-2);
+  --field: #ffffff;
+  --border: #cdc8bd;
+  --border-strong: #a8a296;
+  --text: #26231f;
+  --muted: #5f5a51;
+  --faint: #7c766a;
+  --accent: #b4461c;
+  --accent-soft: #f4dccd;
+  --accent-text: #ffffff;
+  --selected: #f1d9ca;
+  --hover: rgba(38, 35, 31, 0.06);
+  --ok: #2f7f47;
+  --ok-text: #2a6f3f;
+  --warn: #9c6a00;
+  --warn-text: #7f5700;
+  --warn-soft: #f6e9c6;
+  --danger: #b8271b;
+  --danger-text: #b8271b;
+  --danger-soft: #f6dad6;
+  --focus: var(--accent);
+  --shadow: 0 2px 6px rgba(38, 35, 31, 0.18);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #1a1917;
+  --chrome: #242321;
+  --chrome-2: #2d2b27;
+  --field: #1a1917;
+  --border: #3a3832;
+  --border-strong: #4e4b44;
+  --text: #e4e0d6;
+  --muted: #a39e92;
+  --faint: #7f7a6f;
+  --accent: #d8733f;
+  --accent-soft: #45291b;
+  --accent-text: #1a1917;
+  --selected: #3b2a21;
+  --hover: rgba(255, 255, 255, 0.05);
+  --ok: #6aad60;
+  --ok-text: #6aad60;
+  --warn: #d6a42e;
+  --warn-text: #d6a42e;
+  --warn-soft: #3f3214;
+  --danger: #e4675c;
+  --danger-text: #e4675c;
+  --danger-soft: #4a2522;
+  --shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input:not([type]),
+select,
+textarea {
+  background: var(--field);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  padding: 5px 8px;
+  outline: none;
+  min-width: 0;
+  user-select: text;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--focus);
+}
+
+button {
+  cursor: pointer;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 3px;
+  border: 1px solid var(--border-strong);
+  background: var(--raised);
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: var(--panel-2);
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.btn.primary:hover {
+  filter: brightness(1.08);
+}
+
+.btn.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--accent-text);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.icon-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.icon-btn.active {
+  color: var(--text);
+  background: var(--selected);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Icons: one weight, monochrome; the state lives in the mark beside an icon, never in the icon. */
+svg.lucide-icon {
+  stroke-width: 1.5;
+}
+
+/* State marks: a colour and a shape each, so they read for colour-blind eyes too. Connected is a filled
+   circle, connecting a hollow ring that pulses, failed a diamond, closed a quiet grey circle. */
+.smark {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--faint);
+  flex-shrink: 0;
+}
+.smark.connected {
+  background: var(--ok);
+}
+.smark.connecting {
+  background: transparent;
+  border: 2px solid var(--warn);
+  animation: smark-pulse 1.2s ease-in-out infinite;
+}
+.smark.failed {
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+  background: var(--danger);
+  transform: rotate(45deg);
+}
+@keyframes smark-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .smark.connecting {
+    animation: none;
+  }
+}

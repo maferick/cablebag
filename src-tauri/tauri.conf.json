@@ -1,0 +1,67 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Cablebag",
+  "version": "0.2.1",
+  "identifier": "io.github.maferick.cablebag",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build:all",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Cablebag",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 560,
+        "center": true,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "shortDescription": "All-in-one remote access workstation",
+    "publisher": "maferick",
+    "resources": {
+      "../rdp-helper/publish/cablebag-rdp.exe": "cablebag-rdp.exe"
+    },
+    "createUpdaterArtifacts": true,
+    "licenseFile": "../LICENSE",
+    "copyright": "Copyright (c) 2026 maferick. Use only; see LICENSE.",
+    "homepage": "https://github.com/maferick/cablebag",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcyODkxRUE3NERBQkJCRDIKUldUU3U2dE5weDZKY2w1UFhFSkNhZm5pWXhzN0RZWjZsekdtNGNOSXRHZmV6bTFiSGZEb0pwUWYK",
+      "endpoints": [
+        "https://github.com/maferick/cablebag/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

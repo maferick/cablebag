@@ -1,0 +1,51 @@
+Cablebag Licence (use only)
+
+Copyright (c) 2026 maferick. All rights reserved.
+
+Cablebag is not open source. The source code is published so it can be read; reading it gives no rights
+beyond what this licence grants.
+
+1. What you may do
+
+   Anyone may download Cablebag from its official page, https://github.com/maferick/cablebag, install it
+   and use it, free of charge, for private or work purposes, on as many computers as they like.
+
+2. What you may not do without written permission from maferick
+
+   a. Share, copy or distribute Cablebag or its source code in any form, for example by passing on the
+      installer, putting it on another website, a package repository or a company software store, or
+      bundling it with something else. Others can download it from the official page themselves.
+   b. Change, adapt or translate Cablebag or its source code, or build other software from it or from
+      parts of it. This includes publishing changed copies, forks with changes and patches.
+   c. Decompile, disassemble or otherwise reverse engineer the programs, except where the law allows it
+      regardless of this licence.
+   d. Sell, rent, lease or sublicense Cablebag, or offer it as a service.
+   e. Remove or change this licence, the copyright notice or the third-party notices.
+   f. Use the name Cablebag or its logo for anything other than referring to this software.
+
+   For permission, open an issue on the official page.
+
+3. The source code on GitHub
+
+   GitHub's terms let its users view the repository and make a fork of it on GitHub. That is all such a
+   fork may be used for: it gives no right to change, use or distribute the code beyond this licence.
+
+4. Other people's software
+
+   Cablebag contains open-source components, each under its own licence. They are listed in
+   THIRD-PARTY-NOTICES.md. Nothing in this licence limits the rights those licences give for those
+   components.
+
+5. No warranty, no liability
+
+   Cablebag is provided "as is", without any warranty, express or implied, including fitness for a
+   particular purpose. You use it at your own risk. maferick is not liable for any damage, loss of data,
+   or any other claim arising from using or not being able to use Cablebag, as far as the law allows.
+
+6. End of the licence
+
+   If you do not keep to this licence, your right to use Cablebag ends automatically.
+
+7. Applicable law
+
+   This licence is governed by the laws of the Netherlands.
