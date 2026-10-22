@@ -25,6 +25,8 @@
 
   if (!s.data) s.data = {};
   s.data.vault_item ??= "";
+  // An absent wireguard would bind undefined into the picker's fallback value: svelte rejects it.
+  s.data.wireguard ??= "";
   const k = $derived(kindInfo(s.kind));
   const isNew = !initial.id;
   let proxmoxMode = $state(false);

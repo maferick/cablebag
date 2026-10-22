@@ -15,6 +15,7 @@
   // A copy to edit: the folder itself changes only on Save (one dialog per folder, see App).
   // svelte-ignore state_referenced_locally
   let d = $state<Record<string, any>>({ jump_hosts: [], ...structuredClone($state.snapshot(folder.data ?? {})) });
+  d.wireguard ??= ""; // bound into WireGuardPicker, which must not get undefined
   // What a folder above this one already gives, shown as the value when this folder leaves it empty.
   const above = $derived(app.folderDefaults(folder.parent_id));
   const count = $derived(app.sessions.filter((s) => app.inFolder(s.folder_id, folder.id)).length);
