@@ -27,7 +27,6 @@ tokio = { version = "1.54.0", features = ["full"] }
 portable-pty = "0.9.0"
 russh = { version = "0.64.1", default-features = false, features = ["flate2", "ring", "rsa"] }
 russh-sftp = "3.0.1"
-pageant = "0.2.4"
 anyhow = "1.0.104"
 thiserror = "2.0.21"
 async-trait = "0.1.92"
@@ -44,8 +43,6 @@ uuid = { version = "1.28.0", features = ["v4"] }
 tauri-plugin-dialog = "2.8.3"
 md-5 = "0.11.0"
 hex = "0.4.3"
-windows = { version = "0.62.2", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_System_Memory", "Win32_System_Time", "Win32_UI_WindowsAndMessaging", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_WinRT", "Security_Credentials_UI", "Foundation"] }
-windows-future = "0.3"
 ssh-key = { version = "=0.7.0-rc.11", features = ["ed25519", "p256", "p384", "rsa", "encryption", "getrandom", "std"] }
 netstat2 = "0.11.2"
 sysinfo = "0.39.6"
@@ -67,14 +64,19 @@ cipher = { version = "0.4", features = ["std"] }
 vnc-rs = "0.6"
 suppaftp = { version = "12.2.1", default-features = false, features = ["tokio", "tokio-rustls-ring", "deprecated"] }
 serialport = { version = "4.10.1", default-features = false }
-webview2-com = "0.39"
 tauri-plugin-updater = "2"
-windows-registry = "0.6"
 regex = "1"
 boringtun = { version = "0.6", default-features = false }
 smoltcp = { version = "0.14", default-features = false, features = ["std", "log", "medium-ip", "proto-ipv4", "proto-ipv6", "socket-tcp", "socket-dns", "socket-tcp-cubic"] }
 socket2 = "0.6"
 
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62.2", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_System_Memory", "Win32_System_Time", "Win32_UI_WindowsAndMessaging", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_WinRT", "Security_Credentials_UI", "Foundation"] }
+windows-future = "0.3"
+webview2-com = "0.39"
+windows-registry = "0.6"
+pageant = "0.2.4"
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

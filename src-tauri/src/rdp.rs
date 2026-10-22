@@ -12,9 +12,14 @@ use parking_lot::Mutex;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
+use std::io::Write;
+#[cfg(windows)]
+use std::io::{BufRead, BufReader};
+#[cfg(windows)]
 use std::path::PathBuf;
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{Child, ChildStdin};
+#[cfg(windows)]
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -128,6 +133,7 @@ fn status(app: &AppHandle, id: &str, state: &str, message: &str) {
     let _ = app.emit("term-status", json!({"id": id, "state": state, "message": message}));
 }
 
+#[cfg(windows)]
 fn helper_path() -> Result<PathBuf> {
     if let Ok(p) = std::env::var("CABLEBAG_RDP_HELPER") {
         return Ok(PathBuf::from(p));
@@ -181,9 +187,6 @@ fn clip_children(hwnd: i64) {
     }
 }
 
-#[cfg(not(windows))]
-fn clip_children(_hwnd: i64) {}
-
 fn s(v: &Value, k: &str) -> String {
     v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string()
 }
@@ -196,6 +199,14 @@ pub struct Geometry {
     pub scale: u32,
 }
 
+/// The helper is a Windows program hosted inside Cablebag's window; other platforms get the message.
+/// shortcut: no RDP engine outside Windows yet, remove this stub when one is rendered like the VNC canvas.
+#[cfg(not(windows))]
+pub async fn open(_app: AppHandle, _id: String, _session: Session, _geo: Geometry) -> Result<()> {
+    anyhow::bail!("Remote Desktop tabs need Windows for now; use SSH or VNC.");
+}
+
+#[cfg(windows)]
 pub async fn open(app: AppHandle, id: String, session: Session, geo: Geometry) -> Result<()> {
     let state = app.state::<AppState>();
     let mut host = session.host.trim().to_string();

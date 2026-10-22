@@ -40,9 +40,6 @@
     ],
     "shortDescription": "All-in-one remote access workstation",
     "publisher": "maferick",
-    "resources": {
-      "../rdp-helper/publish/cablebag-rdp.exe": "cablebag-rdp.exe"
-    },
     "createUpdaterArtifacts": true,
     "licenseFile": "../LICENSE",
     "copyright": "Copyright (c) 2026 maferick. Use only; see LICENSE.",
