@@ -1,6 +1,6 @@
 [package]
 name = "cablebag"
-version = "0.2.3"
+version = "0.3.0"
 description = "Cablebag: all-in-one remote access workstation"
 license-file = "../LICENSE"
 authors = ["maferick"]
@@ -69,6 +69,7 @@ serialport = { version = "4.10.1", default-features = false }
 webview2-com = "0.39"
 tauri-plugin-updater = "2"
 windows-registry = "0.6"
+regex = "1"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

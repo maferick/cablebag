@@ -1,0 +1,72 @@
+# What's new in Cablebag
+
+Cablebag updates itself: when a new version is out, the status line shows **Update to ...**. One click
+installs it and starts Cablebag again. Every version is also on the
+[releases page](https://github.com/maferick/cablebag/releases).
+
+---
+
+## 0.3.0 · 22 October 2026
+
+**The assistant, first step: ask about what is on your screen**
+
+- A new **Assistant** column at the right (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>). Ask about the tab
+  you are in, for example *"why does this service not start?"*. The last lines of the terminal go with the
+  question.
+- Works with any AI host that speaks the OpenAI API: LiteLLM, vLLM, Ollama or a cloud service. Add one in
+  Settings › Assistant; the key comes from your vault or is kept on this PC, and **Test** shows the models
+  and what each can do.
+- **Secrets stay home.** Before anything is sent, Cablebag hides the passwords it knows and text that looks
+  like a secret (private keys, tokens, `password=` values, password hashes).
+- **Nothing runs by itself.** A command in an answer can be put at the prompt with one click; it only runs
+  when you press Enter.
+- Settings › Assistant lists everything that was sent and what came back.
+
+## 0.2.3 · 22 October 2026
+
+**Remote files your way**
+
+- Choose whether the remote files show when an SSH session connects: **Show** or **Don't show**, in
+  Settings › SSH.
+- Each session can choose differently in its editor, for example closed for network switches and open for
+  servers.
+- The choice now belongs to each tab: hiding the files in one tab no longer hides them in another, and
+  <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd> works on the tab you are in.
+
+## 0.2.2 · 22 October 2026
+
+**Smoother updates**
+
+- An update no longer stops with *"Error opening file for writing: cablebag-rdp.exe"* when a Remote Desktop
+  tab was open. Cablebag closes its Remote Desktop helpers before it installs, a helper also quits by itself
+  once Cablebag is gone, and the installer stops any helper that is left.
+
+## 0.2.1 · 22 October 2026
+
+**A look of its own, and imports from other programs**
+
+- **New colours.** Warm graphite and paper, with one rust accent that only marks what is yours: the focused
+  pane, the selected row, the main button. Connection states have a shape as well as a colour (a filled
+  circle when connected, a ring while connecting, a diamond when it failed), so they read for colour-blind
+  eyes too.
+- **Import sessions** from PuTTY and KiTTY saved sessions, WinSCP sites, your OpenSSH config file, Remote
+  Desktop (`.rdp`) files and `.ini` or `.mxtsessions` session files. Each source gets its own folder;
+  importing again updates those sessions instead of adding copies.
+- **A new New session window:** the session types in a list with a short explanation each, next to one
+  form, with the extra options folded underneath.
+- **A new Tunnels page:** every tunnel is a card with its route drawn step by step, from where it listens to
+  where it arrives.
+- The logo now shows on GitHub in both light and dark mode.
+
+## 0.2.0 · 22 October 2026
+
+**The first public release**
+
+- Tabs for SSH, Remote Desktop, VNC, Telnet, serial ports, SFTP and FTP, local shells and WSL, web pages,
+  and the consoles of Proxmox machines.
+- Remote files beside every SSH tab, tiling of all tabs with resizing and moving from the keyboard, a split
+  view for terminals, and a search box that finds any session, tab or command.
+- Logins from Vaultwarden, unlocked with Windows Hello; sessions synced through git, encrypted.
+- Proxmox servers as live folders of their machines; tunnels, a network and port scanner, Wake on LAN and an
+  SSH key generator.
+- Updates from this page only, checked against the Cablebag signature before anything is installed.

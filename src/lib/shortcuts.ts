@@ -11,7 +11,7 @@ export function isAppShortcut(e: KeyboardEvent): boolean {
   if (!e.ctrlKey) return false;
   // Ctrl+Shift+T new terminal, W close tab, D duplicate, N new session, K command palette, H Home,
   // E remote files, plus and minus interface size.
-  if (e.shiftKey && !e.altKey && ["T", "W", "D", "N", "K", "H", "E"].some((l) => letter(e, l))) return true;
+  if (e.shiftKey && !e.altKey && ["T", "W", "D", "N", "K", "H", "E", "A"].some((l) => letter(e, l))) return true;
   if (e.shiftKey && !e.altKey && ["Equal", "Minus", "NumpadAdd", "NumpadSubtract"].includes(e.code)) return true;
   // Ctrl+comma Settings.
   if (e.key === "," && !e.shiftKey && !e.altKey) return true;

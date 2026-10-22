@@ -96,6 +96,16 @@ pub struct SecretInfo {
     pub updated: i64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct AiLogEntry {
+    pub at: i64,
+    pub host: String,
+    pub model: String,
+    pub about: String,
+    pub direction: String,
+    pub text: String,
+}
+
 pub struct Store {
     conn: Connection,
 }
@@ -134,7 +144,10 @@ impl Store {
                 protocol TEXT NOT NULL DEFAULT '', host TEXT NOT NULL DEFAULT '',
                 port INTEGER NOT NULL DEFAULT 0, username TEXT NOT NULL DEFAULT '',
                 nonce BLOB NOT NULL, ciphertext BLOB NOT NULL, updated INTEGER NOT NULL);
-             CREATE TABLE IF NOT EXISTS vault(k TEXT PRIMARY KEY, v BLOB NOT NULL);",
+             CREATE TABLE IF NOT EXISTS vault(k TEXT PRIMARY KEY, v BLOB NOT NULL);
+             CREATE TABLE IF NOT EXISTS ai_log(
+                at INTEGER NOT NULL, host TEXT NOT NULL, model TEXT NOT NULL, about TEXT NOT NULL,
+                direction TEXT NOT NULL, text TEXT NOT NULL);",
         )?;
         Ok(Self { conn })
     }
@@ -328,6 +341,26 @@ impl Store {
             params![host, port, algo],
         )?;
         Ok(())
+    }
+
+    // ---------- the assistant's log: what was sent to an AI host and what came back ----------
+
+    pub fn ai_log_add(&self, host: &str, model: &str, about: &str, direction: &str, text: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO ai_log(at, host, model, about, direction, text) VALUES(?1, ?2, ?3, ?4, ?5, ?6)",
+            params![now(), host, model, about, direction, text],
+        )?;
+        // Keep the newest 2000 entries.
+        self.conn.execute("DELETE FROM ai_log WHERE rowid NOT IN (SELECT rowid FROM ai_log ORDER BY rowid DESC LIMIT 2000)", [])?;
+        Ok(())
+    }
+
+    pub fn ai_log(&self, limit: usize) -> Result<Vec<AiLogEntry>> {
+        let mut st = self.conn.prepare("SELECT at, host, model, about, direction, text FROM ai_log ORDER BY rowid DESC LIMIT ?1")?;
+        let rows = st.query_map(params![limit as i64], |r| {
+            Ok(AiLogEntry { at: r.get(0)?, host: r.get(1)?, model: r.get(2)?, about: r.get(3)?, direction: r.get(4)?, text: r.get(5)? })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
     // ---------- secrets (values are encrypted by the vault before they get here) ----------

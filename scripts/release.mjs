@@ -26,7 +26,17 @@ const PRIVATE = [/^docs\//, /^PLAN\.md$/, /^\.claude\//];
 const [version, notes = "", ...flags] = process.argv.slice(2);
 const dry = flags.includes("--dry") || notes === "--dry";
 if (!/^\d+\.\d+\.\d+$/.test(version ?? "")) throw new Error('Usage: node scripts/release.mjs 0.2.1 "What changed" [--dry]');
-const text = notes === "--dry" ? "" : notes;
+/** The notes: given on the command line, or else this version's section of CHANGELOG.md. */
+function changelogSection(v) {
+  const lines = existsSync("CHANGELOG.md") ? readFileSync("CHANGELOG.md", "utf8").split(/\r?\n/) : [];
+  const start = lines.findIndex((l) => l === `## ${v}` || l.startsWith(`## ${v} `));
+  if (start < 0) return "";
+  const end = lines.findIndex((l, i) => i > start && l.startsWith("## "));
+  return lines.slice(start + 1, end < 0 ? undefined : end).join("\n").trim();
+}
+const given = notes === "--dry" ? "" : notes;
+const text = given || changelogSection(version);
+if (!text) throw new Error(`Write the changes for ${version} in CHANGELOG.md (a "## ${version}" section) or pass them on the command line.`);
 
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: "inherit", shell: false, ...opts });
 const out = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", ...opts }).trim();

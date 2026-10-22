@@ -14,6 +14,8 @@ itself up to date: it checks this page at the start and every six hours, shows "
 line, and installs an update only when it carries the Cablebag signature. Updates come from this page and
 nowhere else.
 
+What changed in each version: [CHANGELOG.md](CHANGELOG.md).
+
 Needs Windows 10 or 11. Remote Desktop tabs need the
 [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
 
@@ -74,6 +76,11 @@ the open-source components inside are listed in [THIRD-PARTY-NOTICES.md](THIRD-P
   one, and choose whether the next tab opens beside or below a pane; all of it is in the menu on each pane
   header (the dots, or right-click). Arrange as a grid, side by side, above each other, or one main pane with
   the others beside it.
+- **Assistant** (Ctrl+Shift+A, a column at the right): ask any OpenAI-compatible AI host (LiteLLM, vLLM,
+  Ollama, a cloud API) about the tab you are in; the last lines of a terminal go with the question. Passwords
+  Cablebag knows and text that looks like a secret are hidden before anything is sent, every exchange is in a
+  log (Settings, Assistant), and commands in an answer are only pasted at the prompt, never run by themselves.
+  Keys come from the vault or are kept on this PC.
 - **Send to all**: type once into every connected terminal.
 - **Macros**: record what you type, edit steps (text, pause, wait for text), run with a click or a hotkey.
 - **Highlighting**: words such as error, warning and ok are coloured; network-device set and your own words.
@@ -131,6 +138,7 @@ Cablebag stores its database in `%APPDATA%\Cablebag\cablebag.db`.
 | Ctrl+Shift+N | New session |
 | Ctrl+Shift+H | Home |
 | Ctrl+Shift+E | Show or hide the remote files |
+| Ctrl+Shift+A | Show or hide the assistant |
 | Ctrl+comma | Settings |
 | Ctrl+Shift+plus, Ctrl+Shift+minus | Interface size |
 | Ctrl+Alt+arrows | Tiling: focus the pane in that direction (with Shift: move the pane there) |

@@ -85,6 +85,7 @@ export const SETTINGS_PAGES = [
   { id: "vault", label: "Vault (Vaultwarden)" },
   { id: "proxmox", label: "Proxmox" },
   { id: "sync", label: "Sync (Git)" },
+  { id: "assistant", label: "Assistant" },
   { id: "passwords", label: "Saved passwords" },
   { id: "hosts", label: "Trusted servers" },
 ];

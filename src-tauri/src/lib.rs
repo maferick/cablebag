@@ -1,3 +1,4 @@
+mod ai;
 mod bitwarden;
 mod browser;
 mod files;
@@ -686,6 +687,48 @@ fn vnc_close(state: State<AppState>, id: String) {
     }
 }
 
+#[derive(serde::Serialize)]
+struct AiHostInfo {
+    #[serde(flatten)]
+    host: ai::Host,
+    has_key: bool,
+}
+
+#[tauri::command]
+fn ai_hosts(app: AppHandle) -> Vec<AiHostInfo> {
+    ai::hosts(&app).into_iter().map(|h| AiHostInfo { has_key: ai::has_key(&app, &h), host: h }).collect()
+}
+
+#[tauri::command]
+fn ai_save_host(app: AppHandle, host: ai::Host, key: Option<String>) -> CmdResult<ai::Host> {
+    ai::save_host(&app, host, key).map_err(err)
+}
+
+#[tauri::command]
+fn ai_delete_host(app: AppHandle, id: String) -> CmdResult<()> {
+    ai::delete_host(&app, &id).map_err(err)
+}
+
+#[tauri::command]
+async fn ai_models(app: AppHandle, id: String) -> CmdResult<Vec<ai::ModelInfo>> {
+    ai::models(&app, &id).await.map_err(err)
+}
+
+#[tauri::command]
+async fn ai_chat(app: AppHandle, req: ai::ChatRequest, on_event: tauri::ipc::Channel<ai::ChatEvent>) -> CmdResult<()> {
+    ai::chat(app, req, on_event).await.map_err(err)
+}
+
+#[tauri::command]
+fn ai_stop(app: AppHandle, request_id: String) {
+    ai::stop(&app, &request_id)
+}
+
+#[tauri::command]
+fn ai_log(state: State<AppState>, limit: Option<usize>) -> CmdResult<Vec<store::AiLogEntry>> {
+    state.store.lock().ai_log(limit.unwrap_or(100)).map_err(err)
+}
+
 #[tauri::command]
 fn app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
@@ -714,6 +757,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updater::Pending::default())
+        .manage(std::sync::Arc::new(ai::Chats::default()))
         .manage(AppState {
             store: Mutex::new(store),
             vault: vault::Vault::new(),
@@ -749,6 +793,13 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             app_version,
+            ai_hosts,
+            ai_save_host,
+            ai_delete_host,
+            ai_models,
+            ai_chat,
+            ai_stop,
+            ai_log,
             update_check,
             update_install,
             library,

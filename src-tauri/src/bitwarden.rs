@@ -560,6 +560,13 @@ impl Vaultwarden {
         Ok((item.username.clone(), password))
     }
 
+    /// Every password of the open vault, so the assistant can hide them from what it sends; empty when locked.
+    pub fn known_passwords(&self) -> Vec<String> {
+        let u = self.unlocked.lock();
+        let Some(u) = u.as_ref() else { return Vec::new() };
+        u.secrets.values().filter_map(|s| s.password.as_ref().and_then(|enc| decrypt_text(enc, &s.key).ok())).collect()
+    }
+
     /// Asks for the master password (and a two-step code when needed) and unlocks.
     pub async fn unlock_interactive(&self, app: &AppHandle) -> Result<()> {
         let _one = self.asking.lock().await;

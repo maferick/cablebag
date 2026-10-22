@@ -11,6 +11,8 @@
   import TabBar from "./TabBar.svelte";
   import StatusBar from "./StatusBar.svelte";
   import FilesColumn from "./FilesColumn.svelte";
+  import AssistantColumn from "./AssistantColumn.svelte";
+  import { assistant } from "../assistant.svelte";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import TerminalView from "./TerminalView.svelte";
   import HomeView from "./HomeView.svelte";
@@ -52,6 +54,12 @@
 
   $effect(() => {
     if (tiling) tiles.sync(tiled, app.activeId);
+  });
+
+  // A conversation ends with its tab.
+  $effect(() => {
+    const open = new Set(app.tabs.map((t) => t.id));
+    for (const id of Object.keys(assistant.convs)) if (!open.has(id)) assistant.forget(id);
   });
 
   // Interface size: the whole window zooms, like a browser page; the terminal font has its own size on top.
@@ -270,6 +278,7 @@
         proxmox.start();
         sync.start();
         update.start();
+        assistant.load();
       });
     return () => unlisten.forEach((u) => u.then((f) => f()));
   });
@@ -310,6 +319,9 @@
     } else if (e.shiftKey && letter(e, "H")) {
       e.preventDefault();
       app.showHome();
+    } else if (e.shiftKey && letter(e, "A")) {
+      e.preventDefault();
+      assistant.open = !assistant.open;
     } else if (e.shiftKey && letter(e, "E")) {
       e.preventDefault();
       app.filesOpen = !app.filesOpen;
@@ -458,6 +470,7 @@
       </div>
     </div>
     <FilesColumn />
+    <AssistantColumn />
   </div>
   <StatusBar />
 </div>

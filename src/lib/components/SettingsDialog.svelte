@@ -4,6 +4,7 @@
   import { proxmox } from "../proxmox.svelte";
   import ProxmoxSettings from "./ProxmoxSettings.svelte";
   import SyncSettings from "./SyncSettings.svelte";
+  import AssistantSettings from "./AssistantSettings.svelte";
   import { api, type KnownHost, type SecretInfo } from "../api";
   import { SCHEMES } from "../schemes";
   import { BUILTIN_SYNTAX, type SyntaxSet } from "../highlight";
@@ -263,6 +264,8 @@
           </div>
           <p class="muted small">Two-step login with an authenticator app or email code is supported; Cablebag can remember this PC so the code is asked only once.</p>
         {/if}
+      {:else if page === "assistant"}
+        <AssistantSettings />
       {:else if page === "sync"}
         <SyncSettings />
       {:else if page === "proxmox"}

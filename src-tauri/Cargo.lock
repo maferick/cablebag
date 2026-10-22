@@ -520,7 +520,7 @@ dependencies = [
 
 [[package]]
 name = "cablebag"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "aes 0.8.4",
  "aes-gcm",
@@ -543,6 +543,7 @@ dependencies = [
  "pbkdf2 0.12.2",
  "portable-pty",
  "rand 0.10.3",
+ "regex",
  "reqwest 0.12.28",
  "rsa 0.9.10",
  "rusqlite",
