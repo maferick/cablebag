@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { workspaces } from "../workspaces.svelte";
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import "../theme.css";
@@ -233,6 +234,9 @@
         const t = app.tabs.find((x) => x.id === e.payload.id);
         if (!t) return;
         t.status = e.payload.state;
+        // A lost SSH connection (not an ordinary end) may connect again by itself.
+        if (e.payload.state === "connected") t.lost = undefined;
+        else if (e.payload.state === "closed" && t.proto === "ssh" && e.payload.message) t.lost = e.payload.message;
         // Remote files on connecting: the session's own choice, otherwise the one in Settings.
         if (e.payload.state === "connected" && t.proto === "ssh" && !(t.id in app.filesFor)) {
           const own = t.session?.data?.files;
@@ -279,12 +283,19 @@
         sync.start();
         update.start();
         assistant.load();
+        workspaces.start();
       });
     return () => unlisten.forEach((u) => u.then((f) => f()));
   });
 
   $effect(() => {
     document.documentElement.dataset.theme = app.dark ? "dark" : "light";
+  });
+
+  // What is open now is what opens again next time.
+  $effect(() => {
+    void app.tabs.map((t) => `${t.id}${t.title}`).join();
+    workspaces.remember();
   });
 
 

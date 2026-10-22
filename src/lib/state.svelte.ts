@@ -25,6 +25,10 @@ export interface Tab {
   color?: string;
   /** Raised to restart the terminal in the same tab. */
   gen: number;
+  /** Raised to connect again inside the same terminal, keeping what it shows. */
+  reconnect?: number;
+  /** Why the connection was lost, when it was not an ordinary end (for connecting again by itself). */
+  lost?: string;
 }
 
 export interface Transfer {
@@ -50,6 +54,8 @@ export const DEFAULT_SETTINGS: Record<string, any> = {
   "ssh.agent.pageant": false,
   "ssh.agent.openssh": false,
   "ssh.autoFiles": true,
+  "ssh.autoReconnect": true,
+  "tabs.reopen": "ask",
   "shell.default": "",
   "term.syntax": "keywords",
   "log.enabled": false,
@@ -243,6 +249,11 @@ class AppState {
     });
   }
 
+  /** A local terminal as it was saved (last time's tabs, a workspace). */
+  openLocalSpec(title: string, local: LocalSpec) {
+    this.push({ id: uid(), title, type: "terminal", proto: "local", local: { ...local }, status: "connecting", gen: 0 });
+  }
+
   openSession(s: Session) {
     const title = s.name || (s.host ? `${s.username ? s.username + "@" : ""}${s.host}` : kindInfo(s.kind).label);
     const color = s.data?.tab_color || undefined;
@@ -409,6 +420,12 @@ class AppState {
   restart(id: string) {
     const t = this.tabs.find((x) => x.id === id);
     if (!t) return;
+    // A terminal that has ended connects again in place, with its scrollback.
+    if (t.type === "terminal" && (t.status === "closed" || t.status === "failed")) {
+      t.status = "connecting";
+      t.reconnect = (t.reconnect ?? 0) + 1;
+      return;
+    }
     if (t.type === "rdp") api.rdpClose(id).catch(() => {});
     else if (t.type !== "vnc") api.close(id).catch(() => {});
     t.status = "connecting";

@@ -5,12 +5,13 @@
   import { kindInfo } from "../kinds";
   import { TOOLS, toolInfo } from "../tools";
   import { macros } from "../macros.svelte";
+  import { workspaces } from "../workspaces.svelte";
   import { vault } from "../vault.svelte";
   import { proxmox, isWindows } from "../proxmox.svelte";
   import type { Session } from "../api";
   import {
     Search, Plus, TerminalSquare, X, Copy, RotateCw, Square, Columns2, Rows2, Grid2x2, Radio, Circle, CircleStop,
-    PanelLeft, Sun, Moon, Download, LockOpen, Lock, RefreshCw, Settings, Play, AArrowUp, AArrowDown, ArrowRight, House, Info, Keyboard,
+    PanelLeft, Sun, Moon, Download, LockOpen, Lock, RefreshCw, Settings, Play, AArrowUp, AArrowDown, ArrowRight, House, Info, Keyboard, LayoutGrid, History,
     Server, Monitor, Boxes, FolderTree, ZoomIn, ZoomOut,
   } from "@lucide/svelte";
 
@@ -147,6 +148,9 @@
       },
       { group: "Actions", label: "Larger terminal text", keys: "Ctrl+plus", words: "font zoom", icon: AArrowUp, run: () => app.setSetting("term.fontSize", Math.min(40, Number(app.settings["term.fontSize"]) + 1)) },
       { group: "Actions", label: "Smaller terminal text", keys: "Ctrl+minus", words: "font zoom", icon: AArrowDown, run: () => app.setSetting("term.fontSize", Math.max(7, Number(app.settings["term.fontSize"]) - 1)) },
+      { group: "Actions", label: "Save the open tabs as a workspace", words: "workspace tabs set customer", icon: LayoutGrid, run: () => workspaces.saveCurrent() },
+      ...(workspaces.last.length ? [{ group: "Actions", label: `Open the ${workspaces.last.length} tabs from last time`, words: "reopen restore previous tabs", icon: History, run: () => workspaces.openLast() }] : []),
+      ...workspaces.list.map((w) => ({ group: "Workspaces", label: w.name, words: `workspace ${w.tabs.map((t) => t.title).join(" ")}`, icon: LayoutGrid, run: () => workspaces.open(w.tabs) })),
       { group: "Actions", label: "Keyboard shortcuts", words: "keys hotkeys ctrl alt tiling", icon: Keyboard, run: () => app.openSettings("keyboard") },
       { group: "Actions", label: "About Cablebag", words: "version licence license update changelog what's new data folder", icon: Info, run: () => app.openSettings("about") },
       { group: "Actions", label: "Import sessions", words: "mobaxterm putty winscp kitty ssh config rdp ini", icon: Download, run: () => (app.importOpen = true) },

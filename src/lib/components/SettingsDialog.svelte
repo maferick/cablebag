@@ -236,6 +236,13 @@
               <option value="hide">Don't show</option>
             </select>
           </SettingsRow>
+          <SettingsRow label="Tabs from last time" help="The tabs that were open when Cablebag closed. Home offers them, or they open by themselves.">
+            <select value={app.settings["tabs.reopen"] ?? "ask"} onchange={set("tabs.reopen")}>
+              <option value="ask">Offer them on Home</option>
+              <option value="always">Open them at the start</option>
+              <option value="never">Don't offer them</option>
+            </select>
+          </SettingsRow>
           <SettingsRow label="Import sessions" help="From MobaXterm, PuTTY, KiTTY, WinSCP, the OpenSSH config or Remote Desktop files.">
             <button class="btn" onclick={() => (app.importOpen = true)}>Import sessions...</button>
           </SettingsRow>
@@ -349,6 +356,11 @@
           </SettingsRow>
           <SettingsRow label="Windows OpenSSH agent">
             <input type="checkbox" class="switch" checked={app.settings["ssh.agent.openssh"]} onchange={set("ssh.agent.openssh")} />
+          </SettingsRow>
+        </SettingsSection>
+        <SettingsSection title="When a connection drops">
+          <SettingsRow label="Connect again by itself" help="After sleep, a network change or a VPN that drops: in the same terminal, with what it showed, for up to ten minutes. Esc stops it.">
+            <input type="checkbox" class="switch" checked={app.settings["ssh.autoReconnect"] !== false} onchange={set("ssh.autoReconnect")} />
           </SettingsRow>
         </SettingsSection>
       {:else if page === "vault"}

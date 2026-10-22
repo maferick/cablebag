@@ -81,6 +81,7 @@ async fn run_inner(app: &AppHandle, session: &Session, out: &TermOut, rx: &mut m
     let mut _fwd = None;
     if let Some(gw) = session.data.get("ssh_gateway").filter(|g| !s(g, "host").is_empty()) {
         let hop = Hop {
+            agent_forward: false,
             host: s(gw, "host"),
             port: gw.get("port").and_then(|p| p.as_u64()).unwrap_or(22) as u16,
             user: s(gw, "user"),

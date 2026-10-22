@@ -32,6 +32,9 @@ pub type Forwards = Arc<parking_lot::Mutex<std::collections::HashMap<u32, (Strin
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Hop {
+    /// Lets the server use this PC's SSH agent while connected (only the last hop of a session).
+    #[serde(default)]
+    pub agent_forward: bool,
     pub host: String,
     #[serde(default = "default_port")]
     pub port: u16,
@@ -59,6 +62,27 @@ pub struct Client {
     host: String,
     port: u16,
     forwards: Forwards,
+    agent_forward: bool,
+}
+
+/// One forwarded agent channel: the bytes go to the Windows OpenSSH agent or to Pageant, as switched on in
+/// Settings, SSH (the OpenSSH agent first when both or neither are on).
+async fn serve_agent(app: AppHandle, channel: russh::Channel<client::Msg>) {
+    let mut stream = channel.into_stream();
+    let pageant = settings_flag(&app, "ssh.agent.pageant", false);
+    let openssh = settings_flag(&app, "ssh.agent.openssh", false);
+    #[cfg(windows)]
+    {
+        if openssh || !pageant {
+            if let Ok(mut pipe) = tokio::net::windows::named_pipe::ClientOptions::new().open(r"\\.\pipe\openssh-ssh-agent") {
+                let _ = tokio::io::copy_bidirectional(&mut stream, &mut pipe).await;
+                return;
+            }
+        }
+        if let Ok(mut p) = pageant::PageantStream::new().await {
+            let _ = tokio::io::copy_bidirectional(&mut stream, &mut p).await;
+        }
+    }
 }
 
 impl client::Handler for Client {
@@ -70,6 +94,22 @@ impl client::Handler for Client {
             PublicKeyOrCertificate::Certificate(c) => PublicKey::from(c.public_key().clone()),
         };
         Ok(verify_host_key(&self.app, &self.host, self.port, &key).await)
+    }
+
+    /// The server wants to use this PC's SSH agent: only when forwarding is on for this session.
+    async fn server_channel_open_agent_forward(
+        &mut self,
+        channel: russh::Channel<client::Msg>,
+        reply: client::ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        if !self.agent_forward {
+            reply.reject(russh::ChannelOpenFailure::AdministrativelyProhibited).await;
+            return Ok(());
+        }
+        reply.accept().await;
+        tokio::spawn(serve_agent(self.app.clone(), channel));
+        Ok(())
     }
 
     /// A connection arrived on a port the server listens on for us (remote port forwarding).
@@ -524,7 +564,7 @@ pub async fn connect_chain(app: &AppHandle, hops: &[Hop], keepalive: bool, out: 
     for (i, hop) in hops.iter().enumerate() {
         let via = if i + 1 < hops.len() { " (jump host)" } else { "" };
         out.info(&format!("Connecting to {}:{}{}...", hop.host, hop.port, via));
-        let handler = Client { app: app.clone(), host: hop.host.clone(), port: hop.port, forwards: forwards.clone() };
+        let handler = Client { app: app.clone(), host: hop.host.clone(), port: hop.port, forwards: forwards.clone(), agent_forward: hop.agent_forward };
         let fut = async {
             match &prev {
                 None => client::connect(config.clone(), (hop.host.as_str(), hop.port), handler).await,
@@ -569,6 +609,7 @@ pub fn hops_for(s: &Session) -> Vec<Hop> {
         .filter(|h| !h.host.trim().is_empty())
         .collect();
     hops.push(Hop {
+        agent_forward: bool_of(&s.data, "agent_forward", false),
         host: s.host.trim().to_string(),
         port: if s.port > 0 { s.port as u16 } else { 22 },
         user: s.username.clone(),
@@ -609,6 +650,9 @@ pub async fn run_terminal(
             let t = str_of(&session.data, "term_type");
             if t.is_empty() { "xterm-256color".to_string() } else { t }
         };
+        if bool_of(&session.data, "agent_forward", false) {
+            channel.agent_forward(false).await?;
+        }
         channel.request_pty(false, &term_type, cols as u32, rows as u32, 0, 0, &[]).await?;
         channel.request_shell(true).await?;
         out.status("connected", "");
@@ -634,7 +678,9 @@ pub async fn run_terminal(
                     Some(ChannelMsg::ExitStatus { exit_status }) => {
                         if exit_status != 0 { out.info(&format!("\r\nRemote shell ended with exit code {exit_status}.")); }
                     }
-                    Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) | None => break,
+                    Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) => break,
+                    // The connection itself went away (sleep, network, VPN): not an ordinary end.
+                    None => anyhow::bail!("The connection to the server was lost."),
                     _ => {}
                 }
             }

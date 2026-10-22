@@ -6,6 +6,22 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.9.0 · 22 October 2026
+
+**Pick up where you left off**
+
+- **The tabs from last time.** Cablebag remembers the tabs that were open when it closed; Home offers to open them
+  again in one click, or they open by themselves at the start (Settings, General, Tabs from last time).
+- **Workspaces**: save the open tabs under a name, such as everything for one customer, and open them again from
+  Home, the + menu or the search box. Workspaces travel with Sync.
+- **SSH connects again by itself** when the connection drops (sleep, a network change, a VPN that goes away): in
+  the same terminal, with everything it showed, after 2, 5, 10, 20 and 30 seconds and then every 30 seconds for
+  up to ten minutes. Esc stops it; Settings, SSH can switch it off. Pressing R in an ended terminal also connects
+  again in place now, instead of starting an empty one.
+- **SSH agent forwarding**, per session (Advanced): the server can use the keys in Pageant or the Windows OpenSSH
+  agent while you are connected, for example to log in further from a jump server. Off unless you switch it on,
+  and only for servers you trust.
+
 ## 0.8.0 · 22 October 2026
 
 **Rough edges smoothed, and more in About**

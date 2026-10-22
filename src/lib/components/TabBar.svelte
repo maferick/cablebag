@@ -4,11 +4,12 @@
   import { app, type Tab } from "../state.svelte";
   import { menu, type MenuEntry } from "../menu.svelte";
   import { tiles } from "../tiles.svelte";
+  import { workspaces } from "../workspaces.svelte";
   import { kindInfo } from "../kinds";
   import { TOOLS, toolInfo } from "../tools";
   import CommandPalette from "./CommandPalette.svelte";
   import {
-    Plus, X, Copy, RotateCw, Pencil, Palette, TerminalSquare, Save, ClipboardCopy, ChevronDown, PanelLeft, Settings,
+    Plus, X, Copy, RotateCw, Pencil, Palette, TerminalSquare, Save, ClipboardCopy, ChevronDown, PanelLeft, Settings, LayoutGrid,
     Square, LayoutDashboard, Grid2x2, Columns2, Rows2, Equal, Radio, Circle, Server,
   } from "@lucide/svelte";
   import { save as saveDialog } from "@tauri-apps/plugin-dialog";
@@ -81,6 +82,9 @@
       ...app.shells.map((s, i) => ({ label: s.name, icon: TerminalSquare, hint: i === 0 ? "Ctrl+Shift+T" : undefined, action: () => app.openLocal(s) })),
       "sep",
       ...TOOLS.map((t) => ({ label: t.name, icon: t.icon, action: () => app.openTool(t.id, t.name) })),
+      "sep",
+      ...workspaces.list.map((w) => ({ label: `Workspace: ${w.name}`, icon: LayoutGrid, action: () => workspaces.open(w.tabs) })),
+      { label: "Save the open tabs as a workspace", icon: LayoutGrid, action: () => workspaces.saveCurrent() },
     ];
     if (at) menu.showAt(at, items);
     else menu.show(e, items);

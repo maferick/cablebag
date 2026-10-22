@@ -330,6 +330,7 @@
       <div class="grid2">
         <label class="check"><input type="checkbox" bind:checked={s.data.compression} /> Compress traffic (helps on slow links)</label>
         <label class="check"><input type="checkbox" checked={s.data.keepalive !== false} onchange={(e) => (s.data.keepalive = (e.target as HTMLInputElement).checked)} /> Keep the connection alive when idle</label>
+        <label class="check" title="The server can use the keys in Pageant or the Windows OpenSSH agent while you are connected, for example to log in further from there. Only for servers you trust."><input type="checkbox" bind:checked={s.data.agent_forward} /> Forward your SSH agent (only to servers you trust)</label>
         <label class="check"><input type="checkbox" checked={s.data.stay_after_command !== false} onchange={(e) => (s.data.stay_after_command = (e.target as HTMLInputElement).checked)} /> Stay logged in after the command ends</label>
         <label class="check" title="Cablebag has no X server yet, so programs with windows cannot be shown"><input type="checkbox" disabled checked={!!s.data.x11} /> X11 forwarding <em class="soon">not available yet</em></label>
       </div>

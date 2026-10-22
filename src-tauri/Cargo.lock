@@ -520,7 +520,7 @@ dependencies = [
 
 [[package]]
 name = "cablebag"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "aes 0.8.4",
  "aes-gcm",
@@ -539,6 +539,7 @@ dependencies = [
  "log",
  "md-5",
  "netstat2",
+ "pageant",
  "parking_lot 0.13.0",
  "pbkdf2 0.12.2",
  "portable-pty",

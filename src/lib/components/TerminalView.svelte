@@ -115,7 +115,12 @@
       }
       // Cablebag's own shortcuts (close tab, new terminal, palette, macros...) go to the window, not the shell.
       if (isAppShortcut(e)) return false;
+      if (retry && e.type === "keydown" && e.key === "Escape") {
+        stopRetry("Not connecting again. Press R to connect again.");
+        return false;
+      }
       if ((tab.status === "closed" || tab.status === "failed") && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === "r") {
+        stopRetry();
         app.restart(tab.id);
         return false;
       }
@@ -129,6 +134,16 @@
     });
 
     terminals.set(tab.id, term);
+    connect();
+
+    ro = new ResizeObserver(() => sendResize());
+    ro.observe(host);
+    if (visible) setTimeout(() => term?.focus(), 30);
+  });
+
+  /** Opens the connection (again) into this terminal; what it showed so far stays. */
+  function connect() {
+    if (!term) return;
     const syntaxId = tab.session?.data?.syntax || app.settings["term.syntax"] || "keywords";
     const set: SyntaxSet | undefined =
       syntaxId === "custom" ? (app.settings["term.customSyntax"] as SyntaxSet) : BUILTIN_SYNTAX.find((x) => x.id === syntaxId);
@@ -154,13 +169,50 @@
       term?.write(`\r\n\x1b[31m${String(e)}\x1b[0m\r\n`);
       tab.status = "failed";
     });
+  }
 
-    ro = new ResizeObserver(() => sendResize());
-    ro.observe(host);
-    if (visible) setTimeout(() => term?.focus(), 30);
+  // Connect again in place (R, Reconnect, or by itself after a lost connection).
+  let seenReconnect = 0;
+  $effect(() => {
+    const n = tab.reconnect ?? 0;
+    if (n === seenReconnect) return;
+    seenReconnect = n;
+    api.close(tab.id).catch(() => {});
+    setTimeout(() => connect(), 300);
+  });
+
+  // A lost SSH connection connects again by itself: after 2, 5, 10, 20 and 30 seconds, then every 30 seconds,
+  // for at most ten minutes. Esc stops it.
+  const DELAYS = [2, 5, 10, 20, 30];
+  let retry: { tries: number; since: number; timer?: ReturnType<typeof setTimeout> } | null = null;
+  function stopRetry(note = "") {
+    if (retry?.timer) clearTimeout(retry.timer);
+    retry = null;
+    if (note) term?.write(`\x1b[2m\r\n${note}\x1b[0m\r\n`);
+  }
+  $effect(() => {
+    const status = tab.status;
+    if (status === "connected") {
+      if (retry) stopRetry();
+      return;
+    }
+    if ((status !== "closed" && status !== "failed") || app.settings["ssh.autoReconnect"] === false) return;
+    if (!retry && !(status === "closed" && tab.lost)) return;
+    if (retry?.timer) return;
+    retry ??= { tries: 0, since: Date.now() };
+    if (Date.now() - retry.since > 10 * 60_000) return stopRetry("Stopped trying after ten minutes. Press R to connect again.");
+    const wait = DELAYS[Math.min(retry.tries, DELAYS.length - 1)];
+    term?.write(`\x1b[2m\r\n${retry.tries ? "Still no connection." : `${tab.lost ?? "The connection was lost."}`} Connecting again in ${wait} s; Esc stops this.\x1b[0m\r\n`);
+    retry.timer = setTimeout(() => {
+      if (!retry) return;
+      retry.timer = undefined;
+      retry.tries += 1;
+      app.restart(tab.id);
+    }, wait * 1000);
   });
 
   onDestroy(() => {
+    if (retry?.timer) clearTimeout(retry.timer);
     ro?.disconnect();
     terminals.delete(tab.id);
     term?.dispose();
@@ -210,7 +262,7 @@
 
   let announced = false;
   $effect(() => {
-    if ((tab.status === "closed" || tab.status === "failed") && term && !announced) {
+    if ((tab.status === "closed" || tab.status === "failed") && term && !announced && !retry && !(tab.lost && app.settings["ssh.autoReconnect"] !== false)) {
       announced = true;
       term.write("\x1b[2m\r\nPress R to reconnect, or close this tab.\x1b[0m\r\n");
     }
