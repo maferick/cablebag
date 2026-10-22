@@ -64,6 +64,8 @@ struct Progress {
 /// Cablebag and starts the new version.
 pub async fn install(app: &AppHandle) -> Result<()> {
     let update = app.state::<Pending>().0.lock().unwrap().take().ok_or_else(|| anyhow!("Check for updates first."))?;
+    // The installer replaces the Remote Desktop helper too, which it cannot while one still runs.
+    app.state::<crate::AppState>().rdp.close_all();
     let mut done = 0u64;
     let progress = app.clone();
     update

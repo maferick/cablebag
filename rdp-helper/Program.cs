@@ -32,6 +32,9 @@ static class Native
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr SetParent(IntPtr child, IntPtr parent);
 
+    [DllImport("user32.dll")]
+    public static extern bool IsWindow(IntPtr hwnd);
+
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr SetWindowLongPtr(IntPtr hwnd, int index, IntPtr value);
 
@@ -142,7 +145,7 @@ class HostForm : Form, IMsTscAxEvents
     {
         // Stay hidden until Cablebag asks to show the window.
         base.SetVisibleCore(IsHandleCreated ? value : false);
-        if (!IsHandleCreated) { CreateHandle(); StartReader(); Out.Send("ready", new { hwnd = Handle.ToInt64() }); }
+        if (!IsHandleCreated) { CreateHandle(); StartReader(); WatchParent(); Out.Send("ready", new { hwnd = Handle.ToInt64() }); }
     }
 
     protected override void OnHandleCreated(EventArgs e)
@@ -163,6 +166,22 @@ class HostForm : Form, IMsTscAxEvents
     {
         if (parentHwnd == IntPtr.Zero || !IsHandleCreated) return;
         if (Native.GetAncestor(Handle, 1) != parentHwnd) Native.SetParent(Handle, parentHwnd);
+    }
+
+    /// Quits when the Cablebag window is gone, also when the end of the command pipe never arrives (an
+    /// installer that inherited it, a crash): a helper left behind keeps its file locked for updates.
+    void WatchParent()
+    {
+        if (parentHwnd == IntPtr.Zero) return;
+        var t = new System.Windows.Forms.Timer { Interval = 1500 };
+        t.Tick += (_, _) =>
+        {
+            if (Native.IsWindow(parentHwnd)) return;
+            t.Stop();
+            try { Disconnect(); } catch { }
+            Environment.Exit(0);
+        };
+        t.Start();
     }
 
     void StartReader()

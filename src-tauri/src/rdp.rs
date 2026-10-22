@@ -55,6 +55,10 @@ impl Rdps {
     pub fn remove(&self, id: &str) {
         self.map.lock().remove(id);
     }
+    /// Ends every helper (each one quits and is stopped as it is dropped), before an update replaces its file.
+    pub fn close_all(&self) {
+        self.map.lock().clear();
+    }
 }
 
 #[derive(Clone, Serialize)]
