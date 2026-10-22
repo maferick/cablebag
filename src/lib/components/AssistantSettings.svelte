@@ -5,6 +5,9 @@
   import { ask } from "../ask.svelte";
   import { app } from "../state.svelte";
   import VaultPicker from "./VaultPicker.svelte";
+  import MemoryList from "./MemoryList.svelte";
+  import SettingsSection from "./SettingsSection.svelte";
+  import { memory } from "../memory.svelte";
   import { Plus, Pencil, Trash2, RefreshCw, ChevronRight, X } from "@lucide/svelte";
 
   let editing = $state<(AiHost & { key: string; keyFrom: "vault" | "pc" | "none" }) | null>(null);
@@ -84,11 +87,8 @@
   const time = (t: number) => new Date(t * 1000).toLocaleString();
 </script>
 
-<p class="muted small">
-  Any service with an OpenAI-compatible API works: LiteLLM, vLLM, Ollama, a cloud API. Before anything is sent,
-  Cablebag replaces passwords it knows and text that looks like a secret; the log below shows exactly what went out.
-</p>
-
+<SettingsSection title="AI hosts" desc="Any service with an OpenAI-compatible API: LiteLLM, vLLM, Ollama or a cloud API. Before anything is sent, Cablebag hides the passwords it knows and text that looks like a secret.">
+  <div class="inner">
 {#each assistant.hosts as h (h.id)}
   <div class="host">
     <div class="hhead">
@@ -157,12 +157,22 @@
 {:else}
   <div><button class="btn" onclick={blank}><Plus size={14} /> Add an AI host</button></div>
 {/if}
+  </div>
+</SettingsSection>
 
-<h4>Protected folders</h4>
-<p class="muted small">
-  In a protected folder (and the folders inside it) every command asks first, dangerous commands are refused, and
-  only AI hosts marked "may see protected folders" are used. Protect a folder with a right-click on it in the tree.
-</p>
+<SettingsSection title="Memory" desc="What the assistant learns, kept here in Cablebag: per connection (see a session's editor), per folder and in general. It travels with Sync (Git), encrypted; secrets are hidden before anything is stored.">
+  <div class="inner">
+<strong class="sub">General, for every conversation</strong>
+<MemoryList scope="general" />
+<details class="allmem">
+  <summary>Everything the assistant remembers ({memory.all.length})</summary>
+  <MemoryList all />
+</details>
+  </div>
+</SettingsSection>
+
+<SettingsSection title="Protected folders" desc="Every command asks first, dangerous commands are refused, and only AI hosts that may see protected folders are used. Protect a folder with a right-click on it in the tree.">
+  <div class="inner">
 {#if protectedFolders.length}
   <ul class="plain">
     {#each protectedFolders as f (f.id)}
@@ -172,9 +182,11 @@
 {:else}
   <p class="muted small">No folder is protected yet.</p>
 {/if}
+  </div>
+</SettingsSection>
 
-<h4>Always allowed</h4>
-<p class="muted small">Kinds of commands you chose "Always" for: they run without asking on that server (never in a protected folder, never when dangerous).</p>
+<SettingsSection title="Always allowed" desc="Kinds of commands you chose Always for: they run without asking on that server, never in a protected folder and never when dangerous.">
+  <div class="inner">
 {#if assistant.rules.length}
   <ul class="plain">
     {#each assistant.rules as r (r.kind + r.host)}
@@ -184,8 +196,11 @@
 {:else}
   <p class="muted small">None yet.</p>
 {/if}
+  </div>
+</SettingsSection>
 
-<h4>What was sent</h4>
+<SettingsSection title="What was sent" desc="Every question with the screen text that went with it, every answer and every command that ran.">
+  <div class="inner">
 {#if !log.length}
   <p class="muted small">Nothing yet. Every question, with the screen text that went with it, and every answer is listed here.</p>
 {:else}
@@ -201,8 +216,16 @@
     {/each}
   </div>
 {/if}
+  </div>
+</SettingsSection>
 
 <style>
+  .inner {
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
   .host {
     border: 1px solid var(--border);
     border-radius: 3px;
@@ -255,9 +278,15 @@
     color: var(--danger-text);
     margin: 0;
   }
-  h4 {
-    margin: 12px 0 0;
-    font-size: 13px;
+  .sub {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .allmem summary {
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    margin-bottom: 6px;
   }
   .plain {
     margin: 0;

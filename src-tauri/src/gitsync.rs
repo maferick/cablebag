@@ -17,12 +17,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use tauri::{AppHandle, Emitter, Manager};
 
 /// What is synced: collection name, file in the repository.
-const FILES: [(&str, &str); 5] = [
+const FILES: [(&str, &str); 6] = [
     ("folders", "folders.json"),
     ("sessions", "sessions.json"),
     ("macros", "macros.json"),
     ("tunnels", "tunnels.json"),
     ("proxmox", "proxmox.json"),
+    ("memory", "memory.json"),
 ];
 
 /// Settings that hold the synced lists.
@@ -31,6 +32,7 @@ fn setting_key(collection: &str) -> Option<&'static str> {
         "macros" => Some("macros"),
         "tunnels" => Some("tunnels"),
         "proxmox" => Some("proxmox.sources"),
+        "memory" => Some("ai.memory"),
         _ => None,
     }
 }

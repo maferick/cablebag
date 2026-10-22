@@ -4,7 +4,8 @@
   import { tick } from "svelte";
   import { app } from "../state.svelte";
   import { api } from "../api";
-  import { assistant, parts, SCREEN_LINES } from "../assistant.svelte";
+  import { assistant, parts, inline, SCREEN_LINES } from "../assistant.svelte";
+  import { memory } from "../memory.svelte";
   import { Sparkles, X, Square, Send, ClipboardPaste, Copy, Eraser } from "@lucide/svelte";
   import { writeText } from "../clipboard";
 
@@ -107,6 +108,7 @@
       <div class="about muted small">
         About: {assistant.describe(tab)}
         {#if works}<br />{prot ? "Protected folder: every command asks you first." : "Can work on this server: reads by itself, asks before every change."}{/if}
+        <br />Memory: {memory.relevant(tab.session).length || "nothing yet"}{memory.relevant(tab.session).length ? " facts go along" : ""}
       </div>
       <div class="msgs" bind:this={list}>
         {#if !conv?.msgs.length}
@@ -135,8 +137,14 @@
                     </div>
                   </div>
                 {:else}
-                  <p class="text">{p.text.trim()}</p>
+                  <p class="text">{@html inline(p.text.trim())}</p>
                 {/if}
+              {/each}
+              {#each m.notes ?? [] as n}
+                <div class="mnote" class:undone={n.undone}>
+                  <span>{n.kind === "remembered" ? "Remembered" : "Forgot"} ({memory.label(n.memory)}): {n.memory.text}</span>
+                  {#if !n.undone}<button class="link" onclick={() => assistant.undoNote(n)}>Undo</button>{:else}<span class="muted">undone</span>{/if}
+                </div>
               {/each}
               {#each m.steps ?? [] as st}
                 <div class="step {st.verdict.effect} {st.state}">
@@ -301,6 +309,13 @@
     white-space: pre-wrap;
     line-height: 1.5;
   }
+  .text :global(code) {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 0 3px;
+    border-radius: 3px;
+    background: var(--chrome-2);
+  }
   .text:empty {
     display: none;
   }
@@ -328,6 +343,28 @@
   }
   .codebar :global(.btn.small) {
     padding: 2px 8px;
+    font-size: 12px;
+  }
+  .mnote {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 8px;
+    border-left: 3px solid var(--border-strong);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .mnote span:first-child {
+    flex: 1;
+  }
+  .mnote.undone span:first-child {
+    text-decoration: line-through;
+  }
+  .link {
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--accent);
     font-size: 12px;
   }
   .step {

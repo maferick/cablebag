@@ -22,6 +22,7 @@ class SyncStore {
       app.settings["macros"],
       app.settings["tunnels"],
       proxmox.sources.map(({ has_secret, ...s }) => s),
+      app.settings["ai.memory"],
     ]);
   }
 

@@ -114,6 +114,9 @@ fn reads(words: &[&str]) -> bool {
         "top" => has("-b") || has("-bn1"),
         "mount" => rest.is_empty() || rest.iter().all(|w| w.starts_with('-') && (w.contains('l') || *w == "-t")),
         "awk" => !rest.iter().any(|w| w.contains("system(") || w.contains("> ") || w.contains(">\"")),
+        // `command -v x` only looks up where a program is; `command x` would run it.
+        "command" => rest.first().is_some_and(|s| *s == "-v" || *s == "-V"),
+        "test" | "[" | "[[" => true,
         _ => READ_PROGRAMS.contains(&w0),
     }
 }
@@ -360,6 +363,8 @@ mod tests {
             "find /etc -name '*.conf'",
             "sed -n '1,20p' /etc/hosts",
             "qm list",
+            "ss -tlnp 2>/dev/null | head -40; command -v nginx caddy haproxy && true",
+            "test -f /etc/nginx/nginx.conf && echo yes",
         ] {
             assert_eq!(e(c), Effect::Reads, "{c}");
         }
@@ -379,6 +384,7 @@ mod tests {
             "docker restart web",
             "touch /tmp/x",
             "cat x | sh",
+            "command rm -rf /tmp/x",
         ] {
             assert_eq!(e(c), Effect::Changes, "{c}");
         }

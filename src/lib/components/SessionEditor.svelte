@@ -10,11 +10,12 @@
   import { api, type Session } from "../api";
   import { Plus, Trash2, ArrowUp, ArrowDown, FolderOpen, Info, ServerCog, ChevronRight } from "@lucide/svelte";
   import ProxmoxSettings from "./ProxmoxSettings.svelte";
+  import MemoryList from "./MemoryList.svelte";
 
   let { session }: { session: Session } = $props();
   const initial = untrack(() => session);
   let s = $state<Session>(JSON.parse(JSON.stringify(initial)));
-  type Part = "basic" | "advanced" | "rdp" | "network" | "bookmark";
+  type Part = "basic" | "advanced" | "rdp" | "network" | "bookmark" | "memory";
   /** The folded parts under the main form, open or closed. */
   let open = $state<Record<string, boolean>>({});
   let error = $state("");
@@ -110,6 +111,7 @@
       s.kind === "rdp" ? (["rdp", "Screen, sharing and Remote Desktop options"] as const) : null,
       s.kind === "rdp" || s.kind === "vnc" ? (["network", "Gateways"] as const) : null,
       ["bookmark", "Notes, tab colour and word colours"] as const,
+      s.id ? (["memory", "What the assistant remembers about it"] as const) : null,
     ].filter(Boolean) as (readonly [Part, string])[],
   );
 
@@ -187,7 +189,9 @@
 </Modal>
 
 {#snippet part(section: Part)}
-    {#if section === "basic"}
+    {#if section === "memory"}
+      <MemoryList scope="session" target={s.id} />
+    {:else if section === "basic"}
       <div class="row2n">
         <label class="field grow"><span>Session name</span><input bind:value={s.name} placeholder={s.host || "Name shown in the sessions list"} /></label>
         <label class="field grow"><span>Folder</span>

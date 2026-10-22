@@ -6,6 +6,23 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.5.0 · 22 October 2026
+
+**The assistant remembers, and Settings you can read**
+
+- **The assistant has a memory, inside Cablebag.** It remembers what it learns per connection (how a server is set
+  up, what fixed a problem), per folder and in general, and starts each conversation with what it knows about
+  that server. New memories show in the conversation with an **Undo**; see and edit them in a session's editor
+  or in Settings › Assistant. The memory travels with Sync (Git), encrypted, and secrets are hidden before
+  anything is stored.
+- **Settings rebuilt.** Each page has a title, settings are grouped in cards with a short explanation next to
+  each one, on/off settings are switches, and **Find a setting** filters the pages. The page no longer gets cut
+  off halfway.
+- The assistant's answers show **bold** and `code` properly.
+- More commands count as only reading (`command -v`, `test`), and the password question for sudo says
+  *Continue* instead of *Connect*.
+- A shorter README with a screenshot.
+
 ## 0.4.0 · 22 October 2026
 
 **The assistant can now work on your SSH servers**

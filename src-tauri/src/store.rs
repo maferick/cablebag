@@ -7,7 +7,8 @@ use serde_json::Value;
 use std::path::PathBuf;
 
 pub fn data_dir() -> PathBuf {
-    let dir = dirs::config_dir().unwrap_or_else(std::env::temp_dir).join("Cablebag");
+    // CABLEBAG_DATA_DIR runs Cablebag on another data folder (demo data for screenshots, tests).
+    let dir = std::env::var_os("CABLEBAG_DATA_DIR").map(PathBuf::from).unwrap_or_else(|| dirs::config_dir().unwrap_or_else(std::env::temp_dir).join("Cablebag"));
     let _ = std::fs::create_dir_all(&dir);
     dir
 }
@@ -15,6 +16,9 @@ pub fn data_dir() -> PathBuf {
 /// The app was called TraxTerm before. On the first start under the new name its data folder is copied
 /// over (not moved, so an old install keeps working) and the database gets the new file name.
 fn adopt_old_data() {
+    if std::env::var_os("CABLEBAG_DATA_DIR").is_some() {
+        return;
+    }
     let Some(base) = dirs::config_dir() else { return };
     let (old, new) = (base.join("TraxTerm"), base.join("Cablebag"));
     if !old.join("traxterm.db").exists() || new.join("cablebag.db").exists() {

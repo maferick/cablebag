@@ -105,7 +105,7 @@ impl Prompts {
                     message: message.into(),
                     details: vec![],
                     fields,
-                    buttons: vec![button("ok", "Connect", "primary"), button("cancel", "Cancel", "normal")],
+                    buttons: vec![button("ok", "Continue", "primary"), button("cancel", "Cancel", "normal")],
                     warning: false,
                 },
             )

@@ -725,6 +725,12 @@ fn ai_stop(app: AppHandle, request_id: String) {
     ai::stop(&app, &request_id)
 }
 
+/// Hides secrets in a text before the assistant stores it in its memory.
+#[tauri::command]
+fn ai_redact(app: AppHandle, text: String) -> String {
+    ai::redact_known(&app, &text)
+}
+
 #[tauri::command]
 fn agent_classify(command: String) -> agent::Verdict {
     agent::classify(&command)
@@ -829,6 +835,7 @@ pub fn run() {
             ai_stop,
             ai_log,
             agent_classify,
+            ai_redact,
             agent_exec,
             update_check,
             update_install,
