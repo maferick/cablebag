@@ -6,6 +6,11 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.5.3 · 22 October 2026
+
+- **Clicking a Remote Desktop pane makes it the active one.** Before, the pane only lit up after you clicked its
+  title bar, because the click went straight to the remote screen.
+
 ## 0.5.2 · 22 October 2026
 
 - **You can see when the assistant waits for you.** The conversation now follows every new command and card,

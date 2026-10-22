@@ -41,6 +41,8 @@
     const un = listen<{ id: string; event: string; text: string }>("rdp-event", (e) => {
       if (e.payload.id !== tab.id) return;
       if (e.payload.event === "log" && e.payload.text) log = [...log.slice(-6), e.payload.text];
+      // A click on the remote screen: this pane becomes the active one.
+      if (e.payload.event === "activated" && app.activeId !== tab.id) app.activeId = tab.id;
       if (e.payload.event === "disconnected") {
         message = e.payload.text || "The remote desktop session ended.";
         nativeUp = false;

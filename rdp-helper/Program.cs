@@ -19,6 +19,7 @@ static class Program
             if (args[i] == "--parent") long.TryParse(args[i + 1], out parent);
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
+        FocusWatch.Start();
         Application.Run(new HostForm(new IntPtr(parent)));
     }
 }
@@ -52,6 +53,42 @@ static class Native
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetWindowLongPtr(IntPtr hwnd, int index);
+}
+
+/// Tells Cablebag when you click the remote screen. The click goes to this process's windows, not to
+/// Cablebag, which would otherwise not know which pane you are working in. The remote screen's input
+/// window runs on a thread of the Remote Desktop control, so a message filter on our own thread misses
+/// it; a focus event from Windows covers every thread of this process.
+static class FocusWatch
+{
+    const uint EVENT_OBJECT_FOCUS = 0x8005, WINEVENT_OUTOFCONTEXT = 0;
+    delegate void WinEventProc(IntPtr hook, uint evt, IntPtr hwnd, int obj, int child, uint thread, uint time);
+
+    [DllImport("user32.dll")]
+    static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr module, WinEventProc proc, uint pid, uint thread, uint flags);
+
+    [DllImport("user32.dll")]
+    static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+
+    static WinEventProc? proc;
+    static long last;
+
+    /// Must run on a thread with a message loop: Windows delivers the events there.
+    public static void Start()
+    {
+        var me = (uint)Environment.ProcessId;
+        proc = (_, _, hwnd, _, _, _, _) =>
+        {
+            // Every focus change on the desktop arrives here; only one into a window of ours counts.
+            GetWindowThreadProcessId(hwnd, out var pid);
+            if (pid != me) return;
+            var now = Environment.TickCount64;
+            if (now - last < 300) return;
+            last = now;
+            Out.Send("activated");
+        };
+        SetWinEventHook(EVENT_OBJECT_FOCUS, EVENT_OBJECT_FOCUS, IntPtr.Zero, proc, 0, 0, WINEVENT_OUTOFCONTEXT);
+    }
 }
 
 static class Out

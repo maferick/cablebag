@@ -1,6 +1,6 @@
 [package]
 name = "cablebag"
-version = "0.5.2"
+version = "0.5.3"
 description = "Cablebag: all-in-one remote access workstation"
 license-file = "../LICENSE"
 authors = ["maferick"]
