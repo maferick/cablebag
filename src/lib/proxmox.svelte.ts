@@ -114,7 +114,7 @@ class ProxmoxStore {
     s.host = src.url.replace(/^https?:\/\//, "").replace(/:\d+$/, "");
     s.port = 0;
     s.comment = `Console of ${g.kind === "lxc" ? "container" : "VM"} ${g.vmid} on ${g.node} (${src.name})`;
-    s.data.proxmox = { source: src.id, node: g.node, kind: g.kind, vmid: g.vmid };
+    s.data.proxmox = { source: src.id, node: g.node, kind: g.kind, vmid: g.vmid, os: g.os };
     app.openSession(s);
   }
 

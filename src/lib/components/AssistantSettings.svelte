@@ -171,6 +171,17 @@
   </div>
 </SettingsSection>
 
+<SettingsSection title="What it may do by itself" desc="For every server and screen it works on. Protected folders always ask for every command.">
+  <div class="modes" role="radiogroup" aria-label="What the assistant may do by itself">
+    {#each [{ id: "ask", name: "Read by itself, ask before every change", help: "Looking around (status, logs, listings) runs at once. Anything that changes something waits for Run it, Always or Refuse." }, { id: "free", name: "Do what is needed, ask only before dangerous commands", help: "Changes, root and actions on a screen run without asking. Dangerous commands, such as rm -rf / or wiping a disk, still wait for you." }] as m}
+      <label class="mode" class:on={assistant.mode === m.id}>
+        <input type="radio" name="ai-mode" value={m.id} checked={assistant.mode === m.id} onchange={() => app.setSetting("ai.mode", m.id)} />
+        <span><span class="name">{m.name}</span><span class="help">{m.help}</span></span>
+      </label>
+    {/each}
+  </div>
+</SettingsSection>
+
 <SettingsSection title="Protected folders" desc="Every command asks first, dangerous commands are refused, and only AI hosts that may see protected folders are used. Protect a folder with a right-click on it in the tree.">
   <div class="inner">
 {#if protectedFolders.length}
@@ -220,6 +231,40 @@
 </SettingsSection>
 
 <style>
+  .modes {
+    display: flex;
+    flex-direction: column;
+  }
+  .mode {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .mode:last-child {
+    border-bottom: none;
+  }
+  .mode.on {
+    background: var(--selected);
+  }
+  .mode input {
+    margin-top: 2px;
+  }
+  .mode > span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .mode .name {
+    font-size: 13px;
+  }
+  .mode .help {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.45;
+  }
   .inner {
     padding: 12px 14px;
     display: flex;

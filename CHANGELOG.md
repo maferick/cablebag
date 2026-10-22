@@ -6,6 +6,20 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.7.0 · 22 October 2026
+
+**The assistant inside Proxmox guests, and on a longer leash if you want**
+
+- **It runs commands inside Proxmox VMs and containers**, from the guest's console tab: in a VM through the QEMU
+  guest agent (PowerShell on Windows), in a container with `pct exec` on its node over SSH. Everything runs as
+  root, so the first command asks once. A VM needs the guest agent switched on and installed, and the API token
+  needs the `VM.GuestAgent.Unrestricted` privilege (Proxmox 9). For a container, Cablebag uses your saved SSH
+  session for the node, or logs in as root with the vault.
+- **Choose what it may do by itself** (Settings, Assistant): read by itself and ask before every change, as
+  before, or do what is needed and ask only before dangerous commands, such as `rm -rf /`, wiping a disk, a
+  reboot or destroying a VM. Protected folders always ask for everything. The top of the assistant column shows
+  the choice, with **Change**.
+
 ## 0.6.0 · 22 October 2026
 
 **The assistant on Remote Desktop and VNC**

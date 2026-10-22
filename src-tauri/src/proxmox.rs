@@ -610,6 +610,127 @@ pub fn has_secret(app: &AppHandle, src: &Source) -> bool {
     matches!(store.find_secret("password", "", "proxmox", &src.url, 0, &src.token_id), Ok(Some(_)))
 }
 
+// ---- Commands inside guests, for the assistant ----
+
+/// Runs one command inside a guest as root: in a VM through the QEMU guest agent (PowerShell on Windows,
+/// sh elsewhere), in a container with `pct exec` on its node, over SSH.
+pub async fn guest_exec(app: &AppHandle, id: &str, node: &str, kind: &str, vmid: u64, command: &str, timeout: Duration) -> Result<crate::agent::ExecResult> {
+    let api = connect(app, id).await?;
+    match kind {
+        "qemu" => vm_exec(&api, node, vmid, command, timeout).await,
+        "lxc" => container_exec(app, id, &api, node, vmid, command, timeout).await,
+        _ => bail!("Unknown guest type."),
+    }
+}
+
+async fn vm_exec(api: &Api, node: &str, vmid: u64, command: &str, timeout: Duration) -> Result<crate::agent::ExecResult> {
+    let base = format!("/nodes/{node}/qemu/{vmid}");
+    let config = api.get(&format!("{base}/config")).await?;
+    let agent = s(&config, "agent");
+    if !(agent.starts_with('1') || agent.contains("enabled=1")) {
+        bail!("The QEMU guest agent is off for this VM (its Options in Proxmox), so commands cannot run in it.");
+    }
+    let argv: Vec<&str> = if s(&config, "ostype").starts_with("win") {
+        vec!["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command]
+    } else {
+        vec!["sh", "-c", command]
+    };
+    // The API takes the program and its arguments as a list: one form field per item.
+    let form: Vec<(&str, &str)> = argv.iter().map(|a| ("command", *a)).collect();
+    let started = api
+        .call_form(reqwest::Method::POST, &format!("{base}/agent/exec"), &form)
+        .await
+        .map_err(|e| {
+            // A refused token says so itself; anything else is most likely the agent missing in the VM.
+            if e.to_string().contains("not allowed") { e } else { anyhow!("{e} Is qemu-guest-agent installed and running in the VM?") }
+        })?;
+    let pid = started["pid"].as_u64().ok_or_else(|| anyhow!("The guest agent did not start the command."))?;
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        let st = api.get(&format!("{base}/agent/exec-status?pid={pid}")).await?;
+        if st["exited"].as_u64() == Some(1) || st["exited"].as_bool() == Some(true) {
+            let mut text = s(&st, "out-data");
+            let err = s(&st, "err-data");
+            if !err.is_empty() {
+                if !text.is_empty() && !text.ends_with('\n') {
+                    text.push('\n');
+                }
+                text.push_str(&err);
+            }
+            let (output, cut) = crate::agent::limit_output(text);
+            return Ok(crate::agent::ExecResult {
+                output,
+                exit: st["exitcode"].as_u64().map(|c| c as u32),
+                timed_out: false,
+                truncated: cut || st["out-truncated"].as_u64() == Some(1) || st["out-truncated"].as_bool() == Some(true),
+            });
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Ok(crate::agent::ExecResult { output: String::new(), exit: None, timed_out: true, truncated: false });
+        }
+    }
+}
+
+/// SSH connections to Proxmox nodes for `pct exec`, kept open between commands, by source and node.
+static NODE_SSH: std::sync::OnceLock<Mutex<std::collections::HashMap<String, Arc<crate::ssh::SshConn>>>> = std::sync::OnceLock::new();
+
+struct Quiet;
+
+impl crate::term::Sink for Quiet {
+    fn info(&self, _: &str) {}
+    fn error(&self, _: &str) {}
+}
+
+async fn container_exec(app: &AppHandle, id: &str, api: &Api, node: &str, vmid: u64, command: &str, timeout: Duration) -> Result<crate::agent::ExecResult> {
+    let quoted = format!("'{}'", command.replace('\'', r"'\''"));
+    let (conn, root) = node_ssh(app, id, api, node).await?;
+    let line = format!("{}pct exec {vmid} -- sh -c {quoted}", if root { "" } else { "sudo -n " });
+    match crate::agent::exec_line(&conn, &line, timeout).await {
+        Ok(r) => Ok(r),
+        Err(_) => {
+            // The kept connection may have dropped: once more with a new one.
+            NODE_SSH.get_or_init(Default::default).lock().remove(&format!("{id}/{node}"));
+            let (conn, _) = node_ssh(app, id, api, node).await?;
+            crate::agent::exec_line(&conn, &line, timeout).await
+        }
+    }
+}
+
+/// An SSH connection to the node, and whether it logs in as root. The login comes from a saved SSH session
+/// for the node's address or name when there is one, otherwise root with the vault and saved passwords.
+async fn node_ssh(app: &AppHandle, id: &str, api: &Api, node: &str) -> Result<(Arc<crate::ssh::SshConn>, bool)> {
+    let key = format!("{id}/{node}");
+    let mut addr = node.to_string();
+    if let Ok(list) = api.get("/cluster/status").await {
+        for e in list.as_array().into_iter().flatten() {
+            if s(e, "type") == "node" && s(e, "name") == node && !s(e, "ip").is_empty() {
+                addr = s(e, "ip");
+            }
+        }
+    }
+    let saved = {
+        let state = app.state::<AppState>();
+        let store = state.store.lock();
+        store.sessions().unwrap_or_default().into_iter().find(|x| x.kind == "ssh" && (x.host.eq_ignore_ascii_case(&addr) || x.host.eq_ignore_ascii_case(node)))
+    };
+    let hops = match &saved {
+        Some(sess) => crate::ssh::hops_for(sess),
+        None => vec![crate::ssh::Hop { host: addr.clone(), port: 22, user: "root".into(), key_path: String::new(), vault_item: String::new(), session_id: String::new(), name: node.to_string() }],
+    };
+    let root = hops.last().map(|h| h.user.is_empty() || h.user == "root").unwrap_or(true);
+    if let Some(c) = NODE_SSH.get_or_init(Default::default).lock().get(&key).cloned() {
+        return Ok((c, root));
+    }
+    let conn = Arc::new(
+        crate::ssh::connect_chain(app, &hops, true, &Quiet)
+            .await
+            .map_err(|e| anyhow!("Could not log in to the Proxmox node {node} ({addr}) over SSH: {e}"))?,
+    );
+    NODE_SSH.get_or_init(Default::default).lock().insert(key, conn.clone());
+    Ok((conn, root))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -324,6 +324,61 @@ async fn sudo_without_password(conn: &crate::ssh::SshConn) -> bool {
     }
 }
 
+/// The output (at most MAX_OUTPUT) and exit code of a command on a channel, until it ends or the time is up.
+async fn collect(channel: &mut russh::Channel<russh::client::Msg>, timeout: Duration) -> ExecResult {
+    let mut res = ExecResult::default();
+    let mut buf: Vec<u8> = Vec::new();
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        let msg = tokio::select! {
+            m = channel.wait() => m,
+            _ = tokio::time::sleep_until(deadline) => {
+                res.timed_out = true;
+                let _ = channel.close().await;
+                break;
+            }
+        };
+        match msg {
+            Some(ChannelMsg::Data { data }) | Some(ChannelMsg::ExtendedData { data, .. }) => {
+                if buf.len() < MAX_OUTPUT {
+                    buf.extend_from_slice(&data[..data.len().min(MAX_OUTPUT - buf.len())]);
+                } else {
+                    res.truncated = true;
+                }
+            }
+            Some(ChannelMsg::ExitStatus { exit_status }) => res.exit = Some(exit_status),
+            Some(ChannelMsg::Close) | None => break,
+            _ => {}
+        }
+    }
+    res.output = String::from_utf8_lossy(&buf).into_owned();
+    res
+}
+
+/// Runs one command line on its own channel of an SSH connection (a Proxmox node, for `pct exec`).
+pub async fn exec_line(conn: &crate::ssh::SshConn, line: &str, timeout: Duration) -> Result<ExecResult> {
+    let mut channel = tokio::time::timeout(Duration::from_secs(15), conn.handle.channel_open_session())
+        .await
+        .map_err(|_| anyhow!("The server did not open a channel for the command in time."))??;
+    tokio::time::timeout(Duration::from_secs(15), channel.exec(true, line.as_bytes()))
+        .await
+        .map_err(|_| anyhow!("The server did not start the command in time."))??;
+    Ok(collect(&mut channel, timeout).await)
+}
+
+/// Text cut to at most MAX_OUTPUT bytes on a character boundary, and whether it was cut.
+pub fn limit_output(mut s: String) -> (String, bool) {
+    if s.len() <= MAX_OUTPUT {
+        return (s, false);
+    }
+    let mut end = MAX_OUTPUT;
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    s.truncate(end);
+    (s, true)
+}
+
 /// Runs one command on its own channel of the tab's SSH login.
 /// `session` is the tab's saved session, used only to find the sudo password.
 pub async fn exec(app: &AppHandle, tab_id: &str, session: &Session, command: &str, root: bool, timeout: Duration) -> Result<ExecResult> {
@@ -353,32 +408,7 @@ pub async fn exec(app: &AppHandle, tab_id: &str, session: &Session, command: &st
             keep = Some(pw);
         }
     }
-    let mut res = ExecResult::default();
-    let mut buf: Vec<u8> = Vec::new();
-    let deadline = tokio::time::Instant::now() + timeout;
-    loop {
-        let msg = tokio::select! {
-            m = channel.wait() => m,
-            _ = tokio::time::sleep_until(deadline) => {
-                res.timed_out = true;
-                let _ = channel.close().await;
-                break;
-            }
-        };
-        match msg {
-            Some(ChannelMsg::Data { data }) | Some(ChannelMsg::ExtendedData { data, .. }) => {
-                if buf.len() < MAX_OUTPUT {
-                    buf.extend_from_slice(&data[..data.len().min(MAX_OUTPUT - buf.len())]);
-                } else {
-                    res.truncated = true;
-                }
-            }
-            Some(ChannelMsg::ExitStatus { exit_status }) => res.exit = Some(exit_status),
-            Some(ChannelMsg::Close) | None => break,
-            _ => {}
-        }
-    }
-    res.output = String::from_utf8_lossy(&buf).into_owned();
+    let res = collect(&mut channel, timeout).await;
     if root && res.exit == Some(1) && res.output.contains("incorrect password") {
         bail!("sudo did not accept the password.");
     }

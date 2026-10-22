@@ -121,7 +121,10 @@
     {:else}
       <div class="about muted small">
         About: {assistant.describe(tab)}
-        {#if works}<br />{prot ? "Protected folder: every command asks you first." : "Can work on this server: reads by itself, asks before every change."}{/if}
+        {#if works}<br />{prot
+            ? "Protected folder: every command asks you first."
+            : `Can work ${assistant.guestOf(tab) ? "inside this guest, as root" : "on this server"}: ${assistant.mode === "free" ? "does what is needed by itself, asks only before dangerous commands" : "reads by itself, asks before every change"}.`}
+          <button class="link" onclick={() => app.openSettings("assistant")}>Change</button>{/if}
         <br />Memory: {memoryLine}
       </div>
       <div class="msgs" bind:this={list}>

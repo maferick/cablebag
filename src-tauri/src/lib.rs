@@ -374,6 +374,27 @@ async fn rdp_snapshot(state: State<'_, AppState>, id: String) -> CmdResult<Strin
     state.rdp.snapshot(&id).await.map_err(err)
 }
 
+/// A command of the assistant inside a Proxmox guest (as root), after the person's approval.
+#[tauri::command]
+async fn proxmox_exec(app: AppHandle, source: String, node: String, kind: String, vmid: u64, command: String, timeout_secs: Option<u64>) -> CmdResult<agent::ExecResult> {
+    let secs = timeout_secs.unwrap_or(60).clamp(5, 600);
+    let res = proxmox::guest_exec(&app, &source, &node, &kind, vmid, &command, std::time::Duration::from_secs(secs)).await.map_err(err)?;
+    let state = app.state::<AppState>();
+    let note = format!(
+        "{command}
+exit {}{}
+{}",
+        res.exit.map(|e| e.to_string()).unwrap_or_else(|| "unknown".into()),
+        if res.timed_out { ", stopped after the time limit" } else { "" },
+        res.output.chars().take(2000).collect::<String>()
+    );
+    // Hide secrets first: that reads the database too, which must not be locked twice.
+    let note = ai::redact_known(&app, &note);
+    let what = if kind == "lxc" { "container" } else { "VM" };
+    let _ = state.store.lock().ai_log_add("this PC", "", &format!("{what} {vmid} on {node}"), "ran", &note);
+    Ok(res)
+}
+
 /// An action of the assistant on a remote screen that the user approved: a click, keys or text.
 #[tauri::command]
 async fn rdp_input(state: State<'_, AppState>, id: String, action: serde_json::Value) -> CmdResult<serde_json::Value> {
@@ -938,6 +959,7 @@ pub fn run() {
             rdp_open,
             rdp_snapshot,
             rdp_input,
+            proxmox_exec,
             rdp_bounds,
             rdp_visible,
             rdp_command,
