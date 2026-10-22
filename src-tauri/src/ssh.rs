@@ -74,6 +74,9 @@ async fn serve_agent(app: AppHandle, channel: russh::Channel<client::Msg>) {
     let mut stream = channel.into_stream();
     let pageant = settings_flag(&app, "ssh.agent.pageant", false);
     let openssh = settings_flag(&app, "ssh.agent.openssh", false);
+    // shortcut: only Windows connects an agent so far; the SSH_AUTH_SOCK path will take this over.
+    #[cfg(not(windows))]
+    let _ = (&mut stream, pageant, openssh);
     #[cfg(windows)]
     {
         if openssh || !pageant {

@@ -45,6 +45,28 @@ const step = (s) => console.log(`\n== ${s}`);
 // 1. Version, notices, commit and tag (private).
 step(`Version ${version}`);
 if (out("git", ["status", "--porcelain"])) throw new Error("The working tree has uncommitted changes; commit them first.");
+// The public repository is overwritten below: anything merged on GitHub itself must be in the private one first.
+if (existsSync(join(PUBLIC_DIR, ".git"))) {
+  run("git", ["fetch", "-q", "origin", "main"], { cwd: PUBLIC_DIR });
+  try {
+    out("git", ["merge-base", "--is-ancestor", "origin/main", "HEAD"], { cwd: PUBLIC_DIR });
+  } catch {
+    throw new Error(
+      `GitHub's main has commits that are not in ${PUBLIC_DIR} (merged on GitHub?). Bring them into the private repository (git fetch https://github.com/${REPO}.git main, then cherry-pick), pull them into ${PUBLIC_DIR}, and release again.`,
+    );
+  }
+}
+/** Other people's commits since the last version, credited on the public commit (GitHub shows them as co-authors). */
+const previous = (() => {
+  try {
+    return out("git", ["describe", "--tags", "--abbrev=0"]);
+  } catch {
+    return "";
+  }
+})();
+const coAuthors = [...new Set(out("git", ["log", "--format=%an <%ae>", ...(previous ? [`${previous}..HEAD`] : [])]).split("\n"))]
+  .filter((a) => a && !a.startsWith("maferick "))
+  .map((a) => `Co-authored-by: ${a}`);
 const conf = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
 conf.version = version;
 writeFileSync("src-tauri/tauri.conf.json", JSON.stringify(conf, null, 2) + "\n");
@@ -114,7 +136,8 @@ for (const f of files) {
 }
 run("node", ["scripts/scan-private.mjs", PUBLIC_DIR, "src-tauri/target/release/cablebag.exe", "rdp-helper/publish/cablebag-rdp.exe", "build", join(bundle, setup), join(bundle, "latest.json")]);
 run("git", ["add", "-A"], { cwd: PUBLIC_DIR });
-if (out("git", ["status", "--porcelain"], { cwd: PUBLIC_DIR })) run("git", [...AUTHOR, "commit", "-q", "-m", `Cablebag ${version}`], { cwd: PUBLIC_DIR });
+const message = [`Cablebag ${version}`, ...(coAuthors.length ? ["", ...coAuthors] : [])].join("\n");
+if (out("git", ["status", "--porcelain"], { cwd: PUBLIC_DIR })) run("git", [...AUTHOR, "commit", "-q", "-m", message], { cwd: PUBLIC_DIR });
 run("git", [...AUTHOR, "tag", "-f", `v${version}`], { cwd: PUBLIC_DIR });
 
 if (dry) {

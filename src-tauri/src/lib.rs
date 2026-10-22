@@ -940,6 +940,7 @@ struct SystemInfo {
 /// What a bug report needs to say about this PC.
 #[tauri::command]
 fn system_info(app: AppHandle) -> SystemInfo {
+    #[cfg(windows)]
     let windows = (|| -> Option<String> {
         let k = windows_registry::LOCAL_MACHINE.open(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion").ok()?;
         let build = k.get_string("CurrentBuild").unwrap_or_default();
@@ -952,11 +953,22 @@ fn system_info(app: AppHandle) -> SystemInfo {
         Some(format!("{name} {} (build {build}{ubr})", k.get_string("DisplayVersion").unwrap_or_default()))
     })()
     .unwrap_or_else(|| "Windows (unknown version)".into());
+    #[cfg(not(windows))]
+    let windows = (|| -> Option<String> {
+        let osr = std::fs::read_to_string("/etc/os-release").ok()?;
+        let value = |k: &str| osr.lines().find_map(|l| l.strip_prefix(&format!("{k}=\""))).map(|v| v.trim_end_matches('"').to_string());
+        Some(value("PRETTY_NAME").unwrap_or_else(|| format!("{} {}", std::env::consts::OS, std::env::consts::ARCH)))
+    })()
+    .unwrap_or_else(|| format!("{} (unknown version)", std::env::consts::OS));
+    #[cfg(windows)]
     let dotnet = std::env::var_os("ProgramFiles")
         .map(|p| std::path::PathBuf::from(p).join(r"dotnet\shared\Microsoft.WindowsDesktop.App"))
         .and_then(|d| std::fs::read_dir(d).ok())
         .map(|it| it.flatten().map(|e| e.file_name().to_string_lossy().to_string()).filter(|n| n.starts_with("8.")).max().unwrap_or_default())
         .unwrap_or_default();
+    // The .NET runtime only matters for the Windows RDP helper.
+    #[cfg(not(windows))]
+    let dotnet = String::new();
     SystemInfo {
         version: app.package_info().version.to_string(),
         windows,

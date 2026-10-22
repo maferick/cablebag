@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Cablebag",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "identifier": "io.github.maferick.cablebag",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -40,9 +40,6 @@
     ],
     "shortDescription": "All-in-one remote access workstation",
     "publisher": "maferick",
-    "resources": {
-      "../rdp-helper/publish/cablebag-rdp.exe": "cablebag-rdp.exe"
-    },
     "createUpdaterArtifacts": true,
     "licenseFile": "../LICENSE",
     "copyright": "Copyright (c) 2026 maferick. Use only; see LICENSE.",

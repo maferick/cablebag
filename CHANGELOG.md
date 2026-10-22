@@ -6,6 +6,12 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.15.1 · 22 October 2026
+
+- **First steps towards Linux**, by @martijnvandijk: the Windows-only parts are kept to Windows, so the rest
+  builds and its tests run on Linux. Off Windows the vault key is now protected by a key file only your account
+  can read, instead of lying in the database as it was. Nothing changes on Windows.
+
 ## 0.15.0 · 22 October 2026
 
 **Proxmox behind WireGuard**

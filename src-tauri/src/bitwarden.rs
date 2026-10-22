@@ -736,7 +736,11 @@ impl Vaultwarden {
             return Ok(false);
         };
         if mode == "hello" {
+            #[cfg(windows)]
             let hwnd = app.get_webview_window("main").and_then(|w| w.hwnd().ok()).map(|h| h.0 as isize).unwrap_or(0);
+            // No Hello on other platforms: the stub verify gets no window and answers Unavailable.
+            #[cfg(not(windows))]
+            let hwnd = 0isize;
             let email = setting(app, "vault.email");
             let outcome = tokio::task::spawn_blocking(move || hello::verify(hwnd, &format!("Unlock the Cablebag vault ({email})"))).await??;
             match outcome {
