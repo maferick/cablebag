@@ -520,7 +520,7 @@ dependencies = [
 
 [[package]]
 name = "cablebag"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "aes 0.8.4",
  "aes-gcm",

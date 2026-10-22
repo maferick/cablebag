@@ -6,6 +6,12 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.5.4 · 22 October 2026
+
+- **The assistant asks for a sudo password only when it needs one.** On servers where sudo works without a
+  password, it no longer asks. Otherwise it first looks in your vault for a login for that server, also when
+  you logged in with a key. A password you type can be remembered, so it is asked only once.
+
 ## 0.5.3 · 22 October 2026
 
 - **Clicking a Remote Desktop pane makes it the active one.** Before, the pane only lit up after you clicked its

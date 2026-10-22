@@ -267,27 +267,61 @@ pub struct ExecResult {
 /// At most this much output goes back to the model.
 const MAX_OUTPUT: usize = 48 * 1024;
 
-/// The password sudo asks for: the session's vault login, a saved password, or a question to the user.
-async fn sudo_password(app: &AppHandle, session: &Session) -> Result<String> {
+/// The password sudo asks for: the session's vault login, a saved password, a login the vault holds for this
+/// server, or a question to the user. Also says whether the user wants a typed password remembered.
+async fn sudo_password(app: &AppHandle, session: &Session) -> Result<(String, bool)> {
     let state = app.state::<AppState>();
     let item = session.data.get("vault_item").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
     if !item.is_empty() {
         if let Ok((_, pw)) = state.vw.login(app, &item).await {
             if !pw.is_empty() {
-                return Ok(pw);
+                return Ok((pw, false));
             }
         }
     }
     let saved = { state.vault.password(&state.store.lock(), "ssh", &session.host, session.port, &session.username).ok().flatten() };
     if let Some(pw) = saved {
-        return Ok(pw);
+        return Ok((pw, false));
     }
-    let (pw, _) = state
+    // Logged in with a key: the vault may still hold the password for this server.
+    if item.is_empty() {
+        if let Ok(Some((_, _, _, pw))) = state.vw.pick_login(app, "ssh", &session.host, &session.username, &session.name).await {
+            if !pw.is_empty() {
+                return Ok((pw, false));
+            }
+        }
+    }
+    let message = format!(
+        "The assistant needs root for a command you approved. sudo asks for the password of {} on this server, also when you logged in with a key. It goes to sudo only, never to the AI.",
+        session.username
+    );
+    state
         .prompts
-        .ask_secret(app, &format!("sudo on {}", session.host), &format!("The assistant needs root for a command you approved. Password for {} (goes to sudo only, never to the AI):", session.username), "Password", false)
+        .ask_secret(app, &format!("sudo on {}", session.host), &message, "Password", true)
         .await
-        .ok_or_else(|| anyhow!("No password given for sudo."))?;
-    Ok(pw)
+        .ok_or_else(|| anyhow!("No password given for sudo."))
+}
+
+/// True when sudo works here without a password (NOPASSWD), so none has to be found or asked.
+async fn sudo_without_password(conn: &crate::ssh::SshConn) -> bool {
+    let Ok(Ok(mut channel)) = tokio::time::timeout(Duration::from_secs(10), conn.handle.channel_open_session()).await else {
+        return false;
+    };
+    if channel.exec(true, &b"sudo -n -k true"[..]).await.is_err() {
+        return false;
+    }
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        let msg = tokio::select! {
+            m = channel.wait() => m,
+            _ = tokio::time::sleep_until(deadline) => return false,
+        };
+        match msg {
+            Some(ChannelMsg::ExitStatus { exit_status }) => return exit_status == 0,
+            Some(ChannelMsg::Close) | None => return false,
+            _ => {}
+        }
+    }
 }
 
 /// Runs one command on its own channel of the tab's SSH login.
@@ -298,7 +332,10 @@ pub async fn exec(app: &AppHandle, tab_id: &str, session: &Session, command: &st
         .await
         .map_err(|_| anyhow!("The server did not open a channel for the command in time."))??;
     let quoted = format!("'{}'", command.replace('\'', r"'\''"));
-    let line = if root {
+    let passwordless = root && sudo_without_password(&conn).await;
+    let line = if passwordless {
+        format!("sudo -n -- sh -c {quoted}")
+    } else if root {
         // -S reads the password from the channel, -p '' keeps its question out of the output, -k asks every
         // time so the password always goes the same way.
         format!("sudo -S -k -p '' -- sh -c {quoted}")
@@ -308,9 +345,13 @@ pub async fn exec(app: &AppHandle, tab_id: &str, session: &Session, command: &st
     tokio::time::timeout(Duration::from_secs(15), channel.exec(true, line.as_bytes()))
         .await
         .map_err(|_| anyhow!("The server did not start the command in time."))??;
-    if root {
-        let pw = sudo_password(app, session).await?;
+    let mut keep: Option<String> = None;
+    if root && !passwordless {
+        let (pw, save) = sudo_password(app, session).await?;
         channel.data(format!("{pw}\n").as_bytes()).await?;
+        if save {
+            keep = Some(pw);
+        }
     }
     let mut res = ExecResult::default();
     let mut buf: Vec<u8> = Vec::new();
@@ -340,6 +381,11 @@ pub async fn exec(app: &AppHandle, tab_id: &str, session: &Session, command: &st
     res.output = String::from_utf8_lossy(&buf).into_owned();
     if root && res.exit == Some(1) && res.output.contains("incorrect password") {
         bail!("sudo did not accept the password.");
+    }
+    // sudo took the typed password: remember it, as asked.
+    if let Some(pw) = keep {
+        let state = app.state::<AppState>();
+        let _ = state.vault.save_password(&state.store.lock(), "ssh", &session.host, session.port, &session.username, &pw);
     }
     Ok(res)
 }
