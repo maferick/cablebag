@@ -4,11 +4,13 @@
   import { app } from "../state.svelte";
 
   /** inherited: the profile id a folder above gives, with that folder's name. */
-  let { value = $bindable(""), inherited, from = "" }: { value?: string; inherited?: string; from?: string } = $props();
+  // No fallback for value: most sessions have no network set, and binding undefined to a prop with a fallback is
+  // an error in Svelte that stops the whole window from updating.
+  let { value = $bindable(), inherited, from = "" }: { value?: string; inherited?: string; from?: string } = $props();
 </script>
 
 <div class="wgp">
-  <select bind:value>
+  <select value={value ?? ""} onchange={(e) => (value = e.currentTarget.value)}>
     <option value="">{inherited ? `As ${from}: ${wireguard.name(inherited)}` : "Directly from this PC"}</option>
     {#if inherited}<option value="none">Directly from this PC</option>{/if}
     {#each wireguard.list as p (p.id)}<option value={p.id}>WireGuard: {p.name}</option>{/each}

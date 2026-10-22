@@ -6,6 +6,11 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.14.1 · 22 October 2026
+
+- **Edit session works again**: since 0.13.0, opening the editor of a session without a WireGuard network stopped
+  Cablebag's window from updating, so the editor did not appear and menus stayed open.
+
 ## 0.14.0 · 22 October 2026
 
 **WireGuard for web pages**
