@@ -423,7 +423,7 @@ pub async fn tunnel(app: &AppHandle, id: &str) -> Result<Arc<Tunnel>> {
     let public = PublicKey::from(parse_key(&p.public_key)?);
     let preshared = saved_key(app, id, "preshared").and_then(|k| parse_key(&k).ok());
     let keepalive = if p.keepalive > 0 { Some(p.keepalive) } else { None };
-    let tunn = Tunn::new(private, public, preshared, keepalive, rand::random::<u32>() >> 8, None).map_err(|e| anyhow!("{e}"))?;
+    let tunn = Tunn::new(private, public, preshared, keepalive, rand::random::<u32>() >> 8, None);
 
     let addrs = addresses(&p.address);
     let warning = if local_clash(&addrs) {
@@ -1087,7 +1087,7 @@ mod tests {
         let udp = UdpSocket::bind("127.0.0.1:0").await.unwrap();
         let at = udp.local_addr().unwrap();
         tokio::spawn(async move {
-            let mut tunn = Tunn::new(key, client, None, None, 7, None).unwrap();
+            let mut tunn = Tunn::new(key, client, None, None, 7, None);
             let mut dev = Pipe { rx: VecDeque::new(), tx: VecDeque::new(), mtu: 1420 };
             let mut iface = Interface::new(Config::new(HardwareAddress::Ip), &mut dev, smoltcp::time::Instant::now());
             iface.update_ip_addrs(|ips| {
@@ -1162,7 +1162,7 @@ mod tests {
         let server = StaticSecret::from(rand::random::<[u8; 32]>());
         let client = StaticSecret::from(rand::random::<[u8; 32]>());
         let at = fake_server(banner, server.clone(), PublicKey::from(&client)).await;
-        let tunn = Tunn::new(client, PublicKey::from(&server), None, None, rand::random::<u32>() >> 8, None).unwrap();
+        let tunn = Tunn::new(client, PublicKey::from(&server), None, None, rand::random::<u32>() >> 8, None);
         start(banner, &at.to_string(), tunn, vec!["10.77.0.2".parse().unwrap()], vec![], 1420, String::new()).await.unwrap()
     }
 
@@ -1320,7 +1320,7 @@ AllowedIPs = 10.77.0.0/24
         );
         std::fs::write(std::env::var("WG_CONF").expect("WG_CONF"), conf).unwrap();
         let udp = UdpSocket::bind("127.0.0.1:51999").await.unwrap();
-        let mut tunn = Tunn::new(server, PublicKey::from(&client), None, None, 9, None).unwrap();
+        let mut tunn = Tunn::new(server, PublicKey::from(&client), None, None, 9, None);
         let mut dev = Pipe { rx: VecDeque::new(), tx: VecDeque::new(), mtu: 1420 };
         let mut iface = Interface::new(Config::new(HardwareAddress::Ip), &mut dev, smoltcp::time::Instant::now());
         iface.update_ip_addrs(|ips| {
