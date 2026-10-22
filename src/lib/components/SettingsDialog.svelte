@@ -11,7 +11,9 @@
   import { vault } from "../vault.svelte";
   import { update } from "../update.svelte";
   import { open as openDialog } from "@tauri-apps/plugin-dialog";
-  import { Trash2, Eye, FolderOpen, Lock, LockOpen, RefreshCw, Search } from "@lucide/svelte";
+  import { Trash2, Eye, FolderOpen, Lock, LockOpen, RefreshCw, Search, ExternalLink } from "@lucide/svelte";
+  import { openUrl } from "@tauri-apps/plugin-opener";
+  import Logo from "./Logo.svelte";
   import SettingsSection from "./SettingsSection.svelte";
   import SettingsRow from "./SettingsRow.svelte";
 
@@ -50,7 +52,7 @@
 
   /** One line under each page title. */
   const INTRO: Record<string, string> = {
-    general: "How Cablebag looks and behaves, and its updates.",
+    general: "How Cablebag looks and behaves.",
     terminal: "Font, colours, cursor and copying in every terminal.",
     highlighting: "Words such as error and warning in colour, so they stand out in output.",
     logging: "Keep what terminals show in files.",
@@ -65,17 +67,18 @@
 
   /** Words a page answers to in "Find a setting", besides its name and intro. */
   const WORDS: Record<string, string> = {
-    general: "theme dark light size zoom scale shell close import update version reach dots ping port",
+    general: "theme dark light size zoom scale shell close import reach dots ping port remote files sftp show hide",
     terminal: "font size scheme colours cursor blink scrollback copy paste right click",
     highlighting: "words colour syntax error warning regex",
     logging: "log file folder timestamps",
-    ssh: "keys agent pageant openssh remote files sftp",
+    ssh: "keys agent pageant openssh",
     vault: "vaultwarden bitwarden master password windows hello unlock lock",
     proxmox: "pve token server",
     sync: "git gitea github gitlab repository encrypt passphrase",
     assistant: "ai llm model openai litellm ollama memory protected folders rules always log",
     passwords: "saved secrets passphrase",
     hosts: "known hosts fingerprint trusted",
+    about: "version update licence license changelog what's new data folder issues",
   };
   let find = $state("");
   const shownPages = $derived(
@@ -95,6 +98,9 @@
   let secrets = $state<SecretInfo[]>([]);
   let revealed = $state<Record<string, string>>({});
   let dataFolder = $state("");
+
+  /** A page of the official project on GitHub. */
+  const site = (path: string) => openUrl(`https://github.com/maferick/cablebag${path}`).catch((e) => app.notify(String(e), "error"));
   let vwServer = $state("");
   let vwEmail = $state("");
 
@@ -107,7 +113,7 @@
   $effect(() => {
     if (page === "hosts") api.knownHosts().then((h) => (hosts = h));
     if (page === "passwords") api.secrets().then((s) => (secrets = s));
-    if (page === "general") api.dataFolder().then((d) => (dataFolder = d));
+    if (page === "about") api.dataFolder().then((d) => (dataFolder = d));
     if (page === "proxmox") proxmox.load();
     if (page === "vault")
       vault.refresh().then(() => {
@@ -171,6 +177,12 @@
           <SettingsRow label="Ask before closing" help="When sessions are still connected.">
             <input type="checkbox" class="switch" checked={app.settings["ui.confirmClose"]} onchange={set("ui.confirmClose")} />
           </SettingsRow>
+          <SettingsRow label="Remote files when an SSH session connects" help="A session can choose differently in its editor. Ctrl+Shift+E shows or hides them for the tab you are in.">
+            <select value={app.settings["ssh.autoFiles"] === false ? "hide" : "show"} onchange={(e) => app.setSetting("ssh.autoFiles", (e.target as HTMLSelectElement).value === "show")}>
+              <option value="show">Show</option>
+              <option value="hide">Don't show</option>
+            </select>
+          </SettingsRow>
           <SettingsRow label="Import sessions" help="From MobaXterm, PuTTY, KiTTY, WinSCP, the OpenSSH config or Remote Desktop files.">
             <button class="btn" onclick={() => (app.importOpen = true)}>Import sessions...</button>
           </SettingsRow>
@@ -190,20 +202,6 @@
             <input type="number" min="30" max="3600" value={app.settings["reach.interval"]} onchange={set("reach.interval")} disabled={!app.settings["reach.enabled"]} />
           </SettingsRow>
         </SettingsSection>
-
-        <SettingsSection title="Updates" desc="Only from the official page, github.com/maferick/cablebag, and only with the Cablebag signature.">
-          <SettingsRow label="Cablebag {update.current}" help={update.found ? `Version ${update.found.version} is available.` : update.lastChecked && !update.error ? "The newest version." : update.error || ""}>
-            <div class="btns">
-              {#if update.found}<button class="btn primary" disabled={update.installing} onclick={() => update.install()}>Install and restart</button>{/if}
-              <button class="btn" disabled={update.checking} onclick={() => update.check()}>{update.checking ? "Checking..." : "Check now"}</button>
-            </div>
-          </SettingsRow>
-          <SettingsRow label="Check by itself" help="At the start and every six hours.">
-            <input type="checkbox" class="switch" checked={app.settings["update.auto"] !== false} onchange={set("update.auto")} />
-          </SettingsRow>
-        </SettingsSection>
-
-        <p class="foot">Cablebag keeps its database in <span class="mono">{dataFolder}</span></p>
       {:else if page === "terminal"}
         <SettingsSection title="Text" desc="Font and colour changes apply to open terminals straight away.">
           <SettingsRow label="Font">
@@ -300,14 +298,6 @@
             <input type="checkbox" class="switch" checked={app.settings["ssh.agent.openssh"]} onchange={set("ssh.agent.openssh")} />
           </SettingsRow>
         </SettingsSection>
-        <SettingsSection title="Remote files">
-          <SettingsRow label="When an SSH session connects" help="A session can choose differently in its editor. Ctrl+Shift+E shows or hides them for the tab you are in.">
-            <select value={app.settings["ssh.autoFiles"] === false ? "hide" : "show"} onchange={(e) => app.setSetting("ssh.autoFiles", (e.target as HTMLSelectElement).value === "show")}>
-              <option value="show">Show</option>
-              <option value="hide">Don't show</option>
-            </select>
-          </SettingsRow>
-        </SettingsSection>
       {:else if page === "vault"}
         <SettingsSection title="Vault server" desc="Sessions, Proxmox servers and AI hosts can take their login from it. The opened vault stays in memory only.">
           <SettingsRow label="Server">
@@ -397,6 +387,52 @@
             </div>
           {/each}
         </SettingsSection>
+      {:else if page === "about"}
+        <div class="hero">
+          <Logo height={44} />
+          <div class="hero-txt">
+            <span class="ver">Version {update.current || "..."}</span>
+            <span class="muted">Remote access for system administrators: SSH, RDP, VNC, files, Proxmox and an assistant, as tabs in one window.</span>
+          </div>
+          <div class="btns">
+            <button class="btn" onclick={() => site("/blob/main/CHANGELOG.md")}><ExternalLink size={14} /> What's new</button>
+            <button class="btn" onclick={() => site("")}><ExternalLink size={14} /> Project page</button>
+          </div>
+        </div>
+
+        <SettingsSection title="Updates" desc="Only from the official page, github.com/maferick/cablebag, and only with the Cablebag signature.">
+          <SettingsRow label="Cablebag {update.current}" help={update.found ? `Version ${update.found.version} is available.` : update.lastChecked && !update.error ? "The newest version." : update.error || ""}>
+            <div class="btns">
+              {#if update.found}<button class="btn primary" disabled={update.installing} onclick={() => update.install()}>Install and restart</button>{/if}
+              <button class="btn" disabled={update.checking} onclick={() => update.check()}>{update.checking ? "Checking..." : "Check now"}</button>
+            </div>
+          </SettingsRow>
+          <SettingsRow label="Check by itself" help="At the start and every six hours.">
+            <input type="checkbox" class="switch" checked={app.settings["update.auto"] !== false} onchange={set("update.auto")} />
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection title="Licence" desc="Cablebag is free to use, but it is not open source.">
+          <div class="inner lic">
+            <p><strong>You may</strong> download it from the official page, install it and use it, at home or at work, on as many computers as you like.</p>
+            <p><strong>Not without permission:</strong> pass it on, change it or build on it, sell it or offer it as a service. Others can download it from the official page themselves.</p>
+          </div>
+          <SettingsRow label="The full text" help="Also the licences of the open-source parts inside Cablebag.">
+            <div class="btns">
+              <button class="btn" onclick={() => site("/blob/main/LICENSE")}><ExternalLink size={14} /> Licence</button>
+              <button class="btn" onclick={() => site("/blob/main/THIRD-PARTY-NOTICES.md")}><ExternalLink size={14} /> Open-source parts</button>
+            </div>
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection title="Your data" desc="Sessions, settings, saved passwords (encrypted) and what the assistant remembers stay on this PC, in one folder. Nothing goes anywhere unless you set up Sync or an AI host.">
+          <SettingsRow label="Data folder" help={dataFolder}>
+            <button class="btn" disabled={!dataFolder} onclick={() => api.fileOpen(dataFolder).catch((e) => app.notify(String(e), "error"))}><FolderOpen size={14} /> Open</button>
+          </SettingsRow>
+          <SettingsRow label="Questions or problems" help="Open an issue on the project page.">
+            <button class="btn" onclick={() => site("/issues")}><ExternalLink size={14} /> Issues</button>
+          </SettingsRow>
+        </SettingsSection>
       {/if}
     </div>
   </div>
@@ -483,6 +519,38 @@
     color: var(--muted);
     line-height: 1.5;
   }
+  .hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px 20px;
+    padding: 18px 16px;
+    margin-bottom: 14px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--panel);
+  }
+  .hero-txt {
+    flex: 1;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .ver {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .lic p {
+    margin: 0 0 6px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .lic p:last-child {
+    margin: 0;
+  }
   .btns {
     display: flex;
     gap: 8px;
@@ -497,11 +565,6 @@
   }
   .with-btn input {
     flex: 1;
-  }
-  .foot {
-    margin: 0;
-    font-size: 12px;
-    color: var(--muted);
   }
   .inner {
     padding: 12px 14px;

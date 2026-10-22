@@ -6,6 +6,14 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.7.2 · 22 October 2026
+
+- **About Cablebag**, in Settings and in the search box (Ctrl+K): the version, updates, what the licence
+  allows, where your data is kept (with **Open**), and links to what's new, the project page and its issues.
+  Updates moved here from General.
+- **Remote files when an SSH session connects** (show or don't show) is now in Settings, General, where you would
+  look for it, instead of under SSH.
+
 ## 0.7.1 · 22 October 2026
 
 - **PowerShell commands in Windows VMs are judged as PowerShell.** `Get-`, `Select-`, `Measure-` and other looking

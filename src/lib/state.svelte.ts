@@ -88,6 +88,7 @@ export const SETTINGS_PAGES = [
   { id: "assistant", label: "Assistant" },
   { id: "passwords", label: "Saved passwords" },
   { id: "hosts", label: "Trusted servers" },
+  { id: "about", label: "About Cablebag" },
 ];
 
 const uid = () => crypto.randomUUID();

@@ -75,7 +75,7 @@
   <button class="item" class:bad={!!sync.last?.error} title={sync.last?.error ? `Sync failed: ${sync.last.error}` : "Sessions synced through git"} onclick={syncMenu}>
     <RefreshCw size={13} />Sync: {syncWord}
   </button>
-  <button class="item" class:on={app.filesOpen} title="Show or hide the remote files of this SSH tab (Ctrl+Shift+E)" onclick={() => (app.filesOpen = !app.filesOpen)}>
+  <button class="item" class:on={app.filesOpen} title="Show or hide the remote files of this SSH tab (Ctrl+Shift+E). Whether they show when a session connects: Settings, General." onclick={() => (app.filesOpen = !app.filesOpen)}>
     <FolderTree size={13} />Remote files: {app.filesOpen ? "shown" : "hidden"}
   </button>
   {#each transfers as t (t.tab + t.name)}
