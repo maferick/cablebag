@@ -794,17 +794,17 @@ mod tests {
     fn pbkdf2_master_key_and_login_hash_match_reference() {
         let kdf = json!({ "kdf": 0, "kdfIterations": 5000 });
         let mk = master_key("p4ssw0rd", "user@example.com", &kdf).unwrap();
-        assert_eq!(hex::encode(mk), include_str!("../tests/bw_pbkdf2_master.hex").trim());
-        assert_eq!(password_hash(&mk, "p4ssw0rd"), include_str!("../tests/bw_pbkdf2_hash.txt").trim());
+        assert_eq!(hex::encode(mk), include_str!("../../tests/bw_pbkdf2_master.hex").trim());
+        assert_eq!(password_hash(&mk, "p4ssw0rd"), include_str!("../../tests/bw_pbkdf2_hash.txt").trim());
         let st = stretch(&mk).unwrap();
-        assert_eq!(hex::encode(st.enc), include_str!("../tests/bw_stretch_enc.hex").trim());
-        assert_eq!(hex::encode(st.mac.unwrap()), include_str!("../tests/bw_stretch_mac.hex").trim());
+        assert_eq!(hex::encode(st.enc), include_str!("../../tests/bw_stretch_enc.hex").trim());
+        assert_eq!(hex::encode(st.mac.unwrap()), include_str!("../../tests/bw_stretch_mac.hex").trim());
     }
 
     #[test]
     fn argon2_master_key_matches_reference() {
         let kdf = json!({ "Kdf": 1, "KdfIterations": 3, "KdfMemory": 16, "KdfParallelism": 2 });
         let mk = master_key("p4ssw0rd", "user@example.com", &kdf).unwrap();
-        assert_eq!(hex::encode(mk), include_str!("../tests/bw_argon2_master.hex").trim());
+        assert_eq!(hex::encode(mk), include_str!("../../tests/bw_argon2_master.hex").trim());
     }
 }
