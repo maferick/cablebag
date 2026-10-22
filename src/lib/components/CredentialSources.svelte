@@ -102,8 +102,8 @@
     </SettingsRow>
   {/each}
   {#if !editing}
-    <SettingsRow label="Add a source">
-      <div class="btns end">
+    <SettingsRow label="Add a source" stack>
+      <div class="btns">
         {#each SOURCE_KINDS as k (k.kind)}
           <button class="btn" onclick={() => add(k.kind)}><Plus size={14} /> {k.label}</button>
         {/each}

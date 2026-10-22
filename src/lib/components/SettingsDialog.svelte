@@ -360,7 +360,7 @@
       {:else if page === "assistant"}
         <AssistantSettings />
       {:else if page === "sync"}
-        <SettingsSection title="Sync through git" desc="Sessions, folders, macros, tunnels, Proxmox servers and the assistant's memory, to a private repository; passwords never go there.">
+        <SettingsSection title="Sync through git" desc="Sessions, folders, macros, tunnels, Proxmox servers, credential sources and the assistant's memory, to a private repository; passwords never go there.">
           <div class="inner"><SyncSettings /></div>
         </SettingsSection>
       {:else if page === "proxmox"}
