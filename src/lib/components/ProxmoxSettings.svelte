@@ -6,6 +6,7 @@
   import { proxmox } from "../proxmox.svelte";
   import { vault } from "../vault.svelte";
   import VaultPicker from "./VaultPicker.svelte";
+  import WireGuardPicker from "./WireGuardPicker.svelte";
   import { Plus, Pencil, Trash2, PlugZap, Server, KeyRound } from "@lucide/svelte";
 
   let {
@@ -131,6 +132,10 @@
     <div class="row2">
       <label class="field grow"><span>Address</span><input bind:value={editing.url} placeholder="pve.lan or https://10.0.0.5:8006" /></label>
       <label class="field"><span>Name in the tree</span><input bind:value={editing.name} placeholder="pve" /></label>
+    </div>
+
+    <div class="field"><span>Network (the server, and the sessions of its guests)</span>
+      <WireGuardPicker bind:value={editing.wireguard} />
     </div>
 
     <div class="field">

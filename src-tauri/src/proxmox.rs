@@ -40,6 +40,9 @@ pub struct Source {
     pub ssh_user: String,
     pub key_path: String,
     pub rdp_user: String,
+    /// WireGuard network the server is reached through (its API, console and node SSH), and the guests' sessions
+    /// made from it; empty = directly.
+    pub wireguard: String,
 }
 
 #[derive(Serialize)]
@@ -192,8 +195,13 @@ fn tls_config(pin: &str, seen: Arc<Mutex<Option<String>>>) -> Result<rustls::Cli
         .with_no_client_auth())
 }
 
-fn http_client(pin: &str, seen: Arc<Mutex<Option<String>>>) -> Result<reqwest::Client> {
-    Ok(reqwest::Client::builder()
+/// `proxy`: the port of Cablebag's own proxy into a WireGuard network, when the server is behind one.
+fn http_client(pin: &str, seen: Arc<Mutex<Option<String>>>, proxy: Option<u16>) -> Result<reqwest::Client> {
+    let mut b = reqwest::Client::builder();
+    if let Some(port) = proxy {
+        b = b.proxy(reqwest::Proxy::all(format!("http://127.0.0.1:{port}"))?);
+    }
+    Ok(b
         .use_preconfigured_tls(tls_config(pin, seen)?)
         .user_agent("Cablebag")
         .connect_timeout(Duration::from_secs(6))
@@ -208,6 +216,8 @@ pub struct Api {
     auth: String,
     /// The trusted certificate fingerprint, for connections outside the HTTP client.
     pin: String,
+    /// The WireGuard network the server is reached through, for connections outside the HTTP client.
+    wg: Option<(AppHandle, String)>,
 }
 
 impl Api {
@@ -294,10 +304,21 @@ pub async fn connect(app: &AppHandle, id: &str) -> Result<Api> {
     }
     let auth = format!("PVEAPIToken={}={}", token_id.trim(), secret.trim());
 
+    let wg = (!src.wireguard.is_empty() && src.wireguard != "none").then(|| src.wireguard.clone());
+    let proxy = match &wg {
+        Some(w) => Some(crate::wg::web_proxy(app, w).await?),
+        None => None,
+    };
     let mut pin = src.fingerprint.clone();
     for _ in 0..2 {
         let seen = Arc::new(Mutex::new(None));
-        let api = Api { http: http_client(&pin, seen.clone())?, base: src.url.clone(), auth: auth.clone(), pin: pin.clone() };
+        let api = Api {
+            http: http_client(&pin, seen.clone(), proxy)?,
+            base: src.url.clone(),
+            auth: auth.clone(),
+            pin: pin.clone(),
+            wg: wg.clone().map(|w| (app.clone(), w)),
+        };
         match api.get("/version").await {
             Ok(_) => return Ok(api),
             Err(e) => {
@@ -546,9 +567,14 @@ async fn open_console(api: &Api, node: &str, kind: &str, vmid: u64) -> Result<(t
         Some((h, p)) if !h.ends_with(':') && p.chars().all(|c| c.is_ascii_digit()) => (h.trim_matches(['[', ']']).to_string(), p.parse::<u16>()?),
         _ => (base.trim_matches(['[', ']']).to_string(), 443),
     };
-    let tcp = tokio::time::timeout(Duration::from_secs(8), tokio::net::TcpStream::connect((host.as_str(), web_port)))
-        .await
-        .map_err(|_| anyhow!("No answer from {host}:{web_port}."))??;
+    let tcp: Box<dyn crate::wg::Io> = match &api.wg {
+        Some((app, w)) => Box::new(crate::wg::connect(app, w, &host, web_port).await?),
+        None => Box::new(
+            tokio::time::timeout(Duration::from_secs(8), tokio::net::TcpStream::connect((host.as_str(), web_port)))
+                .await
+                .map_err(|_| anyhow!("No answer from {host}:{web_port}."))??,
+        ),
+    };
     let tls = tokio_rustls::TlsConnector::from(Arc::new(tls_config(&api.pin, Arc::new(Mutex::new(None)))?));
     let name = rustls::pki_types::ServerName::try_from(host.clone())?;
     let tls = tls.connect(name, tcp).await.map_err(|e| anyhow!("Could not open a secure connection for the console: {e}"))?;
@@ -857,10 +883,16 @@ async fn node_ssh(app: &AppHandle, id: &str, api: &Api, node: &str) -> Result<(A
         let store = state.store.lock();
         store.sessions().unwrap_or_default().into_iter().find(|x| x.kind == "ssh" && (x.host.eq_ignore_ascii_case(&addr) || x.host.eq_ignore_ascii_case(node)))
     };
-    let hops = match &saved {
+    let mut hops = match &saved {
         Some(sess) => crate::ssh::hops_for(sess),
         None => vec![crate::ssh::Hop { via_wg: String::new(), agent_forward: false, host: addr.clone(), port: 22, user: "root".into(), key_path: String::new(), vault_item: String::new(), session_id: String::new(), name: node.to_string() }],
     };
+    // Behind WireGuard the node is reached the same way, unless its own session says otherwise.
+    if let (Some((_, w)), Some(first)) = (&api.wg, hops.first_mut()) {
+        if saved.as_ref().is_none_or(|s| s.data.get("wireguard").is_none()) {
+            first.via_wg = w.clone();
+        }
+    }
     let root = hops.last().map(|h| h.user.is_empty() || h.user == "root").unwrap_or(true);
     if let Some(c) = NODE_SSH.get_or_init(Default::default).lock().get(&key).cloned() {
         return Ok((c, root));
@@ -894,14 +926,14 @@ mod tests {
         let auth = format!("PVEAPIToken={}", std::env::var("PVE_TOKEN").unwrap());
         // Unknown certificate: refused during the handshake, fingerprint seen.
         let seen = Arc::new(Mutex::new(None));
-        let api = Api { http: http_client("", seen.clone()).unwrap(), base: url.clone(), auth: auth.clone(), pin: String::new() };
+        let api = Api { http: http_client("", seen.clone(), None).unwrap(), base: url.clone(), auth: auth.clone(), pin: String::new(), wg: None };
         let e = api.get("/version").await.unwrap_err().to_string();
         let fp = seen.lock().clone().expect("no certificate seen");
         println!("refused: {e}
 fingerprint {fp}");
         assert!(e.to_lowercase().contains("certificate"));
         // Trusted fingerprint: works.
-        let api = Arc::new(Api { http: http_client(&fp, Arc::new(Mutex::new(None))).unwrap(), base: url, auth, pin: fp.clone() });
+        let api = Arc::new(Api { http: http_client(&fp, Arc::new(Mutex::new(None)), None).unwrap(), base: url, auth, pin: fp.clone(), wg: None });
         println!("version {}", api.get("/version").await.unwrap());
         for g in guests(api.clone()).await.unwrap() {
             println!("{:>4} {:<5} {:<8} {:<14} {:<7} {:?}", g.vmid, g.kind, g.status, g.name, g.os, g.ips);

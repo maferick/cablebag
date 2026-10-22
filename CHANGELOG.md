@@ -6,6 +6,17 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.15.0 · 22 October 2026
+
+**Proxmox behind WireGuard**
+
+- **A Proxmox server can go through a WireGuard network**: choose it under Network when you add or edit the
+  server (Settings, Proxmox). Its machines list, start and stop, the console, snapshots and the node shell then all
+  go through that network.
+- **Sessions Cablebag makes for its machines** (SSH, RDP) go through the same network.
+- **The Proxmox web interface and the console in a browser** open in a Cablebag tab through that network, since
+  the web browser on this PC cannot reach it.
+
 ## 0.14.2 · 22 October 2026
 
 - **WireGuard networks are made where you use them**: next to Network in a session or a folder there are

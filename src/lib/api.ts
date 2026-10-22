@@ -176,6 +176,8 @@ export interface ProxmoxSource {
   ssh_user: string;
   key_path: string;
   rdp_user: string;
+  /** WireGuard network the server and its guests are reached through; empty = directly. */
+  wireguard?: string;
   /** Only in listings: whether Cablebag keeps the token secret itself. */
   has_secret?: boolean;
 }

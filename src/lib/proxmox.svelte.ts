@@ -89,7 +89,22 @@ class ProxmoxStore {
       s.username = src.rdp_user || "";
     }
     s.comment = `${g.kind === "lxc" ? "Container" : "VM"} ${g.vmid} on ${g.node} (${src.name})`;
+    if (src.wireguard) s.data.wireguard = src.wireguard;
     return s;
+  }
+
+  /** A page of the server: in the web browser, or in a Cablebag tab through its WireGuard network (the browser
+   *  on this PC can not reach that). */
+  openWeb(src: ProxmoxSource, url: string, name: string) {
+    if (!src.wireguard || src.wireguard === "none") {
+      openUrl(url).catch((e) => app.notify(String(e), "error"));
+      return;
+    }
+    const s = newSession("browser");
+    s.name = name;
+    s.host = url;
+    s.data.wireguard = src.wireguard;
+    app.openSession(s);
   }
 
   /** Double-click: Windows over RDP, the rest over SSH; a guest that is off is offered a start. */
@@ -125,7 +140,7 @@ class ProxmoxStore {
   }
 
   openConsoleInBrowser(src: ProxmoxSource, g: ProxmoxGuest) {
-    openUrl(this.consoleUrl(src, g)).catch((e) => app.notify(String(e), "error"));
+    this.openWeb(src, this.consoleUrl(src, g), `${g.name} (console)`);
   }
 
   async power(src: ProxmoxSource, g: ProxmoxGuest, action: string, confirmed = false) {

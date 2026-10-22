@@ -7,7 +7,6 @@
   import { proxmox, isWindows } from "../proxmox.svelte";
   import { writeText } from "../clipboard";
   import { assistant } from "../assistant.svelte";
-  import { openUrl } from "@tauri-apps/plugin-opener";
   import type { ProxmoxGuest, ProxmoxSource } from "../api";
   import { api, type Folder, type Session } from "../api";
   import {
@@ -135,7 +134,7 @@
     e.stopPropagation();
     menu.show(e, [
       { label: "Refresh", icon: RefreshCw, action: () => proxmox.refresh(src.id) },
-      { label: "Open the Proxmox web interface", icon: Globe, action: () => openUrl(src.url) },
+      { label: "Open the Proxmox web interface", icon: Globe, action: () => proxmox.openWeb(src, src.url, src.name) },
       ...proxmox.nodes(src).map((n) => ({ label: `Shell on the node ${n}`, icon: Terminal, action: () => proxmox.openNodeShell(src, n) })),
       { label: "Recent tasks", icon: ListOrdered, action: () => (proxmox.dialog = { kind: "tasks", src }) },
       { label: "Edit this Proxmox server", icon: Pencil, action: () => (app.proxmoxEditing = src) },

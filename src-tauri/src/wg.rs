@@ -441,6 +441,10 @@ pub async fn tunnel(app: &AppHandle, id: &str) -> Result<Arc<Tunnel>> {
     Ok(t)
 }
 
+/// A connection of either kind, for code that goes directly or through WireGuard.
+pub trait Io: AsyncRead + AsyncWrite + Unpin + Send {}
+impl<T: AsyncRead + AsyncWrite + Unpin + Send> Io for T {}
+
 /// A TCP connection through a WireGuard tunnel; it keeps the tunnel running while it is open.
 pub struct WgStream {
     io: DuplexStream,
