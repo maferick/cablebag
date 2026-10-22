@@ -7,7 +7,7 @@
 
 use crate::prompt::{button, field, PromptRequest};
 use crate::AppState;
-use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
+use aes::cipher::{block_padding::Pkcs7, BlockModeDecrypt, KeyIvInit};
 use anyhow::{anyhow, bail, Context, Result};
 use base64::engine::general_purpose::{STANDARD as B64, URL_SAFE_NO_PAD as B64URL};
 use base64::Engine;
@@ -80,7 +80,7 @@ fn decrypt_sym(s: &str, key: &SymKey) -> Result<Vec<u8>> {
             let ct = B64.decode(parts[1])?;
             let mac = B64.decode(parts[2])?;
             let mac_key = key.mac.ok_or_else(|| anyhow!("the key has no authentication part"))?;
-            let mut m = <HmacSha256 as Mac>::new_from_slice(&mac_key).map_err(|e| anyhow!("{e}"))?;
+            let mut m = <HmacSha256 as hmac::KeyInit>::new_from_slice(&mac_key).map_err(|e| anyhow!("{e}"))?;
             m.update(&iv);
             m.update(&ct);
             m.verify_slice(&mac).map_err(|_| anyhow!("wrong key or damaged data"))?;
@@ -98,7 +98,7 @@ fn decrypt_sym(s: &str, key: &SymKey) -> Result<Vec<u8>> {
 
 fn aes_cbc(key: &[u8; 32], iv: &[u8], ct: &[u8]) -> Result<Vec<u8>> {
     let dec = Aes256CbcDec::new_from_slices(key, iv).map_err(|e| anyhow!("{e}"))?;
-    dec.decrypt_padded_vec_mut::<Pkcs7>(ct).map_err(|_| anyhow!("wrong key or damaged data"))
+    dec.decrypt_padded_vec::<Pkcs7>(ct).map_err(|_| anyhow!("wrong key or damaged data"))
 }
 
 fn decrypt_text(s: &str, key: &SymKey) -> Result<String> {
@@ -112,8 +112,8 @@ fn decrypt_rsa(s: &str, private_der: &[u8]) -> Result<Vec<u8>> {
     let data = B64.decode(rest.split('|').next().unwrap_or(""))?;
     let key = rsa::RsaPrivateKey::from_pkcs8_der(private_der).map_err(|e| anyhow!("private key: {e}"))?;
     let out = match t {
-        "4" | "6" => key.decrypt(rsa::Oaep::new::<sha1::Sha1>(), &data),
-        "3" | "5" => key.decrypt(rsa::Oaep::new::<sha2::Sha256>(), &data),
+        "4" | "6" => key.decrypt(rsa::Oaep::new::<rsa_sha1::Sha1>(), &data),
+        "3" | "5" => key.decrypt(rsa::Oaep::new::<rsa_sha2::Sha256>(), &data),
         other => bail!("unsupported key wrapping type {other}"),
     };
     out.map_err(|e| anyhow!("organization key: {e}"))
@@ -909,13 +909,13 @@ pub async fn check_server(server: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aes::cipher::BlockEncryptMut;
+    use aes::cipher::BlockModeEncrypt;
 
     type Aes256CbcEnc = cbc::Encryptor<aes::Aes256>;
 
     fn encrypt(plain: &[u8], key: &SymKey, iv: [u8; 16]) -> String {
-        let ct = Aes256CbcEnc::new_from_slices(&key.enc, &iv).unwrap().encrypt_padded_vec_mut::<Pkcs7>(plain);
-        let mut m = <HmacSha256 as Mac>::new_from_slice(&key.mac.unwrap()).unwrap();
+        let ct = Aes256CbcEnc::new_from_slices(&key.enc, &iv).unwrap().encrypt_padded_vec::<Pkcs7>(plain);
+        let mut m = <HmacSha256 as hmac::KeyInit>::new_from_slice(&key.mac.unwrap()).unwrap();
         m.update(&iv);
         m.update(&ct);
         format!("2.{}|{}|{}", B64.encode(iv), B64.encode(&ct), B64.encode(m.finalize().into_bytes()))

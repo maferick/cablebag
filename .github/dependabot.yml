@@ -1,5 +1,6 @@
-# Weekly update pull requests for minor and patch versions, grouped so a week brings a handful of PRs.
-# Security fixes come separately, as soon as an advisory is out (Dependabot security updates are on).
+# Weekly update pull requests, grouped: minor and patch versions in one PR, major versions in another (those
+# usually need code changes, and CI shows what breaks). Security fixes come separately, as soon as an advisory
+# is out (Dependabot security updates are on).
 version: 2
 updates:
   - package-ecosystem: cargo
@@ -8,13 +9,15 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
-    # Major versions need code changes and are upgraded on purpose, not by a weekly PR.
     ignore:
-      - dependency-name: "*"
+      # windows-future 0.100 needs the windows crate at 0.100 too, which Tauri does not use yet.
+      - dependency-name: windows-future
         update-types: ["version-update:semver-major"]
     groups:
       rust-minor-and-patch:
         update-types: [minor, patch]
+      rust-major:
+        update-types: [major]
 
   - package-ecosystem: npm
     directory: /
@@ -23,11 +26,14 @@ updates:
       day: monday
     open-pull-requests-limit: 5
     ignore:
-      - dependency-name: "*"
+      # SvelteKit and svelte-check support TypeScript 6 at most; 7 comes when they do.
+      - dependency-name: typescript
         update-types: ["version-update:semver-major"]
     groups:
       npm-minor-and-patch:
         update-types: [minor, patch]
+      npm-major:
+        update-types: [major]
 
   - package-ecosystem: nuget
     directory: /rdp-helper
