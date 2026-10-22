@@ -322,6 +322,13 @@
       {/if}
       {#if s.kind === "ssh"}
         <label class="field"><span>Run this command after login</span><input bind:value={s.data.command} placeholder="Nothing" /></label>
+        <label class="field"><span>Remote files when this session connects</span>
+          <select value={s.data.files ?? ""} onchange={(e) => (s.data.files = (e.target as HTMLSelectElement).value || undefined)}>
+            <option value="">Same as Settings ({app.settings["ssh.autoFiles"] === false ? "don't show" : "show"})</option>
+            <option value="show">Show</option>
+            <option value="hide">Don't show</option>
+          </select>
+        </label>
       {/if}
     {:else if section === "advanced"}
       <div class="grid2">

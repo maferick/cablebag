@@ -323,7 +323,7 @@ fn winscp() -> Result<Vec<Item>> {
         for ini in winscp_ini_paths() {
             if let Ok(text) = read_text(&ini) {
                 let mut section: Option<(String, BTreeMap<String, String>)> = None;
-                let mut flush = |sec: Option<(String, BTreeMap<String, String>)>, items: &mut Vec<Item>| {
+                let flush = |sec: Option<(String, BTreeMap<String, String>)>, items: &mut Vec<Item>| {
                     if let Some((name, vals)) = sec {
                         if let Some(it) = winscp_item(&name, &|k: &str| vals.get(k).cloned()) {
                             items.push(it);

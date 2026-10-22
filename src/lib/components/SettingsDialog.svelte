@@ -203,8 +203,14 @@
       {:else if page === "ssh"}
         <label class="check"><input type="checkbox" checked={app.settings["ssh.agent.pageant"]} onchange={set("ssh.agent.pageant")} /> Try keys from PuTTY Pageant</label>
         <label class="check"><input type="checkbox" checked={app.settings["ssh.agent.openssh"]} onchange={set("ssh.agent.openssh")} /> Try keys from the Windows OpenSSH agent</label>
-        <label class="check"><input type="checkbox" checked={app.settings["ssh.autoFiles"]} onchange={set("ssh.autoFiles")} /> Show the remote files panel after logging in</label>
         <p class="muted small">Agent keys are tried before the key file and password of a session.</p>
+        <label class="field"><span>Remote files when an SSH session connects</span>
+          <select value={app.settings["ssh.autoFiles"] === false ? "hide" : "show"} onchange={(e) => app.setSetting("ssh.autoFiles", (e.target as HTMLSelectElement).value === "show")}>
+            <option value="show">Show</option>
+            <option value="hide">Don't show</option>
+          </select>
+        </label>
+        <p class="muted small">A session can choose differently (its editor, Remote files). Ctrl+Shift+E shows or hides them for the tab you are in.</p>
       {:else if page === "vault"}
         <p class="muted small">
           Sessions and Proxmox servers can take their login from your Vaultwarden vault. The decrypted vault stays in memory

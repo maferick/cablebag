@@ -23,7 +23,7 @@ Cablebag is free to use, but it is **not open source**: you may install and use 
 change it or build on its code. The source is published so you can see what it does. See [LICENSE](LICENSE);
 the open-source components inside are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-## What works today
+## What it does
 
 - **The window**: one strip at the top with the sidebar button, the tabs, the + menu (new session, local
   terminals, tools), the search box, Layout and Settings. The session tree fills the left side, with Macros and
@@ -57,9 +57,10 @@ the open-source components inside are listed in [THIRD-PARTY-NOTICES.md](THIRD-P
 - **SSH**: password, keyboard-interactive (two-factor), private keys (OpenSSH and PuTTY `.ppk`, passphrase
   prompt), Pageant and the Windows OpenSSH agent, jump hosts in a chain, host key confirmation with SHA-256
   and MD5 fingerprints, keep-alive, command after login, reconnect with R.
-- **Remote files** beside the tab area for the active SSH tab (opens after login, Ctrl+Shift+E shows or hides it): browse, upload (button or drag from Explorer),
+- **Remote files** beside the tab area for the active SSH tab: browse, upload (button or drag from Explorer),
   download, new file or folder, rename, permissions, delete, open with the Windows program and upload again
-  after saving, paste a path into the terminal with a middle click.
+  after saving, paste a path into the terminal with a middle click. Whether they show when an SSH session
+  connects is a choice in Settings, SSH, and per session; Ctrl+Shift+E shows or hides them any time.
 - **Local terminals**: PowerShell 7, Windows PowerShell, Command Prompt, Git Bash, MSYS2 and WSL
   distributions, through the Windows pseudo console.
 - **Terminal**: tabs with colours, rename, duplicate, close left/right/others, find, copy on select,
@@ -89,7 +90,6 @@ the open-source components inside are listed in [THIRD-PARTY-NOTICES.md](THIRD-P
   "remember this PC"; personal and organization items. The decrypted vault stays in memory only.
 - **Password vault**: passwords and key passphrases are encrypted with AES-256-GCM under a key that only your
   Windows account can unwrap (DPAPI).
-
 - **RDP**: the Windows Remote Desktop control inside a tab (helper `cablebag-rdp.exe`), screen follows the tab
   size, clipboard/drive/printer/smart card/port/microphone sharing, sound choice, admin console, CredSSP,
   restricted admin, Remote Credential Guard, Remote Desktop Gateway, SSH gateway, Ctrl+Alt+Del, reconnect.
@@ -106,9 +106,6 @@ the open-source components inside are listed in [THIRD-PARTY-NOTICES.md](THIRD-P
 - **Browser**: a web page in a tab, with back, forward, reload and its own address bar. It only shows http and
   https pages, gets no access to Cablebag, and keeps its cookies apart.
 - **File or folder**: opens a file, folder or link in the program Windows uses for it.
-
-Mosh, Rsh, XDMCP and AWS S3 sessions are not offered for new sessions; imported ones stay saved with all their
-settings.
 
 ## Building
 

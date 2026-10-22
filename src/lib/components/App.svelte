@@ -225,8 +225,10 @@
         const t = app.tabs.find((x) => x.id === e.payload.id);
         if (!t) return;
         t.status = e.payload.state;
-        if (e.payload.state === "connected" && t.proto === "ssh" && app.activeId === t.id && app.settings["ssh.autoFiles"]) {
-          app.filesOpen = true;
+        // Remote files on connecting: the session's own choice, otherwise the one in Settings.
+        if (e.payload.state === "connected" && t.proto === "ssh" && !(t.id in app.filesFor)) {
+          const own = t.session?.data?.files;
+          app.filesFor[t.id] = own === "show" ? true : own === "hide" ? false : app.settings["ssh.autoFiles"] !== false;
         }
       }),
       listen<Transfer>("transfer", (e) => {

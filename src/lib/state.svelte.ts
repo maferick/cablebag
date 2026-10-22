@@ -116,8 +116,16 @@ class AppState {
   activeId = $state("home");
   prompts = $state<PromptRequest[]>([]);
   transfers = $state<Record<string, Transfer>>({});
-  /** The Remote files column beside the tab area (it follows the active SSH tab). */
-  filesOpen = $state(false);
+  /** Per SSH tab: whether its remote files show beside the tab area. */
+  filesFor = $state<Record<string, boolean>>({});
+
+  /** The remote files of the active tab: shown or not. */
+  get filesOpen(): boolean {
+    return !!this.filesFor[this.activeId];
+  }
+  set filesOpen(v: boolean) {
+    this.filesFor[this.activeId] = v;
+  }
   multiExec = $state(false);
   /** Split view: up to four terminals side by side, apart from tiling. */
   split = $state<SplitMode>("1");
@@ -371,6 +379,7 @@ class AppState {
     if (tab.type === "rdp") api.rdpClose(id).catch(() => {});
     if (tab.type === "browser") api.browserClose(id).catch(() => {});
     this.tabs.splice(i, 1);
+    delete this.filesFor[id];
     if (this.activeId === id) {
       const next = this.tabs[Math.min(i, this.tabs.length - 1)];
       this.activeId = next?.id ?? "home";
