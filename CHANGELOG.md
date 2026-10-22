@@ -6,6 +6,19 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.14.0 · 22 October 2026
+
+**WireGuard for web pages**
+
+- **Web sessions go through WireGuard too**: choose the network under Network, as for SSH or RDP. Cablebag
+  gives the page a proxy of its own that only that tab uses, so every address, including local ones, goes through
+  the tunnel, and WebRTC cannot show the page this PC's own address. Each WireGuard network keeps its cookies
+  apart, and they are removed with the network.
+- **Public key of a key in Vaultwarden**: the WireGuard editor can show it (Cablebag reads the key from the
+  vault for it), and reads it again when the key changed there.
+- **No reachability dot for sessions that go through WireGuard**: checked from this PC the address means
+  something else, and could even be a machine on your own network.
+
 ## 0.13.0 · 22 October 2026
 
 **WireGuard per session**

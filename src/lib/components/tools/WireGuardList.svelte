@@ -43,6 +43,17 @@
     newPublic = "";
   }
 
+  async function showPublic() {
+    if (!editingInfo) return;
+    try {
+      const pub = await api.wireguardPublicKey(editingInfo.id);
+      editingInfo = { ...editingInfo, own_public_key: pub };
+      await wireguard.load();
+    } catch (e) {
+      app.notify(String(e), "error");
+    }
+  }
+
   async function makeKeys() {
     const [priv, pub] = await api.wireguardKeypair();
     privateKey = priv;
@@ -180,6 +191,14 @@
           <button class="btn" onclick={makeKeys} title="Make a new key pair, for a peer of Cablebag's own"><KeyRound size={14} /> New key pair</button>
         </div>
       </label>
+      {#if !newPublic && !editingInfo?.own_public_key && editingInfo?.vault_item && editing.vault_item === editingInfo.vault_item}
+        <div class="field"><span>Public key of this side, for the server's peer list</span>
+          <div><button class="btn" onclick={showPublic}><KeyRound size={14} /> Show the public key of the key in the vault</button></div>
+        </div>
+      {/if}
+      {#if !newPublic && editingInfo?.own_public_key && editingInfo.vault_item && editing.vault_item === editingInfo.vault_item}
+        <div><button class="link" onclick={showPublic}>Read the key in the vault again (after it changed there)</button></div>
+      {/if}
       {#if newPublic || editingInfo?.own_public_key}
         {@const pub = newPublic || editingInfo?.own_public_key || ""}
         <div class="field"><span>{newPublic ? "Public key to add as a peer on the server (save to keep the new key)" : "Public key of this side, for the server's peer list"}</span>
@@ -346,5 +365,13 @@
   }
   .mono {
     font-family: var(--font-mono);
+  }
+  .link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--accent-text, var(--accent));
+    cursor: pointer;
+    font-size: 12px;
   }
 </style>

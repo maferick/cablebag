@@ -59,7 +59,7 @@
       <VaultPicker bind:itemId={d.vault_item} />
       {#if !d.vault_item && from("vault_item")}<span class="muted small">{from("vault_item")}</span>{/if}
     </div>
-    <div class="field"><span>Network (SSH, RDP, VNC, telnet)</span>
+    <div class="field"><span>Network (SSH, RDP, VNC, telnet, web)</span>
       <WireGuardPicker bind:value={d.wireguard} inherited={above.values.wireguard} from={above.from.wireguard ?? ""} />
     </div>
     <div class="field">

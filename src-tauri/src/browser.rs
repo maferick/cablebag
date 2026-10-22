@@ -42,7 +42,10 @@ pub fn parse(input: &str) -> Result<Url> {
     Ok(url)
 }
 
-pub fn open(app: &AppHandle, id: &str, url: &str, x: f64, y: f64, w: f64, h: f64) -> Result<()> {
+/// `wireguard`: the WireGuard network the page goes through (Cablebag's own proxy for it, and a browser
+/// profile of its own: WebView2 sets the proxy per profile).
+#[allow(clippy::too_many_arguments)]
+pub async fn open(app: &AppHandle, id: &str, url: &str, wireguard: Option<String>, x: f64, y: f64, w: f64, h: f64) -> Result<()> {
     let url = parse(url)?;
     let label = label(id);
     if let Some(wv) = app.get_webview(&label) {
@@ -51,9 +54,18 @@ pub fn open(app: &AppHandle, id: &str, url: &str, x: f64, y: f64, w: f64, h: f64
     }
     let window = app.get_window("main").ok_or_else(|| anyhow!("main window missing"))?;
     let (app1, app2, app3, id1, id2, id3) = (app.clone(), app.clone(), app.clone(), id.to_string(), id.to_string(), id.to_string());
-    let profile = crate::store::data_dir().join("browser");
-    let builder = WebviewBuilder::new(&label, WebviewUrl::External(url))
-        .data_directory(profile)
+    let mut builder = WebviewBuilder::new(&label, WebviewUrl::External(url));
+    if let Some(wg) = wireguard {
+        let port = crate::wg::web_proxy(app, &wg).await?;
+        // Arguments of its own replace wry's, so its defaults are repeated. Without <-loopback> Chromium sends
+        // loopback and link-local addresses around the proxy; WebRTC would show the page this PC's address.
+        builder = builder.data_directory(crate::wg::web_profile_dir(&wg)).additional_browser_args(&format!(
+            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --proxy-server=http://127.0.0.1:{port} --proxy-bypass-list=<-loopback> --force-webrtc-ip-handling-policy=disable_non_proxied_udp"
+        ));
+    } else {
+        builder = builder.data_directory(crate::store::data_dir().join("browser"));
+    }
+    let builder = builder
         .on_navigation(move |u| {
             let ok = allowed(u);
             if ok {

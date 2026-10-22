@@ -45,7 +45,7 @@
       if (e.payload.title) tab.title = e.payload.title;
     });
     api
-      .browserOpen(tab.id, tab.session?.host ?? "", rect())
+      .browserOpen(tab.id, tab.session?.host ?? "", tab.session?.data?.wireguard, rect())
       .then(() => {
         // Made while the tab may not have its size yet: place it now (the effect below keeps it placed).
         opened = true;

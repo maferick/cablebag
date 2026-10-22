@@ -350,7 +350,8 @@ export const api = {
     invoke<void>("term_open_stream", { id, session, cols, rows, log: log ?? null, onData }),
   fileOpen: (target: string) => invoke<void>("file_open", { target }),
   serialPorts: () => invoke<{ name: string; description: string }[]>("serial_ports"),
-  browserOpen: (id: string, url: string, r: { x: number; y: number; w: number; h: number }) => invoke<void>("browser_open", { id, url, ...r }),
+  browserOpen: (id: string, url: string, wireguard: string | undefined, r: { x: number; y: number; w: number; h: number }) =>
+    invoke<void>("browser_open", { id, url, wireguard: wireguard || null, ...r }),
   browserBounds: (id: string, r: { x: number; y: number; w: number; h: number }) => invoke<void>("browser_bounds", { id, ...r }),
   browserVisible: (id: string, show: boolean) => invoke<void>("browser_visible", { id, show }),
   browserCommand: (id: string, what: string, url?: string) => invoke<void>("browser_command", { id, what, url: url ?? null }),
@@ -380,6 +381,7 @@ export const api = {
     invoke<WireGuardProfile>("wireguard_save", { profile, privateKey: privateKey ?? null, presharedKey: presharedKey ?? null }),
   wireguardDelete: (id: string) => invoke<void>("wireguard_delete", { id }),
   wireguardImport: (path: string) => invoke<WireGuardProfile>("wireguard_import", { path }),
+  wireguardPublicKey: (id: string) => invoke<string>("wireguard_public_key", { id }),
   wireguardKeypair: () => invoke<[string, string]>("wireguard_keypair"),
   wireguardTest: (id: string) => invoke<WireGuardStatus>("wireguard_test", { id }),
   proxmoxSources: () => invoke<ProxmoxSource[]>("proxmox_sources"),

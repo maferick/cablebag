@@ -198,8 +198,8 @@ fn term_open_stream(
 /// Async on purpose: making a web view inside a synchronous command deadlocks on Windows.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-async fn browser_open(app: AppHandle, id: String, url: String, x: f64, y: f64, w: f64, h: f64) -> CmdResult<()> {
-    browser::open(&app, &id, &url, x, y, w, h).map_err(err)
+async fn browser_open(app: AppHandle, id: String, url: String, wireguard: Option<String>, x: f64, y: f64, w: f64, h: f64) -> CmdResult<()> {
+    browser::open(&app, &id, &url, wireguard.filter(|w| !w.is_empty() && w != "none"), x, y, w, h).await.map_err(err)
 }
 
 #[tauri::command]
@@ -561,6 +561,11 @@ fn wireguard_delete(app: AppHandle, id: String) -> CmdResult<()> {
 #[tauri::command]
 fn wireguard_import(app: AppHandle, path: String) -> CmdResult<wg::Profile> {
     wg::import(&app, &path).map_err(err)
+}
+
+#[tauri::command]
+async fn wireguard_public_key(app: AppHandle, id: String) -> CmdResult<String> {
+    wg::own_public_key(&app, &id).await.map_err(err)
 }
 
 #[tauri::command]
@@ -1114,6 +1119,7 @@ pub fn run() {
             wireguard_import,
             wireguard_test,
             wireguard_keypair,
+            wireguard_public_key,
             proxmox_delete_source,
             proxmox_list,
             proxmox_power,

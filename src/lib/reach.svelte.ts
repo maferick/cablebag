@@ -18,7 +18,9 @@ const NETWORK_KINDS = new Set(["ssh", "sftp", "rdp", "vnc", "telnet", "ftp", "mo
 /** The host:port to check for a session, or null when this PC cannot reach it directly (local, or through a gateway). */
 export function reachKey(s: Session): string | null {
   if (!NETWORK_KINDS.has(s.kind) || !s.host?.trim()) return null;
-  const d = s.data ?? {};
+  const d = app.withFolderDefaults(s).data ?? {};
+  // Through WireGuard the address means something else than from this PC (it may even be a machine here).
+  if (d.wireguard && d.wireguard !== "none") return null;
   if ((d.jump_hosts ?? []).some((h: any) => h?.host?.trim())) return null;
   if (d.ssh_gateway?.host?.trim()) return null;
   if (d.gateway?.host?.trim() && (d.gateway.usage ?? "always") === "always") return null;

@@ -306,7 +306,7 @@
           <VaultPicker bind:itemId={s.data.vault_item} hint={s.host} />
         </div>
       {/if}
-      {#if s.kind === "ssh" || s.kind === "rdp" || s.kind === "sftp" || s.kind === "vnc" || s.kind === "telnet"}
+      {#if s.kind === "ssh" || s.kind === "rdp" || s.kind === "sftp" || s.kind === "vnc" || s.kind === "telnet" || s.kind === "browser"}
         <div class="field"><span>Network</span>
           <WireGuardPicker bind:value={s.data.wireguard} inherited={folderValues.values.wireguard} from={`the folder ${folderValues.from.wireguard ?? ""}`} />
         </div>

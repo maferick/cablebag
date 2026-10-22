@@ -107,7 +107,7 @@ export const FOLDER_DEFAULTS: { key: string; label: string; kinds: string[] }[] 
   { key: "key_path", label: "key file", kinds: ["ssh", "sftp"] },
   { key: "vault_item", label: "vault login", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet", "ftp"] },
   { key: "jump_hosts", label: "jump hosts", kinds: ["ssh", "sftp"] },
-  { key: "wireguard", label: "WireGuard network", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet"] },
+  { key: "wireguard", label: "WireGuard network", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet", "browser"] },
   { key: "tab_color", label: "tab colour", kinds: [] },
 ];
 

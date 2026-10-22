@@ -21,7 +21,7 @@ use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf};
-use tokio::net::{TcpListener, UdpSocket};
+use tokio::net::{TcpListener, TcpStream, UdpSocket};
 use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
 
@@ -102,7 +102,7 @@ pub fn infos(app: &AppHandle) -> Vec<ProfileInfo> {
         .map(|p| ProfileInfo {
             has_key: !p.vault_item.is_empty() || saved_key(app, &p.id, "private").is_some(),
             has_preshared: saved_key(app, &p.id, "preshared").is_some(),
-            own_public_key: saved_key(app, &p.id, "private").and_then(|k| parse_key(&k).ok()).map(|k| encode_key(PublicKey::from(&StaticSecret::from(k)).as_bytes())).unwrap_or_default(),
+            own_public_key: if p.vault_item.is_empty() { saved_key(app, &p.id, "private").map(|k| public_of(&k)).unwrap_or_default() } else { known_public(app, &p.id) },
             status: live.get(&p.id).cloned(),
             profile: p,
         })
@@ -135,7 +135,13 @@ pub fn save(app: &AppHandle, mut p: Profile, private_key: Option<String>, presha
     }
     let mut list = profiles(app);
     match list.iter_mut().find(|x| x.id == p.id) {
-        Some(old) => *old = p.clone(),
+        Some(old) => {
+            // Another vault item can hold another key: the remembered public key is no longer known.
+            if old.vault_item != p.vault_item {
+                forget_public(app, &p.id);
+            }
+            *old = p.clone()
+        }
         None => list.push(p.clone()),
     }
     save_profiles(app, &list)?;
@@ -166,6 +172,10 @@ pub fn delete(app: &AppHandle, id: &str) -> Result<()> {
     let list: Vec<Profile> = profiles(app).into_iter().filter(|p| p.id != id).collect();
     save_profiles(app, &list)?;
     let state = app.state::<AppState>();
+    state.wg.proxies.lock().remove(id);
+    // Cookies of its web tabs; still in use when a tab is open, then they go the next time.
+    let _ = std::fs::remove_dir_all(web_profile_dir(id));
+    forget_public(app, id);
     let store = state.store.lock();
     forget_keys(&store, id, None)
 }
@@ -219,6 +229,58 @@ fn parse_conf(text: &str) -> Result<(Profile, String, Option<String>)> {
     Ok((p, private, preshared))
 }
 
+/// The public key that goes with a private key ("" when it is not a key).
+fn public_of(private: &str) -> String {
+    parse_key(private).map(|k| encode_key(PublicKey::from(&StaticSecret::from(k)).as_bytes())).unwrap_or_default()
+}
+
+/// Public keys of private keys that live in Vaultwarden, remembered on this PC (not synced: they follow from the key).
+const KNOWN_PUBLIC_KEY: &str = "wireguard.public_keys";
+
+fn known_public(app: &AppHandle, id: &str) -> String {
+    let state = app.state::<AppState>();
+    let v = state.store.lock().setting(KNOWN_PUBLIC_KEY).ok().flatten();
+    v.and_then(|v| v.get(id).and_then(|k| k.as_str()).map(String::from)).unwrap_or_default()
+}
+
+fn forget_public(app: &AppHandle, id: &str) {
+    let state = app.state::<AppState>();
+    let store = state.store.lock();
+    if let Some(mut map) = store.setting(KNOWN_PUBLIC_KEY).ok().flatten().and_then(|v| v.as_object().cloned()) {
+        if map.remove(id).is_some() {
+            let _ = store.set_setting(KNOWN_PUBLIC_KEY, &Value::Object(map));
+        }
+    }
+}
+
+fn remember_public(app: &AppHandle, id: &str, public: &str) {
+    let state = app.state::<AppState>();
+    let store = state.store.lock();
+    let mut map = store.setting(KNOWN_PUBLIC_KEY).ok().flatten().and_then(|v| v.as_object().cloned()).unwrap_or_default();
+    if map.get(id).and_then(|v| v.as_str()) != Some(public) {
+        map.insert(id.to_string(), Value::String(public.to_string()));
+        let _ = store.set_setting(KNOWN_PUBLIC_KEY, &Value::Object(map));
+    }
+}
+
+/// This side's public key of a profile, fetching the private key from Vaultwarden when it lives there.
+pub async fn own_public_key(app: &AppHandle, id: &str) -> Result<String> {
+    let p = profile(app, id)?;
+    let private = if p.vault_item.is_empty() {
+        saved_key(app, id, "private").ok_or_else(|| anyhow!("Cablebag has no private key for {}.", p.name))?
+    } else {
+        app.state::<AppState>().vw.login(app, &p.vault_item).await?.1
+    };
+    let public = public_of(&private);
+    if public.is_empty() {
+        bail!("The private key of {} is not a WireGuard key.", p.name);
+    }
+    if !p.vault_item.is_empty() {
+        remember_public(app, id, &public);
+    }
+    Ok(public)
+}
+
 fn encode_key(k: &[u8; 32]) -> String {
     use base64::Engine;
     base64::engine::general_purpose::STANDARD.encode(k)
@@ -257,6 +319,9 @@ pub struct Tunnels {
     /// One start at a time per profile, so two sessions opening together share one tunnel (two would fight over
     /// the key), while a key prompt for one network does not hold up another.
     starting: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
+    /// The web proxy of each profile, shared by its web tabs. It keeps its port while Cablebag runs: WebView2
+    /// keeps the proxy a browser profile started with.
+    proxies: Mutex<HashMap<String, Arc<WebProxy>>>,
 }
 
 impl Tunnels {
@@ -351,6 +416,9 @@ pub async fn tunnel(app: &AppHandle, id: &str) -> Result<Arc<Tunnel>> {
             }
         }
     };
+    if !p.vault_item.is_empty() {
+        remember_public(app, id, &public_of(&private));
+    }
     let private = StaticSecret::from(parse_key(&private).map_err(|_| anyhow!("The private key of {} is not a WireGuard key.", p.name))?);
     let public = PublicKey::from(parse_key(&p.public_key)?);
     let preshared = saved_key(app, id, "preshared").and_then(|k| parse_key(&k).ok());
@@ -472,6 +540,156 @@ async fn handshake(app: &AppHandle, id: &str) -> Result<Arc<Tunnel>> {
         }
         tokio::time::sleep(Duration::from_millis(200)).await;
     }
+}
+
+/// An HTTP proxy on 127.0.0.1 for Cablebag's own web tabs: every request goes through the tunnel, names are
+/// looked up the way sessions do (the tunnel's DNS, or else as usual). Not meant for other programs.
+pub struct WebProxy {
+    pub port: u16,
+    task: JoinHandle<()>,
+}
+
+impl Drop for WebProxy {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
+}
+
+/// The proxy port of a profile's web tabs. The first time it shakes hands, so a wrong key shows at once.
+pub async fn web_proxy(app: &AppHandle, id: &str) -> Result<u16> {
+    let state = app.state::<AppState>();
+    if let Some(p) = state.wg.proxies.lock().get(id) {
+        return Ok(p.port);
+    }
+    let _ = handshake(app, id).await?;
+    let (app2, id2) = (app.clone(), id.to_string());
+    let p = serve_proxy(move || {
+        let (app, id) = (app2.clone(), id2.clone());
+        async move { tunnel(&app, &id).await }
+    })
+    .await?;
+    let port = p.port;
+    state.wg.proxies.lock().entry(id.to_string()).or_insert(Arc::new(p));
+    Ok(state.wg.proxies.lock().get(id).map(|p| p.port).unwrap_or(port))
+}
+
+/// The browser profile of a WireGuard network's web tabs (cookies apart from other networks and from ordinary tabs).
+pub fn web_profile_dir(id: &str) -> std::path::PathBuf {
+    crate::store::data_dir().join(format!("browser-wg-{}", id.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-').collect::<String>()))
+}
+
+/// Serves the proxy; `tunnel` gives the tunnel for each request (starting it when it is not running).
+async fn serve_proxy<F, Fut>(tunnel: F) -> Result<WebProxy>
+where
+    F: Fn() -> Fut + Send + Sync + 'static,
+    Fut: std::future::Future<Output = Result<Arc<Tunnel>>> + Send,
+{
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
+    let port = listener.local_addr()?.port();
+    let tunnel = Arc::new(tunnel);
+    let task = tokio::spawn(async move {
+        while let Ok((mut sock, _)) = listener.accept().await {
+            let tunnel = tunnel.clone();
+            tokio::spawn(async move {
+                match tunnel().await {
+                    Ok(t) => {
+                        let _ = proxy_one(sock, t).await;
+                    }
+                    Err(e) => {
+                        let _ = bad_gateway(&mut sock, &e.to_string()).await;
+                    }
+                }
+            });
+        }
+    });
+    Ok(WebProxy { port, task })
+}
+
+/// One request from the web view: CONNECT host:port (https) becomes a tunnel connection; a plain http request
+/// is sent on with its address made relative, one request per connection.
+async fn proxy_one(mut sock: TcpStream, t: Arc<Tunnel>) -> Result<()> {
+    let mut head = Vec::new();
+    let mut b = [0u8; 4096];
+    let end = loop {
+        let n = sock.read(&mut b).await?;
+        if n == 0 {
+            return Ok(());
+        }
+        head.extend_from_slice(&b[..n]);
+        if let Some(i) = head.windows(4).position(|w| w == b"\r\n\r\n") {
+            break i + 4;
+        }
+        if head.len() > 256 * 1024 {
+            bail!("request head too large");
+        }
+    };
+    let rest = head.split_off(end);
+    let text = String::from_utf8_lossy(&head).to_string();
+    let mut lines = text.split("\r\n");
+    let first = lines.next().unwrap_or("");
+    let mut parts = first.split_whitespace();
+    let (method, target, version) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""), parts.next().unwrap_or("HTTP/1.1"));
+
+    if method.eq_ignore_ascii_case("CONNECT") {
+        let (host, port) = split_host_port(target, 443);
+        match t.open(&host, port).await {
+            Ok(mut up) => {
+                sock.write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n").await?;
+                if !rest.is_empty() {
+                    up.write_all(&rest).await?;
+                }
+                let _ = tokio::io::copy_bidirectional(&mut sock, &mut up).await;
+            }
+            Err(e) => bad_gateway(&mut sock, &e.to_string()).await?,
+        }
+        return Ok(());
+    }
+
+    let Ok(url) = tauri::Url::parse(target) else {
+        return bad_gateway(&mut sock, "Cablebag's web proxy only takes full addresses.").await;
+    };
+    let (Some(host), Some(port)) = (url.host_str().map(|h| h.trim_matches(|c| c == '[' || c == ']').to_string()), url.port_or_known_default()) else {
+        return bad_gateway(&mut sock, "The address has no host.").await;
+    };
+    let path = match url.query() {
+        Some(q) => format!("{}?{q}", url.path()),
+        None => url.path().to_string(),
+    };
+    let mut out = format!("{method} {path} {version}\r\n");
+    for l in lines.filter(|l| !l.is_empty()) {
+        let name = l.split(':').next().unwrap_or("").trim().to_ascii_lowercase();
+        if !matches!(name.as_str(), "proxy-connection" | "connection" | "keep-alive" | "proxy-authorization") {
+            out.push_str(l);
+            out.push_str("\r\n");
+        }
+    }
+    out.push_str("Connection: close\r\n\r\n");
+    match t.open(&host, port).await {
+        Ok(mut up) => {
+            up.write_all(out.as_bytes()).await?;
+            if !rest.is_empty() {
+                up.write_all(&rest).await?;
+            }
+            let _ = tokio::io::copy_bidirectional(&mut sock, &mut up).await;
+        }
+        Err(e) => bad_gateway(&mut sock, &e.to_string()).await?,
+    }
+    Ok(())
+}
+
+fn split_host_port(target: &str, default: u16) -> (String, u16) {
+    match target.rsplit_once(':') {
+        Some((h, p)) if !h.ends_with(':') && p.parse::<u16>().is_ok() => (h.trim_matches(|c| c == '[' || c == ']').to_string(), p.parse().unwrap()),
+        _ => (target.trim_matches(|c| c == '[' || c == ']').to_string(), default),
+    }
+}
+
+async fn bad_gateway(sock: &mut TcpStream, msg: &str) -> Result<()> {
+    let body = format!("Cablebag could not reach this through WireGuard: {msg}");
+    let head = format!("HTTP/1.1 502 Bad Gateway\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+    sock.write_all(head.as_bytes()).await?;
+    sock.write_all(body.as_bytes()).await?;
+    Ok(())
 }
 
 /// The profile a session goes through, if any (its own choice or its folder's, already merged in by the window).
@@ -1002,6 +1220,60 @@ mod tests {
         assert!(e.to_string().contains("refused"), "{e}");
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn web_proxy_passes_requests_through_the_tunnel() {
+        let t = tunnel_to("echo").await;
+        let proxy = serve_proxy(move || {
+            let t = t.clone();
+            async move { Ok(t) }
+        })
+        .await
+        .unwrap();
+        async fn read_until(s: &mut TcpStream, want: usize) -> String {
+            let mut got = Vec::new();
+            let mut b = [0u8; 4096];
+            while got.len() < want {
+                let n = tokio::time::timeout(Duration::from_secs(10), s.read(&mut b)).await.expect("no answer").unwrap();
+                if n == 0 {
+                    break;
+                }
+                got.extend_from_slice(&b[..n]);
+            }
+            String::from_utf8_lossy(&got).to_string()
+        }
+
+        // Plain http: the address is made relative and the proxy's own headers are left out.
+        let mut s = TcpStream::connect(("127.0.0.1", proxy.port)).await.unwrap();
+        s.write_all(b"GET http://10.77.0.1:8000/x?y=1 HTTP/1.1\r\nHost: 10.77.0.1:8000\r\nProxy-Connection: keep-alive\r\n\r\n").await.unwrap();
+        let want = "echoGET /x?y=1 HTTP/1.1\r\nHost: 10.77.0.1:8000\r\nConnection: close\r\n\r\n";
+        assert_eq!(read_until(&mut s, want.len()).await, want);
+        drop(s);
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        // https: CONNECT gives a straight connection.
+        let mut s = TcpStream::connect(("127.0.0.1", proxy.port)).await.unwrap();
+        s.write_all(b"CONNECT 10.77.0.1:8000 HTTP/1.1\r\nHost: 10.77.0.1:8000\r\n\r\n").await.unwrap();
+        let want = "HTTP/1.1 200 Connection Established\r\n\r\necho";
+        assert_eq!(read_until(&mut s, want.len()).await, want);
+        s.write_all(b"hello").await.unwrap();
+        assert_eq!(read_until(&mut s, 5).await, "hello");
+        drop(s);
+
+        // A closed port: the page shows why.
+        let mut s = TcpStream::connect(("127.0.0.1", proxy.port)).await.unwrap();
+        s.write_all(b"CONNECT 10.77.0.1:9 HTTP/1.1\r\n\r\n").await.unwrap();
+        let mut all = String::new();
+        let _ = tokio::time::timeout(Duration::from_secs(10), s.read_to_string(&mut all)).await;
+        assert!(all.starts_with("HTTP/1.1 502") && all.contains("refused"), "{all}");
+    }
+
+    #[test]
+    fn host_and_port() {
+        assert_eq!(split_host_port("example.com:8443", 443), ("example.com".into(), 8443));
+        assert_eq!(split_host_port("example.com", 443), ("example.com".into(), 443));
+        assert_eq!(split_host_port("[fd00::1]:443", 80), ("fd00::1".into(), 443));
+    }
+
     #[test]
     fn reads_a_conf() {
         let (p, private, preshared) = parse_conf(
@@ -1019,13 +1291,14 @@ mod tests {
         assert!(parse_conf("[Interface]\nPrivateKey = a\n").is_err());
     }
 
-    /// For trying Cablebag itself: a WireGuard server on 127.0.0.1:51999 whose 10.77.0.1:22 leads to
-    /// WG_TARGET (host:port). Writes the client .conf to WG_CONF and runs until stopped.
+    /// For trying Cablebag itself: a WireGuard server on 127.0.0.1:51999 whose 10.77.0.1:WG_PORT (default 22)
+    /// leads to WG_TARGET (host:port). Writes the client .conf to WG_CONF and runs until stopped.
     /// WG_TARGET=192.0.2.10:22 WG_CONF=test.conf cargo test --lib wg::tests::gateway -- --ignored --nocapture
     #[tokio::test]
     #[ignore]
     async fn gateway() {
         let target = std::env::var("WG_TARGET").expect("WG_TARGET");
+        let port: u16 = std::env::var("WG_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(22);
         let server = StaticSecret::from(rand::random::<[u8; 32]>());
         let client = StaticSecret::from(rand::random::<[u8; 32]>());
         let conf = format!(
@@ -1053,7 +1326,7 @@ AllowedIPs = 10.77.0.0/24
         let listen = |sockets: &mut SocketSet<'static>| {
             let mut s = tcp::Socket::new(tcp::SocketBuffer::new(vec![0; 256 * 1024]), tcp::SocketBuffer::new(vec![0; 256 * 1024]));
             s.set_congestion_control(tcp::CongestionControl::Cubic);
-            s.listen(22).unwrap();
+            s.listen(port).unwrap();
             sockets.add(s)
         };
         let mut waiting = listen(&mut sockets);
