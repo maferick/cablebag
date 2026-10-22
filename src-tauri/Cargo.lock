@@ -604,7 +604,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serialport",
- "sha1 0.10.7",
+ "sha1 0.11.0",
  "sha2 0.10.9",
  "smoltcp",
  "socket2",
