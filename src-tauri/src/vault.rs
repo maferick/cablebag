@@ -7,7 +7,6 @@ use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
 use anyhow::{anyhow, Result};
 use parking_lot::Mutex;
-use rand::RngExt;
 
 pub struct Vault {
     key: Mutex<Option<[u8; 32]>>,
@@ -35,8 +34,7 @@ impl Vault {
                 key
             }
             None => {
-                let mut k = [0u8; 32];
-                rand::rng().fill(&mut k);
+                let k: [u8; 32] = rand::random();
                 store.vault_put("dpapi_key", &dpapi::protect(&k)?)?;
                 k
             }
@@ -47,8 +45,7 @@ impl Vault {
 
     pub fn encrypt(&self, store: &Store, plain: &str) -> Result<(Vec<u8>, Vec<u8>)> {
         let cipher = Aes256Gcm::new_from_slice(&self.key(store)?).map_err(|e| anyhow!("{e}"))?;
-        let mut nonce = [0u8; 12];
-        rand::rng().fill(&mut nonce);
+        let nonce: [u8; 12] = rand::random();
         let ct = cipher
             .encrypt(&Nonce::try_from(&nonce[..]).map_err(|_| anyhow!("bad nonce"))?, plain.as_bytes())
             .map_err(|_| anyhow!("encryption failed"))?;
@@ -132,7 +129,6 @@ mod dpapi {
     use aes_gcm::aead::{Aead, KeyInit};
     use aes_gcm::{Aes256Gcm, Nonce};
     use anyhow::{anyhow, bail, Result};
-    use rand::RngExt;
     use std::fs::{OpenOptions, Permissions};
     use std::io::Write;
     use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
@@ -148,16 +144,14 @@ mod dpapi {
             let _ = std::fs::set_permissions(&path, Permissions::from_mode(0o600));
             return raw.try_into().map_err(|_| anyhow!("{} does not hold a 32-byte key", path.display()));
         }
-        let mut k = [0u8; 32];
-        rand::rng().fill(&mut k);
+        let k: [u8; 32] = rand::random();
         let mut f = OpenOptions::new().write(true).create_new(true).mode(0o600).open(&path)?;
         f.write_all(&k)?;
         Ok(k)
     }
 
     pub fn protect(data: &[u8]) -> Result<Vec<u8>> {
-        let mut nonce = [0u8; 12];
-        rand::rng().fill(&mut nonce);
+        let nonce: [u8; 12] = rand::random();
         let ct = Aes256Gcm::new_from_slice(&kek()?)
             .map_err(|e| anyhow!("{e}"))?
             .encrypt(&Nonce::try_from(&nonce[..]).map_err(|_| anyhow!("bad nonce"))?, data)
