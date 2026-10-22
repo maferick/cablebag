@@ -109,7 +109,7 @@
               <td class="muted small">{when(s.time)}</td>
               <td class="acts">
                 <button class="btn small" disabled={!!busy} onclick={() => act("rollback", s.name)}><RotateCcw size={13} /> Roll back</button>
-                <button class="icon-btn" title="Delete the snapshot" disabled={!!busy} onclick={() => act("delete", s.name)}><Trash2 size={13} /></button>
+                <button class="icon-btn" title="Delete the snapshot" aria-label="Delete the snapshot" disabled={!!busy} onclick={() => act("delete", s.name)}><Trash2 size={13} /></button>
               </td>
             </tr>
           {/each}

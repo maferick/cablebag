@@ -119,9 +119,9 @@
           {/each}
         </select>
       {/if}
-      <button class="icon-btn" title="Save this conversation as a text file" disabled={!conv?.msgs.length} onclick={saveConversation}><Download size={13} /></button>
-      <button class="icon-btn" title="Start over" disabled={!conv?.msgs.length} onclick={() => tab && assistant.clear(tab.id)}><Eraser size={13} /></button>
-      <button class="icon-btn" title="Hide the assistant (Ctrl+Shift+A)" onclick={() => (assistant.open = false)}><X size={13} /></button>
+      <button class="icon-btn" title="Save this conversation as a text file" aria-label="Save this conversation as a text file" disabled={!conv?.msgs.length} onclick={saveConversation}><Download size={13} /></button>
+      <button class="icon-btn" title="Start over" aria-label="Start over" disabled={!conv?.msgs.length} onclick={() => tab && assistant.clear(tab.id)}><Eraser size={13} /></button>
+      <button class="icon-btn" title="Hide the assistant (Ctrl+Shift+A)" aria-label="Hide the assistant (Ctrl+Shift+A)" onclick={() => (assistant.open = false)}><X size={13} /></button>
     </header>
 
     {#if !assistant.hosts.length}
@@ -164,7 +164,7 @@
                     <pre>{p.text}</pre>
                     <div class="codebar">
                       {#if isTerminal && !p.text.trim().includes("\n")}<button class="btn small" onclick={() => paste(p.text)} title="Put it at the prompt without running it"><ClipboardPaste size={13} /> Paste at the prompt</button>{/if}
-                      <button class="icon-btn" title="Copy" onclick={() => writeText(p.text)}><Copy size={13} /></button>
+                      <button class="icon-btn" title="Copy" aria-label="Copy" onclick={() => writeText(p.text)}><Copy size={13} /></button>
                     </div>
                   </div>
                 {:else}

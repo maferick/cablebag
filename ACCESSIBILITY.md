@@ -24,8 +24,9 @@ Everything here was checked in the source of the current version.
     one, Shift+Enter edits a session, Escape closes the box.
   - Tabs: Ctrl+Tab and Ctrl+Shift+Tab switch tabs, Ctrl+Shift+T opens a local terminal, Ctrl+Shift+N a
     new session, Ctrl+Shift+D opens the same session again, Ctrl+Shift+W closes the tab, Ctrl+Shift+H
-    shows Home. The tabs in the tab bar and the sessions in the sidebar tree can be reached with Tab and
-    opened with Enter.
+    shows Home. In the tab bar the left and right arrow keys move between tabs (Home and End to the first
+    and last), Enter opens the tab. In the session tree the up and down arrows move between rows, right
+    opens a folder and left closes it, Enter opens a session.
   - Tiling: Ctrl+Alt+arrow moves between panes, Ctrl+Alt+Shift+arrow moves a pane, Ctrl+Alt+Enter lets
     a pane fill the area and back, Ctrl+Alt+plus and minus change its size, Ctrl+Alt+0 makes all panes
     the same size, Ctrl+Alt+R turns the split, Ctrl+Alt+M makes a pane the main pane. The same actions
@@ -37,10 +38,17 @@ Everything here was checked in the source of the current version.
   - Window: Ctrl+Shift+A shows or hides the assistant, Ctrl+Shift+E the remote files of an SSH tab,
     Ctrl+Shift+plus and minus make everything in the window bigger or smaller.
 - Macros can be given their own shortcut; they are listed on the same Keyboard shortcuts page.
-- Escape closes the search box, the context menu, the terminal Find bar, the rename box of a tab, and
-  the question and confirmation dialogs. Those dialogs put the focus on their text field or OK button
-  when they open.
-- Context menus are built from ordinary buttons, so Tab reaches their entries.
+- Dialogs (session editor, folder settings, import, Proxmox server, macro editor, WireGuard editor,
+  questions and confirmations, password and host key prompts) put the focus on their first field when
+  they open, keep Tab inside the dialog, close with Escape and give the focus back to where it was.
+  With a dialog on top of another, Escape closes only the top one.
+- Context menus open with the context menu key or Shift+F10 on a focused tab or session, as well as
+  with a right-click. The focus goes to the first entry; the arrow keys, Home and End move between
+  entries, Enter runs one, Escape or Tab closes the menu and returns the focus.
+- Escape also closes the search box, the terminal Find bar and the rename box of a tab.
+- The sidebar's width can be changed with the keyboard: Tab to the line between the sidebar and the
+  tabs, then the left and right arrows (with Shift in larger steps), Home and End for the narrowest and
+  widest.
 
 ### Visual
 
@@ -54,16 +62,22 @@ Everything here was checked in the source of the current version.
   Solarized dark, Solarized light, Monokai), so a light interface can keep a dark terminal or the other
   way round.
 - The terminal cursor can be a block, an underline or a line, and blinking can be switched off.
+- Keyboard focus is shown with a clear ring in the accent colour on buttons, tabs, rows, fields and
+  menus; a mouse click does not draw it.
 - Connection state is not shown by colour alone: connected is a filled circle, connecting a hollow
   ring, failed a diamond, closed a grey circle. The search box also writes the state as a word next to
-  each open tab, and the sidebar's reachability dot has a tooltip that describes it.
-- The pulsing of the "connecting" ring is switched off when Windows asks for reduced motion.
+  each open tab, the marks on tabs and pane headers carry the state as a word for screen readers and in
+  their tooltip, and the sidebar's reachability dot has a tooltip that describes it.
+- When Windows is set to show fewer animations, nothing in Cablebag pulses, spins or slides, and the
+  terminal cursor does not blink.
 
 ### Screen readers and assistive technology
 
 - The window is a WebView2 (Chromium) page, so the controls Cablebag draws itself are ordinary HTML
   buttons, inputs, selects and checkboxes, and screen readers can reach them.
-- Every icon-only button has a title text, which is also what a screen reader announces.
+- Every icon-only button has a name for screen readers (aria-label) as well as its tooltip.
+- The terminal has a setting "Screen reader support" (Settings, Terminal). With it on, screen readers
+  such as Narrator and NVDA can read the terminal's text and announce new output.
 - Roles are set where the structure is not plain HTML: the tab bar (tablist and tab, with the active
   tab marked selected), the session tree (tree and treeitem, with open and closed folders marked), the
   search results (listbox and option), the context menu (menu and menuitem), dialogs (dialog, modal,
@@ -78,27 +92,11 @@ Everything here was checked in the source of the current version.
   this PC cannot read what is inside either of them. Narrator or another screen reader has to run
   inside the remote session, and the keyboard goes to the remote computer while such a tab has the
   focus.
-- The terminal is xterm.js, which draws text on a canvas. Its screen reader mode is not switched on and
-  there is no setting for it yet, so a screen reader cannot read the terminal output today. Copying
-  text out of the terminal and pasting it elsewhere works.
-- Dialogs built on the shared dialog frame (session editor, folder settings, import, Proxmox server,
-  macro editor, WireGuard editor, tunnels) do not close on Escape and do not keep the focus inside the
-  dialog; Tab can leave them. The question and confirmation dialogs are the exception and do close
-  on Escape.
-- Context menus do not move the focus into themselves when they open and do not react to the arrow
-  keys; only Tab, Enter and Escape. Menus on tabs in the tab bar and on sessions in the sidebar open with
-  a right-click only; there is no keyboard way to open them yet. Pane headers have a button for theirs.
-- The tab bar and the session tree react to Tab and Enter only, not to the arrow keys that are usual for
-  tabs and trees.
-- Drag and drop (pane swap, pane and sidebar resize by dragging) has keyboard alternatives for the
-  panes but none for the sidebar width.
-- The keyboard focus is shown with the browser's default ring; a few places (the search box, the file
-  browser, the session tree container, the VNC canvas) hide that ring. Focus visibility has not been
-  reviewed as a whole.
+- The terminal draws its text on a canvas. With "Screen reader support" off (the default, because it
+  slows down very fast output) a screen reader cannot read it; switch it on in Settings, Terminal.
+- The remote file editor and the VNC screen show no focus ring of their own: the text cursor and the
+  remote screen show where the keyboard goes.
 - Colour contrast of the themes has not been measured against WCAG.
-- The busy spinner in the browser tab and in the file browser keeps turning when Windows asks for
-  reduced motion; only the connection ring respects that setting. Cursor blinking is a setting, not
-  tied to it.
 - The terminal shortcuts use Ctrl+Shift with a letter and the tiling shortcuts use Ctrl+Alt, which
   cannot be changed. On keyboards with AltGr the right Alt key is left alone so that it keeps typing
   characters.

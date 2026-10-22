@@ -105,8 +105,8 @@
       <span class="muted small mono">{h.base_url}</span>
       <span class="grow"></span>
       <button class="btn" disabled={testing === h.id} onclick={() => test(h.id)}><RefreshCw size={13} /> {testing === h.id ? "Testing..." : "Test"}</button>
-      <button class="icon-btn" title="Edit" onclick={() => edit(h)}><Pencil size={14} /></button>
-      <button class="icon-btn" title="Remove" onclick={() => remove(h)}><Trash2 size={14} /></button>
+      <button class="icon-btn" title="Edit" aria-label="Edit" onclick={() => edit(h)}><Pencil size={14} /></button>
+      <button class="icon-btn" title="Remove" aria-label="Remove" onclick={() => remove(h)}><Trash2 size={14} /></button>
     </div>
     <div class="hbody">
       <span class="muted small">Key: {h.vault_item ? "from the vault" : h.has_key ? "kept on this PC" : "none"}{h.protected_ok ? " · may see protected folders" : ""}</span>
@@ -221,7 +221,7 @@
 {#if protectedFolders.length}
   <ul class="plain">
     {#each protectedFolders as f (f.id)}
-      <li><span>{app.folderPath(f.id)}</span><button class="icon-btn" title="Lift the protection" onclick={() => assistant.setProtected(f.id, false)}><X size={13} /></button></li>
+      <li><span>{app.folderPath(f.id)}</span><button class="icon-btn" title="Lift the protection" aria-label="Lift the protection" onclick={() => assistant.setProtected(f.id, false)}><X size={13} /></button></li>
     {/each}
   </ul>
 {:else}
@@ -235,7 +235,7 @@
 {#if assistant.rules.length}
   <ul class="plain">
     {#each assistant.rules as r (r.kind + r.host)}
-      <li><span><span class="mono">{r.kind}</span> on {r.host}</span><button class="icon-btn" title="Ask again from now on" onclick={() => assistant.removeRule(r)}><X size={13} /></button></li>
+      <li><span><span class="mono">{r.kind}</span> on {r.host}</span><button class="icon-btn" title="Ask again from now on" aria-label="Ask again from now on" onclick={() => assistant.removeRule(r)}><X size={13} /></button></li>
     {/each}
   </ul>
 {:else}

@@ -11,16 +11,46 @@
       x: Math.min(menu.x, window.innerWidth - r.width - 6),
       y: Math.min(menu.y, window.innerHeight - r.height - 6),
     };
+    // Keyboard users start on the first item.
+    items()[0]?.focus();
   });
+
+  const items = () => [...(el?.querySelectorAll<HTMLButtonElement>("button.item:not(:disabled)") ?? [])];
+
+  /** Arrow keys, Home and End move between the items; Enter and Space run the focused one (buttons do that). */
+  function onKey(e: KeyboardEvent) {
+    if (!menu.open) return;
+    if (e.key === "Escape") {
+      // Only the menu closes, not a dialog underneath it.
+      e.preventDefault();
+      menu.close(true);
+      return;
+    }
+    const list = items();
+    if (!list.length) return;
+    const i = list.indexOf(document.activeElement as HTMLButtonElement);
+    let next = -1;
+    if (e.key === "ArrowDown") next = i < 0 || i === list.length - 1 ? 0 : i + 1;
+    else if (e.key === "ArrowUp") next = i <= 0 ? list.length - 1 : i - 1;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = list.length - 1;
+    else if (e.key === "Tab") {
+      e.preventDefault();
+      menu.close(true);
+      return;
+    }
+    if (next >= 0) {
+      e.preventDefault();
+      list[next].focus();
+    }
+  }
 </script>
 
 <svelte:window
   onmousedown={(e) => {
     if (menu.open && el && !el.contains(e.target as Node)) menu.close();
   }}
-  onkeydown={(e) => {
-    if (e.key === "Escape") menu.close();
-  }}
+  onkeydown={onKey}
   onblur={() => menu.close()}
 />
 

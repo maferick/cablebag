@@ -92,8 +92,8 @@
               {#if st}{st.connections} open, {ago(st.handshake)}, {size(st.sent)} sent, {size(st.received)} received{:else}Starts when a session needs it{/if}
             </span>
             <button class="btn" onclick={() => test(p)} title="Start the tunnel and wait for the server's answer"><Activity size={14} /> Test</button>
-            <button class="icon-btn" title="Edit" onclick={() => (editing = p)}><Pencil size={15} /></button>
-            <button class="icon-btn" title="Delete" onclick={() => remove(p)}><Trash2 size={15} /></button>
+            <button class="icon-btn" title="Edit" aria-label="Edit" onclick={() => (editing = p)}><Pencil size={15} /></button>
+            <button class="icon-btn" title="Delete" aria-label="Delete" onclick={() => remove(p)}><Trash2 size={15} /></button>
           </div>
           <div class="route">
             <span class="stop"><em>This side in the tunnel</em><span class="mono">{p.address}</span></span>

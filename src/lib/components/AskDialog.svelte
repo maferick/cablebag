@@ -21,7 +21,6 @@
   }
 </script>
 
-<svelte:window onkeydown={(e) => e.key === "Escape" && ask.answer(req.input ? null : false)} />
 
 <Modal title={req.title} width={440} warning={req.danger} onclose={() => ask.answer(req.input ? null : false)}>
   {#if req.message}<p class="msg">{req.message}</p>{/if}

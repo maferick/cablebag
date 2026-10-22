@@ -17,14 +17,68 @@
     children: Snippet;
     footer?: Snippet;
   } = $props();
+
+  // Keyboard: Escape closes the dialog on top (a field that uses Escape itself calls preventDefault), Tab stays
+  // inside it, and focus goes into the dialog when it opens and back where it was when it closes.
+  let box = $state<HTMLDivElement>();
+  const me = Symbol("modal");
+
+  const focusable = () =>
+    [...(box?.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') ?? [])].filter(
+      (el) => !(el as HTMLButtonElement).disabled && el.offsetParent !== null,
+    );
+
+  onMount(() => {
+    const before = document.activeElement as HTMLElement | null;
+    stack.push(me);
+    // After the content has had its own chance to focus a field.
+    const t = setTimeout(() => {
+      if (box && !box.contains(document.activeElement)) {
+        const fields = focusable();
+        (fields.find((el) => el.matches("input, select, textarea")) ?? fields.find((el) => !el.matches(".close")) ?? box).focus();
+      }
+    }, 60);
+    return () => {
+      clearTimeout(t);
+      stack.splice(stack.indexOf(me), 1);
+      if (before?.isConnected) before.focus();
+    };
+  });
+
+  function onKey(e: KeyboardEvent) {
+    if (stack[stack.length - 1] !== me || e.defaultPrevented) return;
+    if (e.key === "Escape" && onclose) {
+      e.preventDefault();
+      onclose();
+    } else if (e.key === "Tab") {
+      const fields = focusable();
+      if (!fields.length) return;
+      const i = fields.indexOf(document.activeElement as HTMLElement);
+      if (e.shiftKey && i <= 0) {
+        e.preventDefault();
+        fields[fields.length - 1].focus();
+      } else if (!e.shiftKey && (i === -1 || i === fields.length - 1)) {
+        e.preventDefault();
+        fields[0].focus();
+      }
+    }
+  }
 </script>
 
+<script lang="ts" module>
+  import { onMount } from "svelte";
+  /** Open dialogs, the newest last: only that one answers the keyboard. */
+  const stack: symbol[] = [];
+</script>
+
+<svelte:window onkeydown={onKey} />
+
 <div class="backdrop" role="presentation">
-  <div class="modal" class:warning style:width="{width}px" role="dialog" aria-modal="true" aria-label={title}>
+  <div class="modal" class:warning style:width="{width}px" role="dialog" aria-modal="true" aria-label={title} tabindex="-1" bind:this={box}>
     <header>
       <h2>{title}</h2>
       {#if onclose}
-        <button class="icon-btn" title="Close" onclick={onclose}><X size={16} /></button>
+        <button class="icon-btn close" title="Close" aria-label="Close" onclick={onclose}><X size={16} /></button>
       {/if}
     </header>
     <div class="body">

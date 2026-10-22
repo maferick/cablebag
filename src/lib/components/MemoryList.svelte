@@ -37,13 +37,13 @@
       <li>
         {#if editing === m.id}
           <input bind:value={text} onkeydown={(e) => e.key === "Enter" && saveEdit(m)} />
-          <button class="icon-btn" title="Save" onclick={() => saveEdit(m)}><Check size={13} /></button>
-          <button class="icon-btn" title="Cancel" onclick={() => (editing = null)}><X size={13} /></button>
+          <button class="icon-btn" title="Save" aria-label="Save" onclick={() => saveEdit(m)}><Check size={13} /></button>
+          <button class="icon-btn" title="Cancel" aria-label="Cancel" onclick={() => (editing = null)}><X size={13} /></button>
         {:else}
           <span class="t">{m.text}</span>
           <span class="meta">{m.by === "assistant" ? "by the assistant" : "by you"}, {when(m.at)}</span>
-          <button class="icon-btn" title="Edit" onclick={() => ((editing = m.id), (text = m.text))}><Pencil size={13} /></button>
-          <button class="icon-btn" title="Forget" onclick={() => memory.remove(m.id)}><Trash2 size={13} /></button>
+          <button class="icon-btn" title="Edit" aria-label="Edit" onclick={() => ((editing = m.id), (text = m.text))}><Pencil size={13} /></button>
+          <button class="icon-btn" title="Forget" aria-label="Forget" onclick={() => memory.remove(m.id)}><Trash2 size={13} /></button>
         {/if}
       </li>
     {/each}

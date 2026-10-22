@@ -285,8 +285,11 @@
               <option value="bar">Line</option>
             </select>
           </SettingsRow>
-          <SettingsRow label="Blinking cursor">
+          <SettingsRow label="Blinking cursor" help="Never blinks when Windows is set to show fewer animations.">
             <input type="checkbox" class="switch" checked={app.settings["term.cursorBlink"]} onchange={set("term.cursorBlink")} />
+          </SettingsRow>
+          <SettingsRow label="Screen reader support" help="Lets screen readers such as Narrator and NVDA read the terminal's text and new output.">
+            <input type="checkbox" class="switch" checked={app.settings["term.screenReader"]} onchange={set("term.screenReader")} />
           </SettingsRow>
           <SettingsRow label="Lines kept in scrollback">
             <input type="number" value={app.settings["term.scrollback"]} onchange={set("term.scrollback")} />
@@ -432,8 +435,8 @@
               <span class="what">{s.kind === "passphrase" ? "Key passphrase" : s.protocol.toUpperCase()}</span>
               <span class="mono grow">{s.kind === "passphrase" ? s.label : `${s.username}@${s.host}${s.port ? ":" + s.port : ""}`}</span>
               <span class="mono">{revealed[s.id] ?? "••••••••"}</span>
-              <button class="icon-btn" title="Show" onclick={async () => (revealed[s.id] = await api.revealSecret(s.id))}><Eye size={14} /></button>
-              <button class="icon-btn" title="Forget" onclick={async () => { await api.deleteSecret(s.id); secrets = await api.secrets(); }}><Trash2 size={14} /></button>
+              <button class="icon-btn" title="Show" aria-label="Show" onclick={async () => (revealed[s.id] = await api.revealSecret(s.id))}><Eye size={14} /></button>
+              <button class="icon-btn" title="Forget" aria-label="Forget" onclick={async () => { await api.deleteSecret(s.id); secrets = await api.secrets(); }}><Trash2 size={14} /></button>
             </div>
           {/each}
         </SettingsSection>
@@ -448,7 +451,7 @@
               <span class="muted">{h.algo}</span>
               <span class="mono grow fp" title={h.fingerprint}>{h.fingerprint}</span>
               <span class="muted">{date(h.added)}</span>
-              <button class="icon-btn" title="Forget" onclick={async () => { await api.deleteKnownHost(h.host, h.port, h.algo); hosts = await api.knownHosts(); }}><Trash2 size={14} /></button>
+              <button class="icon-btn" title="Forget" aria-label="Forget" onclick={async () => { await api.deleteKnownHost(h.host, h.port, h.algo); hosts = await api.knownHosts(); }}><Trash2 size={14} /></button>
             </div>
           {/each}
         </SettingsSection>

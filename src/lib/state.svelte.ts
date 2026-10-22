@@ -50,6 +50,7 @@ export const DEFAULT_SETTINGS: Record<string, any> = {
   "term.scrollback": 20000,
   "term.cursor": "block",
   "term.cursorBlink": true,
+  "term.screenReader": false,
   "term.copyOnSelect": true,
   "term.rightClickPaste": true,
   "term.scheme": "graphite",
@@ -80,6 +81,11 @@ export const DEFAULT_SETTINGS: Record<string, any> = {
 
 /** The interface sizes offered, in percent. */
 export const SCALES = [90, 100, 110, 125, 150, 175];
+
+/** A tab's state in words, for status marks that would otherwise say it only by shape and colour. */
+export function statusWord(status: string): string {
+  return { connected: "Connected", connecting: "Connecting", failed: "Failed", closed: "Closed" }[status] ?? "Not connected";
+}
 
 export type SplitMode = "1" | "2v" | "2h" | "4";
 

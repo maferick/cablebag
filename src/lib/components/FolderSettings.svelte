@@ -69,7 +69,7 @@
           <input bind:value={j.host} placeholder="Gateway host" />
           <input bind:value={j.user} placeholder="User" class="small" />
           <input type="number" bind:value={j.port} class="tiny" />
-          <button class="icon-btn" title="Remove" onclick={() => (d.jump_hosts = d.jump_hosts.filter((_: unknown, x: number) => x !== i))}><Trash2 size={14} /></button>
+          <button class="icon-btn" title="Remove" aria-label="Remove" onclick={() => (d.jump_hosts = d.jump_hosts.filter((_: unknown, x: number) => x !== i))}><Trash2 size={14} /></button>
         </div>
       {/each}
       <div>

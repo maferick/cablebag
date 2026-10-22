@@ -116,8 +116,8 @@
             {:else}
               <button class="btn" onclick={() => tunnels.start(t)}><Play size={14} /> Start</button>
             {/if}
-            <button class="icon-btn" title="Edit" onclick={() => (editing = JSON.parse(JSON.stringify(t)))}><Pencil size={15} /></button>
-            <button class="icon-btn" title="Delete" onclick={() => remove(t)}><Trash2 size={15} /></button>
+            <button class="icon-btn" title="Edit" aria-label="Edit" onclick={() => (editing = JSON.parse(JSON.stringify(t)))}><Pencil size={15} /></button>
+            <button class="icon-btn" title="Delete" aria-label="Delete" onclick={() => remove(t)}><Trash2 size={15} /></button>
           </div>
           <div class="route">
             {#each stops(t) as stop, i}

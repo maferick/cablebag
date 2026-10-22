@@ -110,9 +110,9 @@
               {#each h.open_ports as p}<span class="port" title={String(p)}>{KNOWN_PORTS[p] ?? p}</span>{/each}
             </td>
             <td class="act">
-              {#if h.open_ports.includes(22)}<button class="icon-btn" title="Open SSH" onclick={() => open(h, "ssh")}><Terminal size={15} /></button>{/if}
-              {#if h.open_ports.includes(3389)}<button class="icon-btn" title="Open Remote Desktop" onclick={() => open(h, "rdp")}><Monitor size={15} /></button>{/if}
-              <button class="icon-btn" title="Copy address" onclick={() => writeText(h.ip)}><Copy size={15} /></button>
+              {#if h.open_ports.includes(22)}<button class="icon-btn" title="Open SSH" aria-label="Open SSH" onclick={() => open(h, "ssh")}><Terminal size={15} /></button>{/if}
+              {#if h.open_ports.includes(3389)}<button class="icon-btn" title="Open Remote Desktop" aria-label="Open Remote Desktop" onclick={() => open(h, "rdp")}><Monitor size={15} /></button>{/if}
+              <button class="icon-btn" title="Copy address" aria-label="Copy address" onclick={() => writeText(h.ip)}><Copy size={15} /></button>
             </td>
           </tr>
         {/each}

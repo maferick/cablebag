@@ -55,6 +55,11 @@
     term.paste(text);
   }
 
+  /** The cursor blinks when the setting says so, unless Windows asks for less motion. */
+  function blinks(): boolean {
+    return !!app.settings["term.cursorBlink"] && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
   export function focus() {
     term?.focus();
   }
@@ -66,7 +71,8 @@
       fontSize: Number(app.settings["term.fontSize"]) || 14,
       scrollback: Number(app.settings["term.scrollback"]) || 20000,
       cursorStyle: app.settings["term.cursor"],
-      cursorBlink: !!app.settings["term.cursorBlink"],
+      cursorBlink: blinks(),
+      screenReaderMode: !!app.settings["term.screenReader"],
       theme: scheme.theme,
       allowProposedApi: true,
       macOptionIsMeta: true,
@@ -257,6 +263,8 @@
     term.options.theme = schemeById(app.settings["term.scheme"]).theme;
     term.options.fontFamily = `"${app.settings["term.font"]}", "Cascadia Mono", Consolas, monospace`;
     term.options.cursorStyle = app.settings["term.cursor"];
+    term.options.cursorBlink = blinks();
+    term.options.screenReaderMode = !!app.settings["term.screenReader"];
     requestAnimationFrame(() => sendResize());
   });
 
@@ -300,11 +308,11 @@
           }
         }}
       />
-      <button class="icon-btn" title="Previous match" onclick={() => find(false)}><ChevronUp size={15} /></button>
-      <button class="icon-btn" title="Next match" onclick={() => find(true)}><ChevronDown size={15} /></button>
+      <button class="icon-btn" title="Previous match" aria-label="Previous match" onclick={() => find(false)}><ChevronUp size={15} /></button>
+      <button class="icon-btn" title="Next match" aria-label="Next match" onclick={() => find(true)}><ChevronDown size={15} /></button>
       <button
         class="icon-btn"
-        title="Close"
+        title="Close" aria-label="Close"
         onclick={() => {
           findOpen = false;
           search?.clearDecorations();

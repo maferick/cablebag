@@ -246,10 +246,28 @@ svg.lucide-icon {
     opacity: 0.35;
   }
 }
+/* Windows set to show fewer animations: nothing pulses, spins or slides. */
 @media (prefers-reduced-motion: reduce) {
-  .smark.connecting {
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
+}
+
+/* Keyboard focus is always visible; a mouse click draws no ring. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -1px;
 }
 
 /* An on/off switch: a checkbox with class "switch". */
