@@ -11,6 +11,7 @@ pub mod cyberark;
 pub mod delinea;
 pub mod matching;
 pub mod vaultwarden;
+pub mod webauth;
 
 use crate::prompt::{button, field, PromptRequest};
 use crate::AppState;

@@ -1,0 +1,36 @@
+{
+  "value": [
+    {
+      "categoryModificationTime": 1729000000,
+      "platformId": "WinServerLocal",
+      "safeName": "Windows-Servers",
+      "id": "12_3",
+      "name": "Operating System-WinServerLocal-10.0.0.5-admin",
+      "address": "10.0.0.5",
+      "userName": "admin",
+      "secretType": "password",
+      "platformAccountProperties": { "LogonDomain": "10.0.0.5" },
+      "secretManagement": {
+        "automaticManagementEnabled": true,
+        "status": "success",
+        "lastModifiedTime": 1729000000
+      },
+      "createdTime": 1700000000
+    },
+    {
+      "categoryModificationTime": 1729000000,
+      "platformId": "UnixSSHKeys",
+      "safeName": "Linux-Keys",
+      "id": "12_4",
+      "name": "Operating System-UnixSSHKeys-web01.example.com-root",
+      "address": "web01.example.com",
+      "userName": "root",
+      "secretType": "key",
+      "platformAccountProperties": {},
+      "secretManagement": { "automaticManagementEnabled": false, "manualManagementReason": "Test" },
+      "createdTime": 1700000000
+    }
+  ],
+  "count": 3,
+  "nextLink": "api/accounts?offset=2&limit=2"
+}
