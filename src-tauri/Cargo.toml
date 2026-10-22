@@ -73,7 +73,7 @@ socket2 = "0.6"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62.2", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_System_Memory", "Win32_System_Time", "Win32_UI_WindowsAndMessaging", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_WinRT", "Security_Credentials_UI", "Foundation"] }
-windows-future = "0.3"
+windows-future = "0.100"
 webview2-com = "0.39"
 windows-registry = "0.6"
 pageant = "0.2.4"
