@@ -701,17 +701,14 @@ fn split_host_port(target: &str, default: u16) -> (String, u16) {
 async fn forbidden(sock: &mut TcpStream) -> Result<()> {
     let mut b = [0u8; 8192];
     let _ = tokio::time::timeout(Duration::from_secs(1), sock.read(&mut b)).await;
-    let body = "This proxy is only for Cablebag's own web tabs.";
-    let head = format!("HTTP/1.1 403 Forbidden
-Content-Type: text/plain; charset=utf-8
-Content-Length: {}
-Connection: close
-
-", body.len());
-    sock.write_all(head.as_bytes()).await?;
-    sock.write_all(body.as_bytes()).await?;
+    sock.write_all(forbidden_answer().as_bytes()).await?;
     sock.shutdown().await?;
     Ok(())
+}
+
+fn forbidden_answer() -> String {
+    let body = "This proxy is only for Cablebag's own web tabs.";
+    format!("HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len())
 }
 
 async fn bad_gateway(sock: &mut TcpStream, msg: &str) -> Result<()> {
@@ -1302,6 +1299,15 @@ mod tests {
         assert_eq!(split_host_port("example.com:8443", 443), ("example.com".into(), 8443));
         assert_eq!(split_host_port("example.com", 443), ("example.com".into(), 443));
         assert_eq!(split_host_port("[fd00::1]:443", 80), ("fd00::1".into(), 443));
+    }
+
+    #[test]
+    fn the_403_is_proper_http() {
+        let a = forbidden_answer();
+        assert!(a.starts_with("HTTP/1.1 403 Forbidden\r\n"));
+        let (head, body) = a.split_once("\r\n\r\n").unwrap();
+        assert!(head.lines().all(|l| !l.is_empty()) && !head.replace("\r\n", "").contains('\n'), "every header line ends in CRLF");
+        assert!(head.contains(&format!("\r\nContent-Length: {}\r\n", body.len())));
     }
 
     #[test]
