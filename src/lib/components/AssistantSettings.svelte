@@ -5,7 +5,7 @@
   import { ask } from "../ask.svelte";
   import { app } from "../state.svelte";
   import VaultPicker from "./VaultPicker.svelte";
-  import { Plus, Pencil, Trash2, RefreshCw, ChevronRight } from "@lucide/svelte";
+  import { Plus, Pencil, Trash2, RefreshCw, ChevronRight, X } from "@lucide/svelte";
 
   let editing = $state<(AiHost & { key: string; keyFrom: "vault" | "pc" | "none" }) | null>(null);
   let models = $state<Record<string, AiModel[]>>({});
@@ -14,6 +14,7 @@
   let log = $state<AiLogEntry[]>([]);
   let openLog = $state<number | null>(null);
   let error = $state("");
+  const protectedFolders = $derived(app.folders.filter((f) => ((app.settings["ai.protected"] as string[] | undefined) ?? []).includes(f.id)));
 
   $effect(() => {
     assistant.load();
@@ -157,6 +158,33 @@
   <div><button class="btn" onclick={blank}><Plus size={14} /> Add an AI host</button></div>
 {/if}
 
+<h4>Protected folders</h4>
+<p class="muted small">
+  In a protected folder (and the folders inside it) every command asks first, dangerous commands are refused, and
+  only AI hosts marked "may see protected folders" are used. Protect a folder with a right-click on it in the tree.
+</p>
+{#if protectedFolders.length}
+  <ul class="plain">
+    {#each protectedFolders as f (f.id)}
+      <li><span>{app.folderPath(f.id)}</span><button class="icon-btn" title="Lift the protection" onclick={() => assistant.setProtected(f.id, false)}><X size={13} /></button></li>
+    {/each}
+  </ul>
+{:else}
+  <p class="muted small">No folder is protected yet.</p>
+{/if}
+
+<h4>Always allowed</h4>
+<p class="muted small">Kinds of commands you chose "Always" for: they run without asking on that server (never in a protected folder, never when dangerous).</p>
+{#if assistant.rules.length}
+  <ul class="plain">
+    {#each assistant.rules as r (r.kind + r.host)}
+      <li><span><span class="mono">{r.kind}</span> on {r.host}</span><button class="icon-btn" title="Ask again from now on" onclick={() => assistant.removeRule(r)}><X size={13} /></button></li>
+    {/each}
+  </ul>
+{:else}
+  <p class="muted small">None yet.</p>
+{/if}
+
 <h4>What was sent</h4>
 {#if !log.length}
   <p class="muted small">Nothing yet. Every question, with the screen text that went with it, and every answer is listed here.</p>
@@ -166,7 +194,7 @@
       <button class="lrow" onclick={() => (openLog = openLog === i ? null : i)}>
         <span class="chev" class:open={openLog === i}><ChevronRight size={12} /></span>
         <span class="lt">{time(l.at)}</span>
-        <span class="ld {l.direction}">{l.direction === "sent" ? "Sent" : l.direction === "received" ? "Answer" : "Error"}</span>
+        <span class="ld {l.direction}">{({ sent: "Sent", received: "Answer", error: "Error", ran: "Ran" } as Record<string, string>)[l.direction] ?? l.direction}</span>
         <span class="la">{l.host} · {l.about}</span>
       </button>
       {#if openLog === i}<pre class="ltext">{l.text}</pre>{/if}
@@ -230,6 +258,24 @@
   h4 {
     margin: 12px 0 0;
     font-size: 13px;
+  }
+  .plain {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+  }
+  .plain li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 4px 3px 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .plain li:last-child {
+    border-bottom: none;
   }
   .log {
     border: 1px solid var(--border);

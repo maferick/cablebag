@@ -22,6 +22,10 @@
   });
   const host = $derived(assistant.hosts.find((h) => h.id === conv?.hostId));
   const isTerminal = $derived(tab?.type === "terminal");
+  const works = $derived(assistant.canWork(tab));
+  const prot = $derived(assistant.isProtected(tab?.session));
+  const EFFECT = { reads: "Reads", changes: "Changes the server", dangerous: "Dangerous" } as const;
+  const STATE = { asking: "Waiting for you", running: "Running...", done: "Done", refused: "Not run", failed: "Failed" } as const;
 
   let width = $state(Number(localStorage.getItem("assistant.width")) || 400);
   let question = $state("");
@@ -100,7 +104,10 @@
     {:else if !tab}
       <div class="empty"><p class="muted">Open a tab; the assistant talks about the tab you are in.</p></div>
     {:else}
-      <div class="about muted small">About: {assistant.describe(tab)}</div>
+      <div class="about muted small">
+        About: {assistant.describe(tab)}
+        {#if works}<br />{prot ? "Protected folder: every command asks you first." : "Can work on this server: reads by itself, asks before every change."}{/if}
+      </div>
       <div class="msgs" bind:this={list}>
         {#if !conv?.msgs.length}
           <p class="muted hint">
@@ -130,6 +137,32 @@
                 {:else}
                   <p class="text">{p.text.trim()}</p>
                 {/if}
+              {/each}
+              {#each m.steps ?? [] as st}
+                <div class="step {st.verdict.effect} {st.state}">
+                  <div class="shead">
+                    <span class="eff">{EFFECT[st.verdict.effect]}</span>
+                    {#if st.verdict.root}<span class="tag">root</span>{/if}
+                    <span class="grow"></span>
+                    <span class="sstate">{STATE[st.state]}{#if st.state === "done" && st.exit != null}, exit {st.exit}{/if}</span>
+                  </div>
+                  <pre class="cmd">{st.command}</pre>
+                  {#if st.reason}<p class="why">{st.reason}</p>{/if}
+                  {#if st.undo && st.verdict.effect !== "reads"}<p class="why muted">Undo: {st.undo}</p>{/if}
+                  {#if st.note && st.state !== "done"}<p class="note">{st.note}</p>{/if}
+                  {#if st.state === "asking" && tab}
+                    <div class="sbar">
+                      <button class="btn primary small" onclick={() => assistant.decide(tab.id, st, "once")}>Run it</button>
+                      {#if st.verdict.effect === "changes" && st.verdict.kind && !prot}
+                        <button class="btn small" title="Run commands like this on {tab.session?.host} without asking from now on (Settings, Assistant shows the rules)" onclick={() => assistant.decide(tab.id, st, "always")}>Always "{st.verdict.kind}" here</button>
+                      {/if}
+                      <button class="btn small" onclick={() => assistant.decide(tab.id, st, "no")}>Refuse</button>
+                    </div>
+                  {/if}
+                  {#if st.output}
+                    <details class="out"><summary>Output</summary><pre>{st.output}</pre></details>
+                  {/if}
+                </div>
               {/each}
               {#if m.error}<p class="err">{m.error}</p>{/if}
             </div>
@@ -296,6 +329,94 @@
   .codebar :global(.btn.small) {
     padding: 2px 8px;
     font-size: 12px;
+  }
+  .step {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border-strong);
+    border-radius: 3px;
+    background: var(--bg);
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .step.changes {
+    border-left-color: var(--warn);
+  }
+  .step.dangerous {
+    border-left-color: var(--danger);
+  }
+  .step.asking {
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .shead {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+  }
+  .eff {
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .changes .eff {
+    color: var(--warn-text);
+  }
+  .dangerous .eff {
+    color: var(--danger-text);
+  }
+  .tag {
+    padding: 0 5px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--muted);
+  }
+  .sstate {
+    color: var(--muted);
+  }
+  .failed .sstate,
+  .refused .sstate {
+    color: var(--danger-text);
+  }
+  .cmd {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .why,
+  .note {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .note {
+    color: var(--warn-text);
+  }
+  .sbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 2px;
+  }
+  .sbar :global(.btn.small) {
+    padding: 2px 9px;
+    font-size: 12px;
+  }
+  .out summary {
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .out pre {
+    margin: 4px 0 0;
+    max-height: 220px;
+    overflow: auto;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
   .err {
     margin: 0;

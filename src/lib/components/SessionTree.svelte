@@ -6,13 +6,14 @@
   import { reach, reachKey } from "../reach.svelte";
   import { proxmox, isWindows } from "../proxmox.svelte";
   import { writeText } from "../clipboard";
+  import { assistant } from "../assistant.svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import type { ProxmoxGuest, ProxmoxSource } from "../api";
   import { api, type Folder, type Session } from "../api";
   import {
     ChevronRight, Folder as FolderIcon, FolderOpen, Search, Plus, FolderPlus, Play, Pencil, Copy, Trash2, X, Activity,
     ServerCog, Server, Monitor, MonitorPlay, Boxes, Terminal, Globe, Save, Power, RotateCw, Square, RefreshCw, Settings,
-  } from "@lucide/svelte";
+  Shield, ShieldCheck, } from "@lucide/svelte";
 
   let filter = $state("");
   let open = $state<Record<string, boolean>>(loadOpen());
@@ -192,6 +193,9 @@
               action: () => app.sessions.filter((s) => s.folder_id === f.id).forEach((s) => app.openSession(s)),
             },
             { label: "Rename folder", icon: Pencil, action: () => renameFolder(f) },
+            ((app.settings["ai.protected"] as string[] | undefined) ?? []).includes(f.id)
+              ? { label: "Protected for the assistant (click to lift)", icon: ShieldCheck, action: () => assistant.setProtected(f.id, false) }
+              : { label: "Protect from the assistant", icon: Shield, action: () => assistant.setProtected(f.id, true) },
             ...(reach.enabled
               ? [{ label: "Check which hosts answer", icon: Activity, action: () => reach.checkNow(keysOf(allIn(f.id))) }]
               : []),

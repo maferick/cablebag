@@ -193,6 +193,11 @@ fn known_secrets(app: &AppHandle) -> Vec<String> {
     out
 }
 
+/// Hides secrets with every password Cablebag knows right now.
+pub fn redact_known(app: &AppHandle, text: &str) -> String {
+    redact_with(text, &known_secrets(app))
+}
+
 pub fn redact_with(text: &str, secrets: &[String]) -> String {
     // The rules first, while the text is still whole.
     let mut s = text.to_string();

@@ -6,6 +6,26 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.4.0 · 22 October 2026
+
+**The assistant can now work on your SSH servers**
+
+- In an SSH tab the assistant **investigates by itself**: it runs commands that only read (status, logs, disk
+  space, container lists) and uses what it finds.
+- **Every change waits for you.** A card shows the command, why, how to undo it and what kind of change it is,
+  with **Run it**, **Always** for that kind of command on that server, or **Refuse**. Cablebag decides what a
+  command does, not the AI: commands that write files, run commands inside commands or cannot be checked
+  always count as changes.
+- **Dangerous commands** (deleting folders, formatting disks, rebooting, stopping SSH, firewall flushes,
+  destroying machines) always get a red card and never an "Always".
+- **Protected folders:** right-click a folder in the tree, *Protect from the assistant*. There every command
+  asks, dangerous ones are refused, and only AI hosts you allowed are used.
+- **Root without sharing your password:** after one click per conversation Cablebag gives sudo the password
+  from the vault, a saved password or a one-time question; the AI never sees it.
+- The commands run on their own channel of your SSH login, with exact output and exit codes; your terminal
+  shows each one as a dimmed line. Limits of 25 commands and 15 minutes per question, and **Stop** works at
+  any moment.
+
 ## 0.3.0 · 22 October 2026
 
 **The assistant, first step: ask about what is on your screen**

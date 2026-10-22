@@ -79,8 +79,10 @@ the open-source components inside are listed in [THIRD-PARTY-NOTICES.md](THIRD-P
 - **Assistant** (Ctrl+Shift+A, a column at the right): ask any OpenAI-compatible AI host (LiteLLM, vLLM,
   Ollama, a cloud API) about the tab you are in; the last lines of a terminal go with the question. Passwords
   Cablebag knows and text that looks like a secret are hidden before anything is sent, every exchange is in a
-  log (Settings, Assistant), and commands in an answer are only pasted at the prompt, never run by themselves.
-  Keys come from the vault or are kept on this PC.
+  log (Settings, Assistant). Keys come from the vault or are kept on this PC. In an SSH tab it can work on the
+  server: it runs commands that only read by itself and asks before every change (Run it, Always for that kind
+  of command on that server, Refuse); dangerous commands always ask, folders you protect ask for everything,
+  and sudo gets its password from Cablebag, never from the AI.
 - **Send to all**: type once into every connected terminal.
 - **Macros**: record what you type, edit steps (text, pause, wait for text), run with a click or a hotkey.
 - **Highlighting**: words such as error, warning and ok are coloured; network-device set and your own words.

@@ -29,3 +29,11 @@ export function bufferText(tabId: string, maxLines = 0): string {
   while (lines.length && !lines[lines.length - 1]) lines.pop();
   return lines.join("\n") + "\n";
 }
+
+/** Writes a dimmed note into a terminal on this PC only (the server never sees it), such as a command the
+ *  assistant runs on its own channel, so you see what happens where you are looking. */
+export function noteLocal(tabId: string, text: string) {
+  const t = terminals.get(tabId);
+  if (!t) return;
+  t.write(`\r\n\x1b[2m${text.replace(/\r?\n/g, "\r\n")}\x1b[0m\r\n`);
+}

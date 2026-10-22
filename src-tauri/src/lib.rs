@@ -1,3 +1,4 @@
+mod agent;
 mod ai;
 mod bitwarden;
 mod browser;
@@ -725,6 +726,33 @@ fn ai_stop(app: AppHandle, request_id: String) {
 }
 
 #[tauri::command]
+fn agent_classify(command: String) -> agent::Verdict {
+    agent::classify(&command)
+}
+
+/// Runs a command the assistant may run (the window decided with the classifier and the user's approval).
+#[tauri::command]
+async fn agent_exec(app: AppHandle, tab_id: String, session: store::Session, command: String, root: bool, timeout_secs: Option<u64>) -> CmdResult<agent::ExecResult> {
+    let secs = timeout_secs.unwrap_or(60).clamp(5, 600);
+    let res = agent::exec(&app, &tab_id, &session, &command, root, std::time::Duration::from_secs(secs)).await.map_err(err)?;
+    let state = app.state::<AppState>();
+    let note = format!(
+        "{}{}
+exit {}{}
+{}",
+        if root { "sudo " } else { "" },
+        command,
+        res.exit.map(|e| e.to_string()).unwrap_or_else(|| "unknown".into()),
+        if res.timed_out { ", stopped after the time limit" } else { "" },
+        res.output.chars().take(2000).collect::<String>()
+    );
+    // Hide secrets first: that reads the database too, which must not be locked twice.
+    let note = ai::redact_known(&app, &note);
+    let _ = state.store.lock().ai_log_add("this PC", "", &format!("{} on {}", session.name, session.host), "ran", &note);
+    Ok(res)
+}
+
+#[tauri::command]
 fn ai_log(state: State<AppState>, limit: Option<usize>) -> CmdResult<Vec<store::AiLogEntry>> {
     state.store.lock().ai_log(limit.unwrap_or(100)).map_err(err)
 }
@@ -800,6 +828,8 @@ pub fn run() {
             ai_chat,
             ai_stop,
             ai_log,
+            agent_classify,
+            agent_exec,
             update_check,
             update_install,
             library,
