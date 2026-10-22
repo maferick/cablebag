@@ -37,5 +37,8 @@
     "typescript": "~6.0.3",
     "vite": "^8.0.16"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "cookie": "^0.7.2"
+  }
 }
