@@ -6,6 +6,16 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.15.2 · 23 October 2026
+
+- **Everything on current versions**: the parts Cablebag is built from are brought up to their latest major
+  versions (among them SvelteKit 3, reqwest 0.13 and the cryptography libraries used for Vaultwarden, the vault
+  and sync), and WireGuard runs on boringtun 0.7. That also closes known issues in older versions of ring and
+  curve25519-dalek. Nothing changes in how Cablebag works.
+- Cablebag is now developed in the open on GitHub, with automatic checks on Windows and Linux, a user guide in
+  the [wiki](https://github.com/maferick/cablebag/wiki) and [Discussions](https://github.com/maferick/cablebag/discussions)
+  for questions and ideas.
+
 ## 0.15.1 · 22 October 2026
 
 - **First steps towards Linux**, by @martijnvandijk: the Windows-only parts are kept to Windows, so the rest
