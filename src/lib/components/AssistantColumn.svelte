@@ -180,7 +180,7 @@
               {#each m.steps ?? [] as st}
                 <div class="step {st.verdict.effect} {st.state}">
                   <div class="shead">
-                    <span class="eff">{st.verdict.kind === "screen" ? "Acts on the screen" : EFFECT[st.verdict.effect]}</span>
+                    <span class="eff">{st.verdict.kind === "screen" ? "Acts on the screen" : st.verdict.kind === "snapshot" ? "Safety net" : EFFECT[st.verdict.effect]}</span>
                     {#if st.verdict.root}<span class="tag">root</span>{/if}
                     <span class="grow"></span>
                     <span class="sstate">{STATE[st.state]}{#if st.state === "done" && st.exit != null}, exit {st.exit}{/if}</span>
@@ -191,11 +191,11 @@
                   {#if st.note && st.state !== "done"}<p class="note">{st.note}</p>{/if}
                   {#if st.state === "asking" && tab}
                     <div class="sbar">
-                      <button class="btn primary small" onclick={() => assistant.decide(tab.id, st, "once")}>{st.verdict.kind === "screen" ? "Do it" : "Run it"}</button>
-                      {#if st.verdict.effect === "changes" && st.verdict.kind && !prot}
+                      <button class="btn primary small" onclick={() => assistant.decide(tab.id, st, "once")}>{st.verdict.kind === "screen" ? "Do it" : st.verdict.kind === "snapshot" ? "Take it" : "Run it"}</button>
+                      {#if st.verdict.effect === "changes" && st.verdict.kind && st.verdict.kind !== "snapshot" && !prot}
                         <button class="btn small" title={st.verdict.kind === "screen" ? `Let the assistant act on the screen of ${tab.session?.host} without asking from now on (Settings, Assistant shows the rules)` : `Run commands like this on ${tab.session?.host} without asking from now on (Settings, Assistant shows the rules)`} onclick={() => assistant.decide(tab.id, st, "always")}>{st.verdict.kind === "screen" ? "Always on this screen" : `Always "${st.verdict.kind}" here`}</button>
                       {/if}
-                      <button class="btn small" onclick={() => assistant.decide(tab.id, st, "no")}>Refuse</button>
+                      <button class="btn small" onclick={() => assistant.decide(tab.id, st, "no")}>{st.verdict.kind === "snapshot" ? "Skip" : "Refuse"}</button>
                     </div>
                   {/if}
                   {#if st.output}

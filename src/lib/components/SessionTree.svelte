@@ -11,7 +11,7 @@
   import type { ProxmoxGuest, ProxmoxSource } from "../api";
   import { api, type Folder, type Session } from "../api";
   import {
-    ChevronRight, Folder as FolderIcon, FolderOpen, Search, Plus, FolderPlus, Settings2, ListChecks, Play, Pencil, Copy, Trash2, X, Activity,
+    ChevronRight, Folder as FolderIcon, FolderOpen, Search, Plus, FolderPlus, Settings2, ListChecks, Camera, ListOrdered, Play, Pencil, Copy, Trash2, X, Activity,
     ServerCog, Server, Monitor, MonitorPlay, Boxes, Terminal, Globe, Save, Power, RotateCw, Square, RefreshCw, Settings,
   Shield, ShieldCheck, } from "@lucide/svelte";
 
@@ -114,6 +114,10 @@
       },
     ];
     if (g.ips.length) items.push({ label: `Copy address ${g.ips[0]}`, icon: Copy, action: () => writeText(g.ips[0]) });
+    items.push(
+      { label: "Snapshots", icon: Camera, action: () => (proxmox.dialog = { kind: "snapshots", src, g }) },
+      { label: "Tasks of this guest", icon: ListOrdered, action: () => (proxmox.dialog = { kind: "tasks", src, g }) },
+    );
     items.push("sep");
     if (running) {
       items.push(
@@ -132,6 +136,8 @@
     menu.show(e, [
       { label: "Refresh", icon: RefreshCw, action: () => proxmox.refresh(src.id) },
       { label: "Open the Proxmox web interface", icon: Globe, action: () => openUrl(src.url) },
+      ...proxmox.nodes(src).map((n) => ({ label: `Shell on the node ${n}`, icon: Terminal, action: () => proxmox.openNodeShell(src, n) })),
+      { label: "Recent tasks", icon: ListOrdered, action: () => (proxmox.dialog = { kind: "tasks", src }) },
       { label: "Edit this Proxmox server", icon: Pencil, action: () => (app.proxmoxEditing = src) },
     ]);
   }

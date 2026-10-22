@@ -6,6 +6,19 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.11.0 · 22 October 2026
+
+**More of Proxmox in the tree**
+
+- **Snapshots** (right-click a VM or container): see them, take one (for a VM optionally with its memory), roll
+  back or delete one. Cablebag follows the Proxmox task until it is done. The API token needs the `VM.Snapshot`
+  privilege (and `VM.Snapshot.Rollback` to roll back); without it Cablebag says so.
+- **Tasks**: the recent tasks of a Proxmox server, or of one guest, with what each one wrote.
+- **A shell on the node** (right-click the Proxmox server): over SSH, with your saved session for the node when
+  there is one.
+- **The assistant takes a snapshot before its first change inside a guest**, after one click, or by itself
+  (Settings, Assistant, Proxmox guests).
+
 ## 0.10.0 · 22 October 2026
 
 **Folders that do the work**

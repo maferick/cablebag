@@ -544,6 +544,37 @@ async fn proxmox_list(app: AppHandle, id: String) -> CmdResult<Vec<proxmox::Gues
 }
 
 #[tauri::command]
+async fn proxmox_snapshots(app: AppHandle, id: String, node: String, kind: String, vmid: u64) -> CmdResult<Vec<proxmox::Snapshot>> {
+    proxmox::snapshots(&app, &id, &node, &kind, vmid).await.map_err(err)
+}
+
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+async fn proxmox_snapshot(app: AppHandle, id: String, node: String, kind: String, vmid: u64, action: String, name: String, description: Option<String>, ram: Option<bool>) -> CmdResult<String> {
+    proxmox::snapshot_action(&app, &id, &node, &kind, vmid, &action, &name, description.as_deref().unwrap_or(""), ram.unwrap_or(false)).await.map_err(err)
+}
+
+#[tauri::command]
+async fn proxmox_tasks(app: AppHandle, id: String, vmid: Option<u64>) -> CmdResult<Vec<proxmox::Task>> {
+    proxmox::tasks(&app, &id, vmid).await.map_err(err)
+}
+
+#[tauri::command]
+async fn proxmox_task_status(app: AppHandle, id: String, node: String, upid: String) -> CmdResult<(bool, String)> {
+    proxmox::task_status(&app, &id, &node, &upid).await.map_err(err)
+}
+
+#[tauri::command]
+async fn proxmox_task_log(app: AppHandle, id: String, node: String, upid: String) -> CmdResult<String> {
+    proxmox::task_log(&app, &id, &node, &upid).await.map_err(err)
+}
+
+#[tauri::command]
+async fn proxmox_node_session(app: AppHandle, id: String, node: String) -> CmdResult<store::Session> {
+    proxmox::node_session(&app, &id, &node).await.map_err(err)
+}
+
+#[tauri::command]
 async fn proxmox_power(app: AppHandle, id: String, node: String, kind: String, vmid: u64, action: String) -> CmdResult<()> {
     proxmox::power(&app, &id, &node, &kind, vmid, &action).await.map_err(err)
 }
@@ -1048,6 +1079,12 @@ pub fn run() {
             rdp_snapshot,
             rdp_input,
             proxmox_exec,
+            proxmox_snapshots,
+            proxmox_snapshot,
+            proxmox_tasks,
+            proxmox_task_status,
+            proxmox_task_log,
+            proxmox_node_session,
             run_once,
             rdp_bounds,
             rdp_visible,

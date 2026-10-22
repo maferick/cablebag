@@ -191,6 +191,16 @@
   </div>
 </SettingsSection>
 
+<SettingsSection title="Proxmox guests" desc="When the assistant works inside a VM or container from its console tab.">
+  <SettingsRow label="Snapshot before the first change" help="Taken before the first command in a conversation that changes something, so you can roll back (the guest's Snapshots in the tree). With 'ask only before dangerous commands' it is taken without asking.">
+    <select value={app.settings["ai.snapshot"] ?? "ask"} onchange={(e) => app.setSetting("ai.snapshot", (e.target as HTMLSelectElement).value)}>
+      <option value="ask">Offer it</option>
+      <option value="always">Always take one</option>
+      <option value="never">Don't</option>
+    </select>
+  </SettingsRow>
+</SettingsSection>
+
 <SettingsSection title="Limits" desc="How much goes to the AI and how far the assistant may go on one question. Larger values cost more and fill the model's memory sooner.">
   {#each [
     { key: "ai.screenLines", label: "Terminal lines sent with a question", help: "The last lines of the terminal you are in.", def: 300 },

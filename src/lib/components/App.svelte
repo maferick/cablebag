@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ProxmoxDialog from "./ProxmoxDialog.svelte";
   import FolderSettings from "./FolderSettings.svelte";
   import { workspaces } from "../workspaces.svelte";
   import { onMount } from "svelte";
@@ -526,6 +527,9 @@
 {/if}
 {#if app.importOpen}
   <ImportDialog />
+{/if}
+{#if proxmox.dialog}
+  <ProxmoxDialog />
 {/if}
 {#if app.folderEditing}
   {#key app.folderEditing.id}<FolderSettings folder={app.folderEditing} />{/key}

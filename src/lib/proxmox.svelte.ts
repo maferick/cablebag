@@ -1,6 +1,7 @@
 // Proxmox servers as live folders in the sessions tree: their guests, state and addresses.
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { api, type ProxmoxGuest, type ProxmoxSource, type Session } from "./api";
+import { invoke } from "@tauri-apps/api/core";
+import { api, type ProxmoxGuest, type ProxmoxSnapshot, type ProxmoxSource, type ProxmoxTask, type Session } from "./api";
 import { ask } from "./ask.svelte";
 import { app, newSession } from "./state.svelte";
 
@@ -146,6 +147,58 @@ class ProxmoxStore {
   }
 
   actions = ACTIONS;
+
+  /** The snapshot or task dialog that is open. */
+  dialog = $state<{ kind: "snapshots" | "tasks"; src: ProxmoxSource; g?: ProxmoxGuest } | null>(null);
+
+  snapshots(src: ProxmoxSource, g: ProxmoxGuest) {
+    return invoke<ProxmoxSnapshot[]>("proxmox_snapshots", { id: src.id, node: g.node, kind: g.kind, vmid: g.vmid });
+  }
+
+  /** A snapshot name Proxmox accepts, from the date and time. */
+  snapshotName() {
+    const d = new Date();
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `cablebag_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  }
+
+  /** Takes, rolls back or deletes a snapshot and waits for Proxmox to finish. Returns "OK" or the error. */
+  async snapshot(src: ProxmoxSource, g: { node: string; kind: string; vmid: number }, action: "create" | "rollback" | "delete", name: string, description = "", ram = false) {
+    const upid = await invoke<string>("proxmox_snapshot", { id: src.id, node: g.node, kind: g.kind, vmid: g.vmid, action, name, description, ram });
+    return upid ? this.waitTask(src.id, g.node, upid) : "OK";
+  }
+
+  /** Follows a Proxmox task until it ends (at most ten minutes). */
+  async waitTask(sourceId: string, node: string, upid: string): Promise<string> {
+    const until = Date.now() + 10 * 60_000;
+    while (Date.now() < until) {
+      const [running, exit] = await invoke<[boolean, string]>("proxmox_task_status", { id: sourceId, node, upid });
+      if (!running) return exit || "OK";
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    return "still running after ten minutes; see the task log";
+  }
+
+  tasks(src: ProxmoxSource, vmid?: number) {
+    return invoke<ProxmoxTask[]>("proxmox_tasks", { id: src.id, vmid: vmid ?? null });
+  }
+
+  taskLog(src: ProxmoxSource, t: ProxmoxTask) {
+    return invoke<string>("proxmox_task_log", { id: src.id, node: t.node, upid: t.upid });
+  }
+
+  /** A shell on a node: your saved session for it, or root on its address. */
+  async openNodeShell(src: ProxmoxSource, node: string) {
+    try {
+      app.openSession(await invoke<Session>("proxmox_node_session", { id: src.id, node }));
+    } catch (e) {
+      app.notify(String(e), "error");
+    }
+  }
+
+  nodes(src: ProxmoxSource): string[] {
+    return [...new Set((this.listings[src.id]?.guests ?? []).map((g) => g.node))].sort();
+  }
 }
 
 export const proxmox = new ProxmoxStore();

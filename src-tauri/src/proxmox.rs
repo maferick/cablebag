@@ -610,6 +610,149 @@ pub fn has_secret(app: &AppHandle, src: &Source) -> bool {
     matches!(store.find_secret("password", "", "proxmox", &src.url, 0, &src.token_id), Ok(Some(_)))
 }
 
+// ---- Snapshots, tasks and the node's shell ----
+
+#[derive(Serialize)]
+pub struct Snapshot {
+    pub name: String,
+    pub description: String,
+    /// Unix time; 0 when Proxmox does not say.
+    pub time: u64,
+    pub parent: String,
+    /// The VM's memory is in it, so a rollback resumes the running VM.
+    pub ram: bool,
+}
+
+/// The snapshots of a guest, oldest first ("current", the live state, left out).
+pub async fn snapshots(app: &AppHandle, id: &str, node: &str, kind: &str, vmid: u64) -> Result<Vec<Snapshot>> {
+    if !["qemu", "lxc"].contains(&kind) {
+        bail!("Unknown guest type.");
+    }
+    let api = connect(app, id).await?;
+    let list = api.get(&format!("/nodes/{node}/{kind}/{vmid}/snapshot")).await?;
+    let mut out: Vec<Snapshot> = list
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|v| s(v, "name") != "current")
+        .map(|v| Snapshot { name: s(v, "name"), description: s(v, "description").trim().to_string(), time: u(v, "snaptime"), parent: s(v, "parent"), ram: u(v, "vmstate") == 1 })
+        .collect();
+    out.sort_by_key(|x| x.time);
+    Ok(out)
+}
+
+/// Takes, rolls back or deletes a snapshot. Returns the Proxmox task (UPID) to follow.
+pub async fn snapshot_action(app: &AppHandle, id: &str, node: &str, kind: &str, vmid: u64, action: &str, name: &str, description: &str, ram: bool) -> Result<String> {
+    if !["qemu", "lxc"].contains(&kind) {
+        bail!("Unknown guest type.");
+    }
+    // Proxmox's own rule for snapshot names.
+    let valid = name.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
+        && name.len() <= 40
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+    if !valid {
+        bail!("A snapshot name starts with a letter and has only letters, digits, - and _ (at most 40).");
+    }
+    let api = connect(app, id).await?;
+    let base = format!("/nodes/{node}/{kind}/{vmid}/snapshot");
+    let upid = match action {
+        "create" => {
+            let ram = if ram && kind == "qemu" { "1" } else { "0" };
+            let mut form = vec![("snapname", name), ("description", description)];
+            if kind == "qemu" {
+                form.push(("vmstate", ram));
+            }
+            api.call_form(reqwest::Method::POST, &base, &form).await?
+        }
+        "rollback" => api.call(reqwest::Method::POST, &format!("{base}/{name}/rollback")).await?,
+        "delete" => api.call(reqwest::Method::DELETE, &format!("{base}/{name}")).await?,
+        _ => bail!("Unknown snapshot action."),
+    };
+    Ok(upid.as_str().unwrap_or_default().to_string())
+}
+
+#[derive(Serialize)]
+pub struct Task {
+    pub upid: String,
+    pub node: String,
+    /// What it did: qmsnapshot, vzdump, qmstart...
+    pub kind: String,
+    /// The guest it was about, if any.
+    pub id: String,
+    pub user: String,
+    /// Empty while running; "OK" or an error text when done.
+    pub status: String,
+    pub start: u64,
+    pub end: u64,
+}
+
+/// The recent tasks of the whole cluster, newest first; with a guest ID, only those about that guest.
+pub async fn tasks(app: &AppHandle, id: &str, vmid: Option<u64>) -> Result<Vec<Task>> {
+    let api = connect(app, id).await?;
+    let list = api.get("/cluster/tasks").await?;
+    let mut out: Vec<Task> = list
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|v| Task {
+            upid: s(v, "upid"),
+            node: s(v, "node"),
+            kind: s(v, "type"),
+            id: s(v, "id"),
+            user: s(v, "user"),
+            status: s(v, "status"),
+            start: u(v, "starttime"),
+            end: u(v, "endtime"),
+        })
+        .filter(|t| vmid.is_none_or(|n| t.id == n.to_string()))
+        .collect();
+    out.sort_by(|a, b| b.start.cmp(&a.start));
+    Ok(out)
+}
+
+/// Whether a task still runs, and how it ended ("OK" or the error).
+pub async fn task_status(app: &AppHandle, id: &str, node: &str, upid: &str) -> Result<(bool, String)> {
+    let api = connect(app, id).await?;
+    let st = api.get(&format!("/nodes/{node}/tasks/{}/status", url_encode(upid))).await?;
+    Ok((s(&st, "status") == "running", s(&st, "exitstatus")))
+}
+
+/// What a task wrote, line by line.
+pub async fn task_log(app: &AppHandle, id: &str, node: &str, upid: &str) -> Result<String> {
+    let api = connect(app, id).await?;
+    let lines = api.get(&format!("/nodes/{node}/tasks/{}/log?limit=5000", url_encode(upid))).await?;
+    Ok(lines.as_array().into_iter().flatten().map(|l| s(l, "t")).collect::<Vec<_>>().join("\n"))
+}
+
+/// A session for a shell on the node: your saved SSH session for its address or name when there is one,
+/// otherwise root on its address (the login then comes from the vault or is asked).
+pub async fn node_session(app: &AppHandle, id: &str, node: &str) -> Result<crate::store::Session> {
+    let api = connect(app, id).await?;
+    let mut addr = node.to_string();
+    if let Ok(list) = api.get("/cluster/status").await {
+        for e in list.as_array().into_iter().flatten() {
+            if s(e, "type") == "node" && s(e, "name") == node && !s(e, "ip").is_empty() {
+                addr = s(e, "ip");
+            }
+        }
+    }
+    let state = app.state::<AppState>();
+    let saved = state.store.lock().sessions().unwrap_or_default().into_iter().find(|x| x.kind == "ssh" && (x.host.eq_ignore_ascii_case(&addr) || x.host.eq_ignore_ascii_case(node)));
+    Ok(saved.unwrap_or(crate::store::Session {
+        id: String::new(),
+        folder_id: None,
+        name: format!("{node} (Proxmox node)"),
+        kind: "ssh".into(),
+        host: addr,
+        port: 22,
+        username: "root".into(),
+        data: serde_json::json!({}),
+        comment: String::new(),
+        sort: 0,
+        last_used: 0,
+    }))
+}
+
 // ---- Commands inside guests, for the assistant ----
 
 /// Runs one command inside a guest as root: in a VM through the QEMU guest agent (PowerShell on Windows,

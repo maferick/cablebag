@@ -157,6 +157,8 @@ class AppState {
   /** The Proxmox server dialog: "new", the server being edited, or closed. */
   proxmoxEditing = $state<ProxmoxSource | "new" | null>(null);
   folderEditing = $state<Folder | null>(null);
+  /** Another dialog over the tabs (Proxmox snapshots or tasks), so remote screens step aside. */
+  dialogOpen = $state(false);
   /** The folder "Run on many servers" starts with (from a folder's menu). */
   runManyFolder = $state<string | null>(null);
   toast = $state<{ text: string; kind: "info" | "error" } | null>(null);
@@ -164,7 +166,7 @@ class AppState {
 
   /** True while something is drawn over the tab area, so native RDP windows must step aside. */
   get overlay(): boolean {
-    return !!(this.prompts.length || this.editing || this.importOpen || this.paletteOpen || this.proxmoxEditing || this.folderEditing || ask.current);
+    return !!(this.prompts.length || this.editing || this.importOpen || this.paletteOpen || this.proxmoxEditing || this.folderEditing || this.dialogOpen || ask.current);
   }
 
   get active(): Tab | undefined {

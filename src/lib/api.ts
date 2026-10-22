@@ -193,6 +193,25 @@ export interface ProxmoxGuest {
   cpu: number;
 }
 
+export interface ProxmoxSnapshot {
+  name: string;
+  description: string;
+  time: number;
+  parent: string;
+  ram: boolean;
+}
+
+export interface ProxmoxTask {
+  upid: string;
+  node: string;
+  kind: string;
+  id: string;
+  user: string;
+  status: string;
+  start: number;
+  end: number;
+}
+
 export interface VaultItem {
   id: string;
   name: string;

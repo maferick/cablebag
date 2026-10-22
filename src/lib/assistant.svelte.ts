@@ -9,6 +9,7 @@ import { kindInfo } from "./kinds";
 import { api, type Session } from "./api";
 import { memory, type Memory } from "./memory.svelte";
 import { SCREEN_TOOLS, describeAction, performAction, type ScreenArgs } from "./screenActions";
+import { proxmox } from "./proxmox.svelte";
 
 export interface AiHost {
   id: string;
@@ -110,6 +111,8 @@ interface Conv {
   bare: Map<object, string>;
   /** Older parts were left out to save room (said once in the instructions). */
   trimmed: boolean;
+  /** A snapshot was offered (or taken) before the first change inside the guest. */
+  snapshotted?: boolean;
 }
 
 type ChatEvent =
@@ -547,6 +550,17 @@ class Assistant {
       if (answer === "always" && verdict.effect === "changes" && !prot) await this.addRule({ kind: verdict.kind, host });
     }
 
+    // Before the first change inside a Proxmox guest: a snapshot to go back to (Settings, Assistant).
+    let before = "";
+    if (guest && verdict.effect !== "reads" && !c.snapshotted) {
+      c.snapshotted = true;
+      before = await this.offerSnapshot(c, msg, guest, msg.steps!.indexOf(s));
+      if (c.stopped) {
+        s.state = "refused";
+        return "The user stopped the assistant.";
+      }
+    }
+
     s.state = "running";
     noteLocal(t.id, `[assistant] ${s.verdict.root ? "(root) " : ""}$ ${command}`);
     try {
@@ -562,11 +576,47 @@ class Assistant {
       // The output limit from Settings; the rest stays visible in the card.
       const max = aiLimits().outputKB * 1024;
       const cut = r.output.length > max;
-      return JSON.stringify({ exit: r.exit, timed_out: r.timed_out, truncated: r.truncated || cut, output: cut ? r.output.slice(0, max) : r.output });
+      return (before ? `${before}\n` : "") + JSON.stringify({ exit: r.exit, timed_out: r.timed_out, truncated: r.truncated || cut, output: cut ? r.output.slice(0, max) : r.output });
     } catch (e) {
       s.state = "failed";
       s.note = String(e);
       return `Could not run it: ${e}`;
+    }
+  }
+
+  /** Offers (or, as set, takes by itself) a snapshot of the guest, as a card before the command's own card.
+   *  Returns a line for the model about what happened. */
+  private async offerSnapshot(c: Conv, msg: Msg, guest: ProxmoxGuestRef, at: number): Promise<string> {
+    const pref = (app.settings["ai.snapshot"] as string) ?? "ask";
+    if (pref === "never") return "";
+    const src = proxmox.sources.find((x) => x.id === guest.source);
+    if (!src) return "";
+    const name = proxmox.snapshotName();
+    const what = `${guest.kind === "lxc" ? "container" : "VM"} ${guest.vmid}`;
+    const verdict: Verdict = { effect: "changes", root: false, why: "", kind: "snapshot" };
+    msg.steps!.splice(at, 0, { command: `take a snapshot of ${what}: ${name}`, reason: "So everything can be put back as it was before the first change.", undo: "", verdict, state: "asking" });
+    const s = msg.steps![at];
+    if (pref !== "always" && this.mode !== "free") {
+      s.note = "A snapshot before the first change, to roll back to if needed.";
+      const answer = await new Promise<"once" | "always" | "no">((res) => c.waiting.set(s, res));
+      c.waiting.delete(s);
+      if (answer === "no" || c.stopped) {
+        s.state = "refused";
+        s.note = "Skipped.";
+        return "";
+      }
+    }
+    s.state = "running";
+    try {
+      const result = await proxmox.snapshot(src, guest, "create", name, "Before the assistant's first change");
+      if (result !== "OK") throw new Error(result);
+      s.state = "done";
+      s.note = undefined;
+      return `(Cablebag took the snapshot ${name} of this ${what} first.)`;
+    } catch (e) {
+      s.state = "failed";
+      s.note = `No snapshot: ${e}`;
+      return `(A snapshot before this change failed: ${e}. Mention this to the user.)`;
     }
   }
 
