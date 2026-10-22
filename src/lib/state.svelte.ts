@@ -148,7 +148,18 @@ class AppState {
   set filesOpen(v: boolean) {
     this.filesFor[this.activeId] = v;
   }
+  /** Send to all: what is typed in a terminal goes to every connected terminal. */
   multiExec = $state(false);
+
+  /** The terminals Send to all types into. */
+  get liveTerminals(): number {
+    return this.tabs.filter((t) => t.type === "terminal" && t.status === "connected").length;
+  }
+
+  /** Send to all only means something with two or more connected terminals. */
+  get canSendToAll(): boolean {
+    return this.liveTerminals >= 2;
+  }
   /** Split view: up to four terminals side by side, apart from tiling. */
   split = $state<SplitMode>("1");
   /** Index of the first terminal tab shown when the view is split. */

@@ -72,6 +72,11 @@
     getCurrentWebview().setZoom(scale).catch(() => {});
   });
 
+  // Send to all switches itself off once fewer than two terminal tabs are left (closing them all ends it).
+  $effect(() => {
+    if (app.multiExec && app.tabs.filter((t) => t.type === "terminal").length < 2) app.multiExec = false;
+  });
+
   // Sync through git: a change here is sent a few seconds later.
   $effect(() => {
     void sync.print();
@@ -385,9 +390,10 @@
       <div class="splitter" role="separator" aria-orientation="vertical" onpointerdown={dragSidebar}></div>
     {/if}
     <div class="work">
-      {#if app.multiExec}
+      <!-- Only over a terminal: typing in a Remote Desktop or another tab does not go to the terminals. -->
+      {#if app.multiExec && app.tabs.find((t) => t.id === app.activeId)?.type === "terminal"}
         <div class="banner send">
-          <span><b>Send to all</b> Typing goes to all {app.tabs.filter((t) => t.type === "terminal" && t.status === "connected").length} connected terminals.</span>
+          <span><b>Send to all</b> Typing goes to all {app.liveTerminals} connected terminals.</span>
           <button class="btn small" onclick={() => (app.multiExec = false)}>Stop sending to all</button>
         </div>
       {/if}

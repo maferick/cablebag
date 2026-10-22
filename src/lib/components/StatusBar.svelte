@@ -92,7 +92,13 @@
       <ArrowDownToLine size={13} />Update to {update.found.version}
     </button>
   {/if}
-  <button class="item" class:send={app.multiExec} title="Type into all connected terminals at once" onclick={() => (app.multiExec = !app.multiExec)}>
+  <button
+    class="item"
+    class:send={app.multiExec}
+    disabled={!app.multiExec && !app.canSendToAll}
+    title={app.multiExec || app.canSendToAll ? "Type into all connected terminals at once" : "Needs two or more connected terminals"}
+    onclick={() => (app.multiExec = !app.multiExec)}
+  >
     <Radio size={13} />Send to all: {app.multiExec ? "on" : "off"}
   </button>
   <button class="item" class:rec={!!macros.recording} title={macros.recording ? "Stop recording and save the macro" : "Record what you type in this terminal as a macro"} onclick={toggleRecord}>
@@ -129,9 +135,13 @@
     color: inherit;
     font-size: 12px;
   }
-  button.item:hover {
+  button.item:hover:not(:disabled) {
     background: var(--hover);
     color: var(--text);
+  }
+  button.item:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
   .item.on {
     color: var(--text);

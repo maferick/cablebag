@@ -6,6 +6,12 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.15.3 · 23 October 2026
+
+- **Send to all ends by itself**: it switches off as soon as fewer than two terminals are open, so closing your
+  tabs ends it, and it can only be switched on with two or more connected terminals. The bar shows only over a
+  terminal, not over a Remote Desktop or another tab, where typing does not go to the terminals.
+
 ## 0.15.2 · 23 October 2026
 
 - **Everything on current versions**: the parts Cablebag is built from are brought up to their latest major

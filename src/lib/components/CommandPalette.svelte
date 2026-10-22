@@ -108,14 +108,16 @@
       { group: "Actions", label: "Make this pane bigger", words: "split tiling tiles grow resize larger", icon: Grid2x2, run: () => tiles.grow(app.activeId, 0.05) },
       { group: "Actions", label: "Make this pane smaller", words: "split tiling tiles shrink resize", icon: Grid2x2, run: () => tiles.grow(app.activeId, -0.05) },
       { group: "Actions", label: "Turn the split of this pane", words: "split tiling tiles rotate orientation", icon: Grid2x2, run: () => tiles.rotate(app.activeId) },
-      {
+    );
+    // Send to all: only with two or more connected terminals (or to switch it off).
+    if (app.multiExec || app.canSendToAll)
+      a.push({
         group: "Actions",
         label: app.multiExec ? "Stop sending to all terminals" : "Send typing to all terminals",
         words: "multi execution broadcast",
         icon: Radio,
         run: () => (app.multiExec = !app.multiExec),
-      },
-    );
+      });
     if (macros.recording) {
       a.push({ group: "Actions", label: "Stop recording and save the macro", icon: CircleStop, run: () => macros.stopRecording() });
     } else if (t?.type === "terminal") {

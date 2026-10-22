@@ -51,7 +51,13 @@
       { label: "Save terminal output", icon: Save, action: () => saveOutput(t), disabled: !term },
       { label: "Copy all terminal output", icon: ClipboardCopy, action: () => writeText(bufferText(t.id)), disabled: !term },
       "sep",
-      { label: app.multiExec ? "Stop sending to all terminals" : "Send typing to all terminals", icon: Radio, action: () => (app.multiExec = !app.multiExec) },
+      {
+        label: app.multiExec ? "Stop sending to all terminals" : "Send typing to all terminals",
+        icon: Radio,
+        disabled: !app.multiExec && !app.canSendToAll,
+        hint: !app.multiExec && !app.canSendToAll ? "Needs two terminals" : undefined,
+        action: () => (app.multiExec = !app.multiExec),
+      },
       macros.recording
         ? { label: "Stop recording and save the macro", icon: Circle, action: () => macros.stopRecording() }
         : { label: "Record a macro in this terminal", icon: Circle, disabled: !term, action: () => macros.startRecording(t.id) },
