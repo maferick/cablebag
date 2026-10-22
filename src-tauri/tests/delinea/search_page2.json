@@ -1,0 +1,30 @@
+{
+  "skip": 2,
+  "take": 2,
+  "total": 3,
+  "pageCount": 2,
+  "currentPage": 2,
+  "prevSkip": 0,
+  "nextSkip": 4,
+  "hasPrev": true,
+  "hasNext": false,
+  "records": [
+    {
+      "id": 21,
+      "name": "Intranet",
+      "secretTemplateId": 9,
+      "secretTemplateName": "Web Password",
+      "folderId": -1,
+      "folderPath": "",
+      "active": true,
+      "checkedOut": false,
+      "isRestricted": false,
+      "extendedFields": [
+        { "name": "URL", "value": "https://intranet.example.test" },
+        { "name": "Username", "value": "" }
+      ]
+    }
+  ],
+  "success": true,
+  "severity": "None"
+}

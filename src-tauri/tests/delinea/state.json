@@ -1,0 +1,18 @@
+{
+  "id": 12,
+  "secretName": "db01 root",
+  "secretState": "None",
+  "folderId": 4,
+  "folderName": "Linux",
+  "isActive": true,
+  "isCheckedOut": false,
+  "isCheckedOutByCurrentUser": false,
+  "checkedOutUserId": null,
+  "checkedOutUserDisplayName": null,
+  "checkOutIntervalMinutes": 30,
+  "checkOutMinutesRemaining": 0,
+  "requireComment": false,
+  "approvalEnd": null,
+  "role": "View",
+  "siteId": 1
+}
