@@ -1,0 +1,86 @@
+name: Bug report
+description: Something in Cablebag does not work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. A few details make a bug much easier to find.
+
+        Please do not paste passwords, private keys, tokens, or hostnames and addresses you want to keep
+        private. Replace them with placeholders such as `server1` or `10.0.0.x`. Security problems go through
+        the Security tab ("Report a vulnerability"), not through an issue.
+  - type: input
+    id: version
+    attributes:
+      label: Cablebag version
+      description: Open About Cablebag and press **Copy details**, then paste the result here.
+      placeholder: "Cablebag 0.15.1 ..."
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: Windows 10 or 11 and the build, as shown by Settings, System, About (or `winver`).
+      placeholder: "Windows 11 Pro 24H2 (build 26100)"
+    validations:
+      required: true
+  - type: dropdown
+    id: session
+    attributes:
+      label: Session type
+      description: Which kind of session or part of Cablebag the problem is in.
+      options:
+        - SSH
+        - SFTP
+        - RDP
+        - VNC
+        - Telnet
+        - Serial
+        - FTP
+        - Local shell/WSL
+        - Web
+        - Proxmox
+        - WireGuard
+        - Assistant
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, including the exact text of any message Cablebag showed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to make it happen again
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: >-
+        A screenshot, whether it worked in an earlier version, whether the session goes through a WireGuard
+        network, imported from where, and so on. Optional.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before you send
+      options:
+        - label: I have checked that this report contains no passwords, keys, tokens or private hostnames.
+          required: true

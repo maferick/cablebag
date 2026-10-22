@@ -3,6 +3,13 @@
   <img src="branding/cablebag-logo-on-light.svg" alt="Cablebag" height="64">
 </picture>
 
+[![Latest release](https://img.shields.io/github/v/release/maferick/cablebag?style=flat&label=release)](https://github.com/maferick/cablebag/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/maferick/cablebag/total?style=flat&label=downloads)](https://github.com/maferick/cablebag/releases)
+[![Windows 10 | 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat)](#install)
+[![Licence: free to use](https://img.shields.io/badge/licence-free%20to%20use-2e8b57?style=flat)](LICENSE)
+[![WireGuard: per session](https://img.shields.io/badge/WireGuard-per%20session-88171a?style=flat)](#wireguard-per-session)
+[![CI](https://img.shields.io/github/actions/workflow/status/maferick/cablebag/ci.yml?branch=main&style=flat&label=CI)](https://github.com/maferick/cablebag/actions/workflows/ci.yml)
+
 Cablebag is a free remote access app for Windows 10 and 11. It puts SSH, Remote Desktop (RDP), VNC, Telnet,
 serial ports, SFTP and FTP, local shells and WSL, web pages and Proxmox consoles in tabs in one window, with
 remote files beside every SSH tab, a password vault, session sync, and an assistant that can work on your servers.

@@ -1,27 +1,22 @@
-// Publishes a new Cablebag version: node scripts/release.mjs <version> "<what changed>" [--dry]
+// Publishes a new Cablebag version: node scripts/release.mjs <version> ["<what changed>"] [--dry]
 //
-// 1. Sets the version, writes the third-party notices, commits and tags in the private repository (origin).
-// 2. Builds the installer, signed with the update key from Vaultwarden (held in memory only).
-// 3. Writes latest.json, the file installed copies check for updates.
-// 4. Copies the publishable files into the public repository (a separate folder with its own history,
-//    commits under the GitHub no-reply address) and scans everything for private words first.
-// 5. Pushes the public repository and creates the GitHub release with the installer, its signature and
-//    latest.json.
-// With --dry it stops before anything leaves this PC (no push, no release).
+// 1. Sets the version, writes the third-party notices, commits and tags (on main, which is GitHub's main).
+// 2. Scans every tracked file for private words, before anything leaves this PC.
+// 3. Builds the installer, signed with the update key from Vaultwarden (held in memory only).
+// 4. Writes latest.json, the file installed copies check for updates.
+// 5. Scans the built programs too, pushes main and the tag, and creates the GitHub release with the
+//    installer, its signature and latest.json.
+// With --dry it stops before anything leaves this PC (the commit and tag stay local).
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 const REPO = "maferick/cablebag";
-const PUBLIC_DIR = join(dirname(process.cwd()), "cablebag-public");
-const AUTHOR = ["-c", "user.name=maferick", "-c", "user.email=5728058+maferick@users.noreply.github.com"];
 /** Private settings of the PC that releases, outside the repository: { "vaultHost": "user@host" }. */
 const LOCAL = JSON.parse(readFileSync(join(homedir(), ".cablebag", "release.json"), "utf8"));
 const VAULT_HOST = LOCAL.vaultHost;
 const VAULT_ITEM = "cablebag-updater-key";
-/** Never published: private notes and plans. */
-const PRIVATE = [/^docs\//, /^PLAN\.md$/, /^\.claude\//];
 
 const [version, notes = "", ...flags] = process.argv.slice(2);
 const dry = flags.includes("--dry") || notes === "--dry";
@@ -42,31 +37,12 @@ const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: "inherit"
 const out = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", ...opts }).trim();
 const step = (s) => console.log(`\n== ${s}`);
 
-// 1. Version, notices, commit and tag (private).
+// 1. Version, notices, commit and tag.
 step(`Version ${version}`);
 if (out("git", ["status", "--porcelain"])) throw new Error("The working tree has uncommitted changes; commit them first.");
-// The public repository is overwritten below: anything merged on GitHub itself must be in the private one first.
-if (existsSync(join(PUBLIC_DIR, ".git"))) {
-  run("git", ["fetch", "-q", "origin", "main"], { cwd: PUBLIC_DIR });
-  try {
-    out("git", ["merge-base", "--is-ancestor", "origin/main", "HEAD"], { cwd: PUBLIC_DIR });
-  } catch {
-    throw new Error(
-      `GitHub's main has commits that are not in ${PUBLIC_DIR} (merged on GitHub?). Bring them into the private repository (git fetch https://github.com/${REPO}.git main, then cherry-pick), pull them into ${PUBLIC_DIR}, and release again.`,
-    );
-  }
-}
-/** Other people's commits since the last version, credited on the public commit (GitHub shows them as co-authors). */
-const previous = (() => {
-  try {
-    return out("git", ["describe", "--tags", "--abbrev=0"]);
-  } catch {
-    return "";
-  }
-})();
-const coAuthors = [...new Set(out("git", ["log", "--format=%an <%ae>", ...(previous ? [`${previous}..HEAD`] : [])]).split("\n"))]
-  .filter((a) => a && !a.startsWith("maferick "))
-  .map((a) => `Co-authored-by: ${a}`);
+if (out("git", ["branch", "--show-current"]) !== "main") throw new Error("Release from main.");
+// What others pushed comes first, so the release is made on top of it.
+run("git", ["pull", "-q", "--ff-only", "origin", "main"]);
 const conf = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
 conf.version = version;
 writeFileSync("src-tauri/tauri.conf.json", JSON.stringify(conf, null, 2) + "\n");
@@ -77,10 +53,14 @@ writeFileSync("src-tauri/Cargo.toml", readFileSync("src-tauri/Cargo.toml", "utf8
 run("node", ["scripts/notices.mjs"]);
 run("cargo", ["update", "-p", "cablebag", "--offline", "--manifest-path", "src-tauri/Cargo.toml"]);
 run("git", ["add", "-A"]);
-if (out("git", ["status", "--porcelain"])) run("git", [...AUTHOR, "commit", "-q", "-m", `Cablebag ${version}`]);
-run("git", [...AUTHOR, "tag", "-f", `v${version}`]);
+if (out("git", ["status", "--porcelain"])) run("git", ["commit", "-q", "-m", `Cablebag ${version}`]);
+run("git", ["tag", "-f", `v${version}`]);
 
-// 2. Build, signed. Paths of this PC are taken out of the programs.
+// 2. Nothing personal in what is published.
+step("Scan");
+run("node", ["scripts/scan-private.mjs", ...out("git", ["ls-files"]).split("\n").filter(Boolean)]);
+
+// 3. Build, signed. Paths of this PC are taken out of the programs.
 step("Build");
 const key = JSON.parse(
   // A fresh vault session every time: a stale one makes bw ask for the master password instead.
@@ -107,7 +87,7 @@ const bundle = "src-tauri/target/release/bundle/nsis";
 const setup = `Cablebag_${version}_x64-setup.exe`;
 if (!existsSync(join(bundle, setup)) || !existsSync(join(bundle, `${setup}.sig`))) throw new Error(`${setup} or its signature is missing.`);
 
-// 3. The update list.
+// 4. The update list.
 const latest = {
   version,
   notes: text,
@@ -121,38 +101,13 @@ const latest = {
 };
 writeFileSync(join(bundle, "latest.json"), JSON.stringify(latest, null, 2) + "\n");
 
-// 4. The public copy, and the scan for private words.
-step("Public copy");
-if (!existsSync(join(PUBLIC_DIR, ".git"))) {
-  mkdirSync(PUBLIC_DIR, { recursive: true });
-  run("git", ["init", "-q", "-b", "main"], { cwd: PUBLIC_DIR });
-  run("git", ["remote", "add", "origin", `https://github.com/${REPO}.git`], { cwd: PUBLIC_DIR });
-}
-for (const name of readdirSync(PUBLIC_DIR)) if (name !== ".git") rmSync(join(PUBLIC_DIR, name), { recursive: true, force: true });
-const files = out("git", ["ls-files"]).split("\n").filter((f) => f && !PRIVATE.some((p) => p.test(f)));
-for (const f of files) {
-  mkdirSync(dirname(join(PUBLIC_DIR, f)), { recursive: true });
-  cpSync(f, join(PUBLIC_DIR, f));
-}
-run("node", ["scripts/scan-private.mjs", PUBLIC_DIR, "src-tauri/target/release/cablebag.exe", "rdp-helper/publish/cablebag-rdp.exe", "build", join(bundle, setup), join(bundle, "latest.json")]);
-run("git", ["add", "-A"], { cwd: PUBLIC_DIR });
-const message = [`Cablebag ${version}`, ...(coAuthors.length ? ["", ...coAuthors] : [])].join("\n");
-if (out("git", ["status", "--porcelain"], { cwd: PUBLIC_DIR })) run("git", [...AUTHOR, "commit", "-q", "-m", message], { cwd: PUBLIC_DIR });
-run("git", [...AUTHOR, "tag", "-f", `v${version}`], { cwd: PUBLIC_DIR });
-
+// 5. The programs too, then out.
+step("Publish");
+run("node", ["scripts/scan-private.mjs", "src-tauri/target/release/cablebag.exe", "rdp-helper/publish/cablebag-rdp.exe", "build", join(bundle, setup), join(bundle, "latest.json")]);
 if (dry) {
-  console.log(`\nDry run done: ${join(bundle, setup)} and latest.json are ready, the public copy is in ${PUBLIC_DIR}. Nothing was pushed.`);
+  console.log(`\nDry run done: ${join(bundle, setup)} and latest.json are ready; the commit and tag v${version} are local. Nothing was pushed.`);
   process.exit(0);
 }
-
-// 5. Out: the private repository, the public one and the release.
-step("Publish");
 run("git", ["push", "-q", "origin", "main", `v${version}`]);
-try {
-  out("gh", ["repo", "view", REPO, "--json", "name"]);
-} catch {
-  run("gh", ["repo", "create", REPO, "--public", "--description", "All-in-one remote access workstation for Windows: terminals, SSH, RDP, VNC, Proxmox. Free to use, not open source.", "--homepage", `https://github.com/${REPO}/releases/latest`, "--disable-wiki"]);
-}
-run("git", ["push", "-q", "-f", "origin", "main", `v${version}`], { cwd: PUBLIC_DIR });
-run("gh", ["release", "create", `v${version}`, "--repo", REPO, "--title", `Cablebag ${version}`, "--notes", text || `Cablebag ${version}`, join(bundle, setup), join(bundle, `${setup}.sig`), join(bundle, "latest.json")]);
+run("gh", ["release", "create", `v${version}`, "--repo", REPO, "--title", `Cablebag ${version}`, "--notes", text, join(bundle, setup), join(bundle, `${setup}.sig`), join(bundle, "latest.json")]);
 console.log(`\nReleased: https://github.com/${REPO}/releases/tag/v${version}`);

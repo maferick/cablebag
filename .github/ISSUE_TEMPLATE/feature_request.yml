@@ -1,0 +1,49 @@
+name: Feature request
+description: An idea for something Cablebag should do, or do differently.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. The most useful requests describe the situation you are in, not only the change
+        you have in mind: there may be a better fix, or it may already exist under another name.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task, and where Cablebag gets in the way or stops short today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like Cablebag to do?
+      description: How it would work from your side, as a user. Optional, but helpful.
+  - type: textarea
+    id: workaround
+    attributes:
+      label: How do you handle it now?
+      description: Another tool, a script, a manual step, or not at all. Optional.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Cablebag?
+      options:
+        - Sessions (SSH, RDP, VNC, Telnet, serial, FTP, local shell)
+        - Files (remote files, editor, SFTP)
+        - Proxmox
+        - WireGuard
+        - Vault and passwords
+        - Sync
+        - Assistant
+        - Import
+        - Tools (tunnels, scanner, macros, Run on many servers)
+        - Window, tabs and keyboard
+        - Something else
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you send
+      options:
+        - label: I have searched the open issues and did not find this request already.
+          required: true
