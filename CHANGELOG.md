@@ -6,6 +6,12 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.7.1 · 22 October 2026
+
+- **PowerShell commands in Windows VMs are judged as PowerShell.** `Get-`, `Select-`, `Measure-` and other looking
+  commands run by themselves; `Set-`, `Stop-` and the like count as changes; `Restart-Computer`, `Format-Volume`,
+  `Clear-Disk` and `Remove-Item -Recurse` are dangerous. Before, every PowerShell command asked as a change.
+
 ## 0.7.0 · 22 October 2026
 
 **The assistant inside Proxmox guests, and on a longer leash if you want**

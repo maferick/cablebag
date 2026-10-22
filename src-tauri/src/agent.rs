@@ -254,6 +254,149 @@ pub fn classify(line: &str) -> Verdict {
     Verdict { effect, root, why, kind }
 }
 
+// ---- PowerShell, for Windows guests ----
+
+/// PowerShell verbs whose cmdlets only look (Format-Volume is the exception, see below).
+const PS_READ_VERBS: &[&str] = &[
+    "get", "test", "select", "measure", "format", "where", "sort", "group", "convertto", "convertfrom", "compare", "find", "resolve",
+    "show", "foreach", "join", "split", "out", "write",
+];
+
+/// PowerShell's verbs: a word such as qemu-ga is a name, not a cmdlet.
+const PS_VERBS: &[&str] = &[
+    "add", "approve", "assert", "backup", "block", "clear", "close", "compare", "complete", "compress", "confirm", "connect", "convert",
+    "convertfrom", "convertto", "copy", "debug", "deny", "disable", "disconnect", "dismount", "edit", "enable", "enter", "exit", "expand",
+    "export", "find", "foreach", "format", "get", "grant", "group", "hide", "import", "initialize", "install", "invoke", "join", "limit",
+    "lock", "measure", "merge", "mount", "move", "new", "open", "optimize", "out", "pop", "protect", "publish", "push", "read", "receive",
+    "redo", "register", "remove", "rename", "repair", "request", "reset", "resize", "resolve", "restart", "restore", "resume", "revoke",
+    "save", "search", "select", "send", "set", "show", "skip", "sort", "split", "start", "step", "stop", "submit", "suspend", "switch",
+    "sync", "tee", "test", "trace", "unblock", "undo", "uninstall", "unlock", "unprotect", "unpublish", "unregister", "update", "use",
+    "wait", "watch", "where", "write",
+];
+
+/// Cmdlets and programs that wipe, format or restart the machine.
+const PS_DANGEROUS: &[(&str, &str)] = &[
+    ("format-volume", "formats a disk"),
+    ("clear-disk", "wipes a disk"),
+    ("initialize-disk", "wipes a disk"),
+    ("remove-partition", "removes a partition"),
+    ("restart-computer", "restarts the computer"),
+    ("stop-computer", "shuts the computer down"),
+    ("remove-vm", "deletes a virtual machine"),
+    ("disable-netadapter", "switches a network card off, which can cut off this connection"),
+    ("shutdown", "shuts the computer down or restarts it"),
+    ("format", "formats a disk"),
+    ("diskpart", "changes disks and partitions"),
+    ("bcdedit", "changes how the computer starts"),
+    ("cipher", "can wipe free space or encrypt files"),
+];
+
+/// Programs that only look.
+const PS_READ_PROGRAMS: &[&str] = &[
+    "hostname", "whoami", "ipconfig", "systeminfo", "tasklist", "netstat", "ping", "nslookup", "tracert", "route", "arp", "dir", "ls",
+    "type", "cat", "findstr", "where", "where.exe", "query", "quser", "gci", "gc", "gps", "gsv", "gwmi", "echo", "date",
+];
+
+/// Kinds of expressions that only compute something: strings, variables, numbers, .NET types such as [math].
+fn ps_expression(word: &str) -> bool {
+    let w = word.to_ascii_lowercase();
+    w.starts_with('"')
+        || w.starts_with('\'')
+        || (w.starts_with('$') && !w.contains('='))
+        || w.starts_with('(')
+        || w.starts_with('@')
+        || w.chars().next().is_some_and(|c| c.is_ascii_digit())
+        || ["[math]", "[datetime]", "[environment]", "[string]", "[int]", "[convert]", "[timespan]", "[system.environment]", "[version]"]
+            .iter()
+            .any(|t| w.starts_with(t))
+}
+
+/// What a PowerShell command line does: the same three answers as `classify`, by verbs instead of programs.
+pub fn classify_powershell(line: &str) -> Verdict {
+    let line = line.trim();
+    let lower = line.to_ascii_lowercase();
+    let mut effect = Effect::Reads;
+    let mut why = String::from("only reads");
+    let mut kind = String::new();
+    // Remove-Item with -Recurse removes a whole tree, as rm -rf does.
+    if (lower.contains("remove-item") || lower.starts_with("rm ") || lower.contains(" rm ") || lower.starts_with("rd ") || lower.starts_with("rmdir "))
+        && (lower.contains("-recurse") || lower.contains(" -r ") || lower.contains(" /s"))
+    {
+        return Verdict { effect: Effect::Dangerous, root: true, why: "removes files and folders without asking".into(), kind: "remove-item".into() };
+    }
+    for seg in segments(line) {
+        let ws = words(&seg);
+        let mut w: Vec<String> = ws.iter().map(|x| x.to_ascii_lowercase()).collect();
+        // $x = ... and $x=...: what matters is the right-hand side.
+        if w.first().is_some_and(|x| x.starts_with('$') && x.contains('=')) {
+            let rest = w[0].split_once('=').map(|(_, r)| r.to_string()).unwrap_or_default();
+            if rest.is_empty() {
+                w.remove(0);
+            } else {
+                w[0] = rest;
+            }
+        } else if w.len() > 1 && w[0].starts_with('$') && w[1] == "=" {
+            w.drain(..2);
+        }
+        let Some(first) = w.first().cloned() else { continue };
+        // Expressions are judged on the text as written (words() takes the quotes off); for $x = ..., the right side.
+        let mut raw = seg.trim_start();
+        if raw.starts_with('$') {
+            if let Some((l, r)) = raw.split_once('=') {
+                if l.split_whitespace().count() == 1 {
+                    raw = r.trim_start();
+                }
+            }
+        }
+        let expression = ps_expression(raw);
+        // Every cmdlet in the segment counts, also one inside ( ) or $( ).
+        let cmdlets: Vec<String> = seg
+            .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '.'))
+            .map(|t| t.to_ascii_lowercase())
+            .filter(|t| t.split_once('-').is_some_and(|(v, n)| !n.is_empty() && PS_VERBS.contains(&v)))
+            .collect();
+        for name in cmdlets.iter().chain(std::iter::once(&first)) {
+            if let Some((_, reason)) = PS_DANGEROUS.iter().find(|(n, _)| n == name) {
+                return Verdict { effect: Effect::Dangerous, root: true, why: reason.to_string(), kind: name.clone() };
+            }
+        }
+        if kind.is_empty() {
+            kind = cmdlets.first().cloned().unwrap_or_else(|| first.clone());
+        }
+        if effect != Effect::Reads {
+            continue;
+        }
+        let changing = cmdlets.iter().find(|c| {
+            let verb = c.split('-').next().unwrap_or("");
+            !PS_READ_VERBS.contains(&verb) || c.as_str() == "out-file"
+        });
+        if let Some(c) = changing {
+            effect = Effect::Changes;
+            why = format!("{c} can change the computer");
+        } else if cmdlets.is_empty() && !expression && !PS_READ_PROGRAMS.contains(&first.as_str()) {
+            effect = Effect::Changes;
+            why = format!("{first} can change the computer");
+        } else if seg.contains("::") && !expression {
+            effect = Effect::Changes;
+            why = "calls .NET directly, which cannot be checked".into();
+        }
+        // Methods on objects that stop, delete or change things.
+        if effect == Effect::Reads && [".delete(", ".kill(", ".stop(", ".remove(", ".set", ".write", ".create("].iter().any(|m| seg.to_ascii_lowercase().contains(m)) {
+            effect = Effect::Changes;
+            why = "calls a method that can change the computer".into();
+        }
+    }
+    // Writing into a file (but not into $null), and running code that cannot be read first.
+    let cleaned = lower.replace("2>&1", "").replace(">$null", "").replace("> $null", "").replace("2>$null", "");
+    let opaque = ["invoke-expression", "iex ", "-encodedcommand", "start-process", "[scriptblock]", "invoke-command"].iter().any(|x| lower.contains(x));
+    if (cleaned.contains('>') || opaque) && effect == Effect::Reads {
+        effect = Effect::Changes;
+        why = if opaque { "runs code that cannot be checked".into() } else { "writes into a file".into() };
+        kind.clear();
+    }
+    Verdict { effect, root: true, why, kind }
+}
+
 // ---- Running ----
 
 #[derive(Debug, Serialize, Default)]
@@ -426,6 +569,27 @@ mod tests {
 
     fn e(cmd: &str) -> Effect {
         classify(cmd).effect
+    }
+
+    #[test]
+    fn powershell() {
+        let p = |c: &str| classify_powershell(c).effect;
+        for c in [
+            "hostname; [Environment]::OSVersion.VersionString; (Get-Service qemu-ga).Status",
+            "$os=Get-CimInstance Win32_OperatingSystem; $u=(Get-Date)-$os.LastBootUpTime; \"Uptime: $($u.Days) days\"",
+            "Get-Volume -DriveLetter C | Select-Object Size,SizeRemaining | Format-Table -AutoSize",
+            "Get-EventLog -LogName System -Newest 20 | Where-Object { $_.EntryType -eq 'Error' } | Out-String -Width 200",
+            "ipconfig /all",
+            "Get-ChildItem C:/Windows/Temp | Measure-Object -Property Length -Sum",
+        ] {
+            assert_eq!(p(c), Effect::Reads, "{c}: {}", classify_powershell(c).why);
+        }
+        for c in ["Restart-Service Spooler", "Set-ItemProperty HKLM:/X -Name Y -Value 1", "Get-Process | Out-File C:/p.txt", "winget upgrade --all", "Stop-Process -Name notepad", "Invoke-Expression $x"] {
+            assert_eq!(p(c), Effect::Changes, "{c}");
+        }
+        for c in ["Restart-Computer -Force", "Remove-Item C:/Data -Recurse -Force", "Format-Volume -DriveLetter D", "Clear-Disk -Number 1 -RemoveData", "shutdown /r /t 0"] {
+            assert_eq!(p(c), Effect::Dangerous, "{c}");
+        }
     }
 
     #[test]

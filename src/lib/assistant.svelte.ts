@@ -429,12 +429,13 @@ class Assistant {
     }
     const command = (args.command ?? "").trim();
     if (!command) return "No command given.";
-    const verdict = await invoke<Verdict>("agent_classify", { command });
+    const guest = this.guestOf(t);
+    // Windows guests run PowerShell, which has its own rules.
+    const verdict = await invoke<Verdict>("agent_classify", { command, powershell: guest?.kind === "qemu" && !!guest.os?.startsWith("win") });
     const step: Step = { command, reason: args.reason ?? "", undo: args.undo ?? "", verdict, state: "asking" };
     msg.steps!.push(step);
     const s = msg.steps![msg.steps!.length - 1];
     // Inside a Proxmox guest every command runs as root; rules then belong to that guest, not the Proxmox host.
-    const guest = this.guestOf(t);
     if (guest) s.verdict.root = true;
     const host = guest ? `${guest.kind === "lxc" ? "container" : "VM"} ${guest.vmid} on ${guest.node}` : t.session!.host;
 

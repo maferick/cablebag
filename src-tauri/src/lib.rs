@@ -767,8 +767,12 @@ fn ai_redact(app: AppHandle, text: String) -> String {
 }
 
 #[tauri::command]
-fn agent_classify(command: String) -> agent::Verdict {
-    agent::classify(&command)
+fn agent_classify(command: String, powershell: Option<bool>) -> agent::Verdict {
+    if powershell == Some(true) {
+        agent::classify_powershell(&command)
+    } else {
+        agent::classify(&command)
+    }
 }
 
 /// Runs a command the assistant may run (the window decided with the classifier and the user's approval).
