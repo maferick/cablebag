@@ -6,6 +6,12 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.12.1 · 22 October 2026
+
+- **Disconnect no longer reports an error**: ending a remote desktop session with Disconnect said "An internal
+  error has occurred." with lines of test output under it. It now says you disconnected the session, and a
+  session ended on the remote computer says that.
+
 ## 0.12.0 · 22 October 2026
 
 **Edit remote files in Cablebag**

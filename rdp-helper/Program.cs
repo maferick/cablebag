@@ -179,6 +179,8 @@ class HostForm : Form, IMsTscAxEvents
     RdpAx? ax;
     IMsRdpClient9? rdp;
     bool connected;
+    // Set when the Disconnect button ended the session, so its end is not reported as an error.
+    bool userEnded;
     int lastW, lastH;
     readonly System.Windows.Forms.Timer resizeTimer = new() { Interval = 400 };
     JsonObject? pending;
@@ -302,7 +304,6 @@ class HostForm : Form, IMsTscAxEvents
                     {
                         Native.ShowWindow(Handle, Native.SW_HIDE);
                     }
-                    Out.Send("log", new { text = $"visible={Visible} ax={(ax == null ? "none" : $"{ax.Visible} {ax.Bounds}")} form={ClientSize} parent-ok={Native.GetAncestor(Handle, 1) == parentHwnd}" });
                     break;
                 case "connect":
                     Connect(cmd);
@@ -328,6 +329,7 @@ class HostForm : Form, IMsTscAxEvents
                     Out.Send("reply", new { req = S(cmd, "req"), skipped = TypeText(S(cmd, "text")) });
                     break;
                 case "disconnect":
+                    userEnded = true;
                     Disconnect();
                     break;
                 case "quit":
@@ -681,7 +683,13 @@ class HostForm : Form, IMsTscAxEvents
     {
         connected = false;
         string text = "";
-        try { text = rdp!.GetErrorDescription((uint)discReason, (uint)rdp.ExtendedDisconnectReason); } catch { }
+        // The plain reasons (1 local, 2 ended on the remote computer, 3 by the server) have no real error behind
+        // them; the control describes 1 as "An internal error has occurred."
+        if (userEnded || discReason == 1) text = "You disconnected the session.";
+        else if (discReason == 2) text = "The session was ended on the remote computer.";
+        else if (discReason == 3) text = "The remote computer ended the session.";
+        else try { text = rdp!.GetErrorDescription((uint)discReason, (uint)rdp.ExtendedDisconnectReason); } catch { }
+        userEnded = false;
         Out.Send("disconnected", new { code = discReason, text });
     }
     public void OnEnterFullScreenMode() { }
