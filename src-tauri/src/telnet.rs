@@ -125,15 +125,15 @@ async fn password(app: &AppHandle, session: &Session) -> Option<String> {
     let state = app.state::<AppState>();
     let item = session.data.get("vault_item").and_then(|v| v.as_str()).unwrap_or("");
     if !item.is_empty() {
-        return state.vw.login(app, item).await.ok().map(|(_, p)| p);
+        return state.creds.login(app, item).await.ok().map(|(_, p)| p);
     }
     let saved = { state.vault.password(&state.store.lock(), "telnet", &session.host, session.port, &session.username).ok().flatten() };
     if saved.is_some() {
         return saved;
     }
-    match state.vw.pick_login(app, "telnet", &session.host, &session.username, &session.name).await {
+    match state.creds.pick_login(app, "telnet", &session.host, &session.username, &session.name).await {
         Ok(Some((found, _, _, pw))) => {
-            crate::bitwarden::link_session(app, &session.id, &found);
+            crate::sources::link_session(app, &session.id, &found);
             Some(pw)
         }
         _ => None,

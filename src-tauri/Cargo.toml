@@ -82,6 +82,10 @@ windows-registry = "0.100"
 pageant = "0.2.4"
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[dev-dependencies]
+# A mock HTTP server for the CyberArk and Delinea client tests.
+wiremock = "0.6.5"
+
 [profile.release]
 codegen-units = 1
 lto = true

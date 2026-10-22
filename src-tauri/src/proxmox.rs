@@ -277,7 +277,7 @@ pub async fn connect(app: &AppHandle, id: &str) -> Result<Api> {
     let state = app.state::<AppState>();
 
     let (mut token_id, secret) = if !src.vault_item.is_empty() {
-        let (user, pw) = state.vw.login(app, &src.vault_item).await?;
+        let (user, pw) = state.creds.login(app, &src.vault_item).await?;
         (user, pw)
     } else {
         let saved = { state.vault.password(&state.store.lock(), "proxmox", &src.url, 0, &src.token_id).ok().flatten() };

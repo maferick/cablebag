@@ -297,7 +297,7 @@ async fn authenticate(h: &mut Handle, hop: &Hop, app: &AppHandle, out: &impl Sin
     let mut vault_password: Option<String> = None;
     let mut user = hop.user.trim().to_string();
     if !hop.vault_item.trim().is_empty() {
-        match state.vw.login(app, hop.vault_item.trim()).await {
+        match state.creds.login(app, hop.vault_item.trim()).await {
             Ok((vault_user, pw)) => {
                 if user.is_empty() {
                     user = vault_user;
@@ -318,7 +318,7 @@ async fn authenticate(h: &mut Handle, hop: &Hop, app: &AppHandle, out: &impl Sin
     let mut searched = !hop.vault_item.trim().is_empty();
     if user.is_empty() && !searched {
         searched = true;
-        if let Some((item, name, u, pw)) = state.vw.pick_login(app, "ssh", &host, "", &hop.name).await? {
+        if let Some((item, name, u, pw)) = state.creds.pick_login(app, "ssh", &host, "", &hop.name).await? {
             user = u;
             if !pw.is_empty() {
                 vault_password = Some(pw);
@@ -433,7 +433,7 @@ async fn authenticate(h: &mut Handle, hop: &Hop, app: &AppHandle, out: &impl Sin
         None => state.vault.password(&state.store.lock(), "ssh", &host, port, &user).ok().flatten(),
     };
     if saved.is_none() && !searched {
-        if let Some((item, name, _, pw)) = state.vw.pick_login(app, "ssh", &host, &user, &hop.name).await? {
+        if let Some((item, name, _, pw)) = state.creds.pick_login(app, "ssh", &host, &user, &hop.name).await? {
             if !pw.is_empty() {
                 out.info(&format!("Using the vault login \"{name}\"."));
                 saved = Some(pw);
@@ -444,7 +444,7 @@ async fn authenticate(h: &mut Handle, hop: &Hop, app: &AppHandle, out: &impl Sin
     // A login found in the vault that works gets linked to the session.
     let link = |found: &Option<(String, String)>| {
         if let Some((item, _)) = found {
-            crate::bitwarden::link_session(app, &hop.session_id, item);
+            crate::sources::link_session(app, &hop.session_id, item);
         }
     };
     if let Some(pw) = &saved {

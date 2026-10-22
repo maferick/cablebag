@@ -249,7 +249,7 @@ pub async fn open(app: AppHandle, id: String, session: Session, geo: Geometry) -
     let mut from_vw = None;
     let item = s(&session.data, "vault_item");
     if !item.is_empty() {
-        match state.vw.login(&app, &item).await {
+        match state.creds.login(&app, &item).await {
             Ok((u, pw)) => {
                 if user.is_empty() {
                     user = u;
@@ -267,13 +267,13 @@ pub async fn open(app: AppHandle, id: String, session: Session, geo: Geometry) -
     };
     // No linked login: the vault may still have one for this host.
     if saved.is_none() && item.is_empty() {
-        match state.vw.pick_login(&app, "rdp", &vault_host, &user, &session.name).await {
+        match state.creds.pick_login(&app, "rdp", &vault_host, &user, &session.name).await {
             Ok(Some((found, name, u, pw))) if !pw.is_empty() => {
                 if user.is_empty() {
                     user = u;
                 }
                 emit(&app, &id, "log", &format!("Using the vault login \"{name}\"."), Value::Null);
-                crate::bitwarden::link_session(&app, &session.id, &found);
+                crate::sources::link_session(&app, &session.id, &found);
                 saved = Some(pw);
             }
             Ok(_) => {}

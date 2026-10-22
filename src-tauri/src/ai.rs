@@ -94,7 +94,7 @@ pub fn has_key(app: &AppHandle, h: &Host) -> bool {
 async fn key_for(app: &AppHandle, h: &Host) -> Result<String> {
     let state = app.state::<AppState>();
     if !h.vault_item.is_empty() {
-        let (_, pw) = state.vw.login(app, &h.vault_item).await?;
+        let (_, pw) = state.creds.login(app, &h.vault_item).await?;
         return Ok(pw);
     }
     Ok(state.vault.password(&state.store.lock(), "ai", &h.base_url, 0, &h.id)?.unwrap_or_default())
@@ -186,7 +186,7 @@ fn known_secrets(app: &AppHandle) -> Vec<String> {
             }
         }
     }
-    out.extend(state.vw.known_passwords());
+    out.extend(state.creds.known_passwords());
     out.retain(|p| p.chars().count() >= 4);
     out.sort_by_key(|p| std::cmp::Reverse(p.len()));
     out.dedup();

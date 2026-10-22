@@ -155,15 +155,37 @@ export interface SyncResult {
   error: string;
 }
 
-export interface VaultStatus {
+/** The kinds of credential source. */
+export type SourceKind = "vaultwarden" | "cyberark" | "delinea";
+
+/** A credential source as set up in Settings. No secrets: this syncs. */
+export interface SourceConfig {
+  id: string;
+  name: string;
+  kind: SourceKind;
+  /** The vault, PVWA or Privilege Cloud, or Secret Server address. */
+  url: string;
+  /** The vault's email address, or the user name to sign in with (empty for single sign-on). */
+  account: string;
+  /** What else the kind needs, such as the sign-in method; each kind has its own keys. */
+  options: Record<string, any>;
+}
+
+/** A source with its state. */
+export interface SourceStatus extends SourceConfig {
   configured: boolean;
+  /** Open (Vaultwarden) or signed in (CyberArk, Secret Server). */
   unlocked: boolean;
+  /** This PC keeps something that opens it again after a restart. */
   remembered: boolean;
-  hello: boolean;
-  server: string;
-  email: string;
   items: number;
   synced: number;
+  /** More logins exist than were loaded: searching asks the server. */
+  partial: boolean;
+  /** Logins checked out to you, to check in again. */
+  checked_out: { id: string; name: string }[];
+  /** One line about the sign-in. */
+  detail: string;
 }
 
 export interface ProxmoxSource {
@@ -250,11 +272,16 @@ export interface ProxmoxTask {
 }
 
 export interface VaultItem {
+  /** The reference sessions keep: "source:item", or a bare id for the first vault. */
   id: string;
+  /** The id of the source it comes from. */
+  source: string;
   name: string;
   username: string;
   uris: string[];
+  /** The vault folder, the CyberArk safe or the Secret Server folder. */
   folder: string;
+  /** The Bitwarden organization, the CyberArk platform or the Secret Server template. */
   organization: string;
   has_password: boolean;
 }
@@ -366,13 +393,18 @@ export const api = {
   rdpClose: (id: string) => invoke<void>("rdp_close", { id }),
   /** A picture of the remote screen as it shows now (a JPEG data URL). */
   rdpSnapshot: (id: string) => invoke<string>("rdp_snapshot", { id }),
-  vaultStatus: () => invoke<VaultStatus>("vault_status"),
-  vaultConfigure: (server: string, email: string) => invoke<void>("vault_configure", { server, email }),
-  vaultUnlock: () => invoke<void>("vault_unlock"),
-  vaultSync: () => invoke<void>("vault_sync"),
-  vaultLock: () => invoke<void>("vault_lock"),
+  sources: () => invoke<SourceStatus[]>("sources_list"),
+  sourcesHello: () => invoke<boolean>("sources_hello"),
+  sourceSave: (source: SourceConfig) => invoke<SourceConfig>("source_save", { source }),
+  sourceDelete: (id: string) => invoke<void>("source_delete", { id }),
+  sourcesReorder: (ids: string[]) => invoke<void>("sources_reorder", { ids }),
+  sourceUnlock: (id: string) => invoke<void>("source_unlock", { id }),
+  sourceSync: (id: string) => invoke<void>("source_sync", { id }),
+  sourceLock: (id: string) => invoke<void>("source_lock", { id }),
+  sourceCheckIn: (item: string) => invoke<void>("source_check_in", { item }),
+  sourceForget: (id: string) => invoke<void>("source_forget", { id }),
   vaultItems: () => invoke<VaultItem[]>("vault_items"),
-  vaultForget: () => invoke<void>("vault_forget"),
+  vaultSearch: (query: string) => invoke<VaultItem[]>("vault_search", { query }),
   syncNow: () => invoke<SyncResult>("sync_now"),
   syncConfigure: (c: { kind: string; url: string; repo: string; vaultItem: string; token?: string; encrypt: string; passphrase?: string }) =>
     invoke<void>("sync_configure", { ...c, token: c.token || null, passphrase: c.passphrase || null }),

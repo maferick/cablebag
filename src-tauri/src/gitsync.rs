@@ -1,4 +1,4 @@
-//! Sync through git: folders, sessions, macros, tunnels and Proxmox servers kept in a private git
+//! Sync through git: folders, sessions, macros, tunnels, Proxmox servers and credential sources kept in a private git
 //! repository (Gitea or Forgejo, GitHub, GitLab, or any other through the git program), so every PC has
 //! the same set and the repository keeps the history. The files are encrypted by default. Passwords
 //! never go there: they stay in the vault or in Cablebag's own encrypted store on each PC.
@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use tauri::{AppHandle, Emitter, Manager};
 
 /// What is synced: collection name, file in the repository.
-const FILES: [(&str, &str); 8] = [
+const FILES: [(&str, &str); 9] = [
     ("folders", "folders.json"),
     ("sessions", "sessions.json"),
     ("macros", "macros.json"),
@@ -26,6 +26,7 @@ const FILES: [(&str, &str); 8] = [
     ("memory", "memory.json"),
     ("workspaces", "workspaces.json"),
     ("wireguard", "wireguard.json"),
+    ("sources", "sources.json"),
 ];
 
 /// Settings that hold the synced lists.
@@ -37,6 +38,7 @@ fn setting_key(collection: &str) -> Option<&'static str> {
         "memory" => Some("ai.memory"),
         "workspaces" => Some("workspaces"),
         "wireguard" => Some("wireguard.profiles"),
+        "sources" => Some(crate::sources::SETTING),
         _ => None,
     }
 }
@@ -80,6 +82,7 @@ fn item_kind(collection: &str) -> &'static str {
         "memory" => "memory note",
         "workspaces" => "workspace",
         "wireguard" => "WireGuard network",
+        "sources" => "credential source",
         _ => "item",
     }
 }
@@ -344,7 +347,7 @@ fn encode(items: &[Value], key: Option<&[u8; 32]>, before: Option<&Stored>) -> R
 }
 
 /// The key the files are encrypted with, or None when encryption is off.
-/// "vault": derived from the Vaultwarden account key, the same on every PC that unlocks that vault.
+/// "vault": derived from the account key of a Vaultwarden source, the same on every PC that unlocks that vault.
 /// "passphrase": derived from a passphrase typed on each PC.
 async fn sync_key(app: &AppHandle) -> Result<Option<[u8; 32]>> {
     let state = app.state::<AppState>();
@@ -365,10 +368,8 @@ async fn sync_key(app: &AppHandle) -> Result<Option<[u8; 32]>> {
             Ok(Some(key))
         }
         _ => {
-            if !state.vw.is_unlocked() {
-                state.vw.unlock_interactive(app).await.map_err(|e| anyhow!("The sync is encrypted with a key from the vault, so it needs the vault: {e}"))?;
-            }
-            state.vw.derived_key("traxterm-sync-v1").map(Some).ok_or_else(|| anyhow!("The vault is locked."))
+            let key = state.creds.derived_key(app, "traxterm-sync-v1").await;
+            key.map(Some).map_err(|e| anyhow!("The sync is encrypted with a key from the vault, so it needs the vault: {e}"))
         }
     }
 }
@@ -379,7 +380,7 @@ async fn token(app: &AppHandle, url: &str) -> Result<String> {
     let state = app.state::<AppState>();
     let item = setting(app, "sync.vault_item");
     if !item.is_empty() {
-        let (_, pw) = state.vw.login(app, &item).await?;
+        let (_, pw) = state.creds.login(app, &item).await?;
         if !pw.is_empty() {
             return Ok(pw);
         }
@@ -419,6 +420,8 @@ pub fn has_passphrase(app: &AppHandle) -> bool {
 pub async fn sync(app: &AppHandle) -> Result<SyncResult> {
     let state = app.state::<AppState>();
     let _one = state.sync_lock.lock().await;
+    // The old single vault becomes a source before the list of sources is synced.
+    crate::sources::configs(app);
     let mut last = Err(anyhow!("not run"));
     for _ in 0..2 {
         last = sync_once(app).await;

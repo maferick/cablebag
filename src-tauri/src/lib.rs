@@ -1,6 +1,5 @@
 mod agent;
 mod ai;
-mod bitwarden;
 mod browser;
 mod files;
 mod ftp;
@@ -14,6 +13,7 @@ mod proxmox;
 mod pty;
 mod rdp;
 mod serial;
+mod sources;
 mod ssh;
 mod store;
 mod telnet;
@@ -46,7 +46,7 @@ pub struct AppState {
     pub tunnels: Arc<tunnels::Tunnels>,
     pub scans: Arc<nettools::Scans>,
     pub keys: keygen::Keys,
-    pub vw: bitwarden::Vaultwarden,
+    pub creds: sources::Sources,
     pub vncs: Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<vnc::VncCmd>>>,
     /// One Gitea sync at a time.
     pub sync_lock: tokio::sync::Mutex<()>,
@@ -671,36 +671,56 @@ async fn key_install(app: AppHandle, state: State<'_, AppState>, id: String, ses
 }
 
 #[tauri::command]
-fn vault_status(app: AppHandle, state: State<AppState>) -> bitwarden::VaultStatus {
-    state.vw.status(&app)
+fn sources_list(app: AppHandle, state: State<AppState>) -> Vec<sources::SourceStatus> {
+    state.creds.status(&app)
+}
+
+/// Windows Hello can confirm it is you before a kept vault key is used.
+#[tauri::command]
+fn sources_hello() -> bool {
+    sources::vaultwarden::hello_available()
 }
 
 #[tauri::command]
-fn vault_configure(app: AppHandle, state: State<AppState>, server: String, email: String) -> CmdResult<()> {
-    let server = server.trim().trim_end_matches('/').to_string();
-    let server = if server.starts_with("http://") || server.starts_with("https://") { server } else { format!("https://{server}") };
-    state.vw.lock();
-    // Another server or account: the key this PC kept belongs to the old one.
-    bitwarden::forget(&app);
-    let store = state.store.lock();
-    store.set_setting("vault.server", &serde_json::Value::String(server)).map_err(err)?;
-    store.set_setting("vault.email", &serde_json::Value::String(email.trim().to_string())).map_err(err)?;
+async fn source_save(app: AppHandle, state: State<'_, AppState>, source: sources::SourceConfig) -> CmdResult<sources::SourceConfig> {
+    state.creds.save(&app, source).await.map_err(err)
+}
+
+#[tauri::command]
+async fn source_delete(app: AppHandle, state: State<'_, AppState>, id: String) -> CmdResult<()> {
+    state.creds.delete(&app, &id).await.map_err(err)
+}
+
+#[tauri::command]
+fn sources_reorder(app: AppHandle, state: State<AppState>, ids: Vec<String>) -> CmdResult<()> {
+    state.creds.reorder(&app, &ids).map_err(err)
+}
+
+#[tauri::command]
+async fn source_unlock(app: AppHandle, state: State<'_, AppState>, id: String) -> CmdResult<()> {
+    state.creds.unlock(&app, &id).await.map_err(err)
+}
+
+#[tauri::command]
+async fn source_sync(app: AppHandle, state: State<'_, AppState>, id: String) -> CmdResult<()> {
+    state.creds.sync(&app, &id).await.map_err(err)
+}
+
+#[tauri::command]
+async fn source_lock(app: AppHandle, state: State<'_, AppState>, id: String) -> CmdResult<()> {
+    state.creds.lock(&app, &id).await;
     Ok(())
 }
 
 #[tauri::command]
-async fn vault_unlock(app: AppHandle, state: State<'_, AppState>) -> CmdResult<()> {
-    state.vw.unlock_interactive(&app).await.map_err(err)
+async fn source_check_in(app: AppHandle, state: State<'_, AppState>, item: String) -> CmdResult<()> {
+    state.creds.check_in(&app, &item).await.map_err(err)
 }
 
+/// Stops keeping what opens a source on this PC; the next unlock asks again.
 #[tauri::command]
-async fn vault_sync(state: State<'_, AppState>) -> CmdResult<()> {
-    state.vw.sync().await.map_err(err)
-}
-
-#[tauri::command]
-fn vault_lock(state: State<AppState>) {
-    state.vw.lock();
+fn source_forget(app: AppHandle, state: State<AppState>, id: String) {
+    state.creds.forget_kept(&app, &id);
 }
 
 #[tauri::command]
@@ -757,21 +777,22 @@ fn sync_has_token(app: AppHandle) -> bool {
     gitsync::has_token(&app)
 }
 
-/// Which vault logins fit a host, best first (names and user names only).
+/// Which loaded logins fit a host, best first (names and user names only).
 #[tauri::command]
-fn vault_find(state: State<AppState>, kind: String, host: String, user: String, name: String) -> Vec<bitwarden::VaultItem> {
-    state.vw.candidates(&kind, &host, &user, &name)
+fn vault_find(app: AppHandle, state: State<AppState>, kind: String, host: String, user: String, name: String) -> Vec<sources::Item> {
+    state.creds.candidates(&app, &kind, &host, &user, &name)
 }
 
-/// Stops keeping the vault key on this PC; the next unlock needs the master password.
+/// The loaded logins of every open source.
 #[tauri::command]
-fn vault_forget(app: AppHandle) {
-    bitwarden::forget(&app);
+fn vault_items(app: AppHandle, state: State<AppState>) -> Vec<sources::Item> {
+    state.creds.items(&app)
 }
 
+/// Logins that match the words, asking the servers of sources that did not load everything.
 #[tauri::command]
-fn vault_items(state: State<AppState>) -> Vec<bitwarden::VaultItem> {
-    state.vw.items()
+async fn vault_search(app: AppHandle, state: State<'_, AppState>, query: String) -> CmdResult<Vec<sources::Item>> {
+    Ok(state.creds.search(&app, &query).await)
 }
 
 #[tauri::command]
@@ -1013,7 +1034,7 @@ pub fn run() {
             tunnels: Arc::new(tunnels::Tunnels::default()),
             scans: Arc::new(nettools::Scans::default()),
             keys: keygen::Keys::default(),
-            vw: bitwarden::Vaultwarden::default(),
+            creds: sources::Sources::default(),
             vncs: Mutex::new(HashMap::new()),
             sync_lock: tokio::sync::Mutex::new(()),
             ftps: ftp::Ftps::default(),
@@ -1104,13 +1125,18 @@ pub fn run() {
             vnc_input,
             vnc_close,
             files_open,
-            vault_status,
-            vault_configure,
-            vault_unlock,
-            vault_sync,
-            vault_lock,
-            vault_forget,
+            sources_list,
+            sources_hello,
+            source_save,
+            source_delete,
+            sources_reorder,
+            source_unlock,
+            source_sync,
+            source_lock,
+            source_check_in,
+            source_forget,
             vault_find,
+            vault_search,
             sync_now,
             sync_configure,
             sync_has_token,
@@ -1163,6 +1189,15 @@ pub fn run() {
             rdp_command,
             rdp_close,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Cablebag");
+        .build(tauri::generate_context!())
+        .expect("error while running Cablebag")
+        .run(|app, event| {
+            // Sign out of CyberArk and Secret Server and check in what was checked out, without holding up the exit long.
+            if let tauri::RunEvent::Exit = event {
+                let app = app.clone();
+                tauri::async_runtime::block_on(async move {
+                    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), app.state::<AppState>().creds.lock_all(&app)).await;
+                });
+            }
+        });
 }

@@ -269,7 +269,7 @@ pub async fn own_public_key(app: &AppHandle, id: &str) -> Result<String> {
     let private = if p.vault_item.is_empty() {
         saved_key(app, id, "private").ok_or_else(|| anyhow!("Cablebag has no private key for {}.", p.name))?
     } else {
-        app.state::<AppState>().vw.login(app, &p.vault_item).await?.1
+        app.state::<AppState>().creds.login(app, &p.vault_item).await?.1
     };
     let public = public_of(&private);
     if public.is_empty() {
@@ -398,7 +398,7 @@ pub async fn tunnel(app: &AppHandle, id: &str) -> Result<Arc<Tunnel>> {
     }
     let p = profile(app, id)?;
     let private = if !p.vault_item.is_empty() {
-        state.vw.login(app, &p.vault_item).await?.1
+        state.creds.login(app, &p.vault_item).await?.1
     } else {
         match saved_key(app, id, "private") {
             Some(k) => k,
