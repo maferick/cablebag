@@ -1,4 +1,4 @@
-# Weekly update pull requests, grouped so a week brings a handful of PRs instead of one per package.
+# Weekly update pull requests for minor and patch versions, grouped so a week brings a handful of PRs.
 # Security fixes come separately, as soon as an advisory is out (Dependabot security updates are on).
 version: 2
 updates:
@@ -8,6 +8,10 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    # Major versions need code changes and are upgraded on purpose, not by a weekly PR.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       rust-minor-and-patch:
         update-types: [minor, patch]
@@ -18,6 +22,9 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       npm-minor-and-patch:
         update-types: [minor, patch]
