@@ -103,7 +103,7 @@ writeFileSync(join(bundle, "latest.json"), JSON.stringify(latest, null, 2) + "\n
 
 // 5. The programs too, then out.
 step("Publish");
-run("node", ["scripts/scan-private.mjs", "src-tauri/target/release/cablebag.exe", "rdp-helper/publish/cablebag-rdp.exe", "build", join(bundle, setup), join(bundle, "latest.json")]);
+run("node", ["scripts/scan-private.mjs", "src-tauri/target/release/cablebag.exe", "rdp-helper/publish/cablebag-rdp.exe", "build", "--packed", join(bundle, setup), join(bundle, "latest.json")]);
 if (dry) {
   console.log(`\nDry run done: ${join(bundle, setup)} and latest.json are ready; the commit and tag v${version} are local. Nothing was pushed.`);
   process.exit(0);
