@@ -9,6 +9,7 @@ mod gitsync;
 mod importers;
 mod keygen;
 mod nettools;
+mod own;
 mod prompt;
 mod proxmox;
 mod pty;
