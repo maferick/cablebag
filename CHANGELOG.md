@@ -6,6 +6,45 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.16.0 · 23 October 2026
+
+**Credential sources: several vaults, CyberArk and Delinea**
+
+- **Settings, Credential sources** (was "Vault (Vaultwarden)"): as many sources as you like, side by side, such
+  as a Vaultwarden for work and one for home. Your existing vault becomes the first source by itself; nothing
+  to set up again, and every login already linked keeps working.
+- **CyberArk** (Privilege Cloud or your own PVWA) and **Delinea Secret Server** as new kinds of source:
+  sign in (single sign-on included), look up logins, give a reason or ticket when a safe asks for one, and
+  check logins out and in. Built from the official documentation; please tell us how it works with yours.
+- **Through CyberArk PSM**: SSH and SFTP through PSM for SSH, Remote Desktop through PSM, per session or for a
+  whole folder.
+- The login picker shows the logins of every open source, grouped by source.
+
+**New session types and options**
+
+- **PowerShell remoting (WinRM)**: a remote PowerShell on a Windows server in a terminal tab, with the login
+  from your vault. Windows' own PowerShell does the connecting; the password never shows on screen or on a
+  command line.
+- **Linux windows on this PC (X11)**: an SSH option that shows the windows of Linux programs on your desktop.
+  The X server (VcXsrv) now comes with Cablebag and starts by itself when needed, which makes the installer
+  larger (about 47 MB).
+
+**Easier to use**
+
+- **Report a problem**, in Settings, About Cablebag, the search box and error messages: describe what happened
+  and GitHub's bug form opens filled in, after Cablebag has hidden anything that looks like a password or key.
+  You check and submit it on GitHub yourself.
+- **Keyboard and screen readers**: dialogs close with Escape and keep the focus inside, menus open with the
+  context menu key or Shift+F10 and work with the arrow keys, the tabs and the session tree follow the arrow
+  keys, keyboard focus is always visible, the sidebar width can be changed by keyboard, and the terminal has
+  a "Screen reader support" setting. Fewer animations when Windows asks for that. See
+  [ACCESSIBILITY.md](ACCESSIBILITY.md).
+
+**Safer**
+
+- The WireGuard ports on this PC (the web proxy and the forwards for Remote Desktop, VNC and telnet) now only
+  let in Cablebag's own programs; other programs on your PC are refused.
+
 ## 0.15.3 · 23 October 2026
 
 - **Send to all ends by itself**: it switches off as soon as fewer than two terminals are open, so closing your
