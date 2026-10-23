@@ -64,6 +64,19 @@ jobs:
         if: runner.os == 'Windows'
         run: npm run build:rdp
 
+      # The Windows bundle also lists the X server (../xserver/vcxsrv/), fetched from its official release and
+      # checked against the checksum in scripts/xserver.json; the download is cached between runs.
+      - name: Cache the X server download (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v6
+        with:
+          path: xserver/cache
+          key: xserver-${{ hashFiles('scripts/xserver.json') }}
+
+      - name: Fetch the X server (Windows)
+        if: runner.os == 'Windows'
+        run: npm run build:xserver
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 

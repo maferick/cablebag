@@ -8,6 +8,27 @@ is available from the linked projects.
 The Remote Desktop helper uses only the .NET runtime (MIT) and the Remote Desktop control that is part of
 Windows. The window uses Microsoft Edge WebView2, which is part of Windows.
 
+## Programs shipped with Cablebag
+
+To show windows of Linux programs from SSH sessions (X11 forwarding), the Windows version comes with the X server
+VcXsrv 21.1.16.1, in the folder vcxsrv next to Cablebag. It is a separate program, shipped
+unchanged from its official release: Cablebag only starts it and talks to it over the X protocol. VcXsrv is
+free software under the GNU General Public License version 3 (GPL-3.0); its licence text is in
+vcxsrv\COPYING, and its components (such as the X.Org server, Mesa, FreeType and OpenSSL) carry their own
+notices in its source code. The licence of Cablebag does not apply to it: you may use, copy, change and pass it
+on under the terms of the GPL.
+
+The complete corresponding source code of VcXsrv 21.1.16.1 is at https://github.com/marchaesen/vcxsrv/tree/21.1.16.1
+(archive: https://github.com/marchaesen/vcxsrv/archive/refs/tags/21.1.16.1.tar.gz). For at least three years after the last Cablebag release that
+contains this version, a copy of that source code is also available from the Cablebag maintainer at no charge
+beyond the cost of providing it: ask in an issue at https://github.com/maferick/cablebag/issues.
+
+| Program | Version | Licence | Where |
+| --- | --- | --- | --- |
+| VcXsrv | 21.1.16.1 | GPL-3.0 | https://github.com/marchaesen/vcxsrv |
+
+## Components built into Cablebag
+
 | Component | Version | Licence | Where |
 | --- | --- | --- | --- |
 | @jridgewell/gen-mapping (JavaScript) | 0.3.13 | MIT | https://www.npmjs.com/package/@jridgewell/gen-mapping |

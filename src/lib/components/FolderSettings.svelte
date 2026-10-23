@@ -77,6 +77,10 @@
         {#if !d.jump_hosts.length && from("jump_hosts")}<span class="muted small">{from("jump_hosts")}</span>{/if}
       </div>
     </div>
+    <label class="check" title="SSH sessions in this folder show the windows of Linux programs on this PC, unless a session says otherwise.">
+      <input type="checkbox" checked={!!(d.x11 ?? above.values.x11)} onchange={(e) => (d.x11 = (e.target as HTMLInputElement).checked)} />
+      Show Linux windows on this PC (X11, SSH){#if d.x11 === undefined && from("x11")}<span class="muted small">From {above.from.x11}</span>{/if}
+    </label>
     <label class="field"><span>Tab colour</span>
       <select bind:value={d.tab_color}>
         {#each TAB_COLORS as c}<option value={c.value}>{c.value ? c.name : above.values.tab_color ? `Same as above` : c.name}</option>{/each}

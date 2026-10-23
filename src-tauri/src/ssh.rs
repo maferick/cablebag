@@ -1,5 +1,5 @@
 //! SSH sessions: connection (optionally through jump hosts), host key checks, login,
-//! the interactive terminal, and SFTP on the same connection for the file browser.
+//! the interactive terminal, X11 forwarding (see x11.rs), and SFTP on the same connection for the file browser.
 
 use crate::prompt::{button, field, PromptRequest};
 use crate::store::{now, KnownHost, Session};
@@ -26,9 +26,12 @@ pub struct SshConn {
     sftp: tokio::sync::Mutex<Option<Arc<SftpSession>>>,
     /// Remote port forwards: server port -> local destination.
     pub forwards: Forwards,
+    /// The X11 forwarding of the session, while it shows Linux windows on this PC.
+    x11: X11Slot,
 }
 
 pub type Forwards = Arc<parking_lot::Mutex<std::collections::HashMap<u32, (String, u16)>>>;
+type X11Slot = Arc<parking_lot::Mutex<Option<Arc<crate::x11::Forward>>>>;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Hop {
@@ -66,6 +69,7 @@ pub struct Client {
     port: u16,
     forwards: Forwards,
     agent_forward: bool,
+    x11: X11Slot,
 }
 
 /// One forwarded agent channel: the bytes go to the Windows OpenSSH agent or to Pageant, as switched on in
@@ -115,6 +119,25 @@ impl client::Handler for Client {
         }
         reply.accept().await;
         tokio::spawn(serve_agent(self.app.clone(), channel));
+        Ok(())
+    }
+
+    /// A program on the server opens a window: only when this session asked for X11 forwarding.
+    async fn server_channel_open_x11(
+        &mut self,
+        channel: russh::Channel<client::Msg>,
+        _originator_address: &str,
+        _originator_port: u32,
+        reply: client::ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        let fwd = self.x11.lock().clone();
+        let Some(fwd) = fwd else {
+            reply.reject(russh::ChannelOpenFailure::AdministrativelyProhibited).await;
+            return Ok(());
+        };
+        reply.accept().await;
+        tokio::spawn(fwd.serve(channel));
         Ok(())
     }
 
@@ -567,6 +590,8 @@ pub async fn connect_chain(app: &AppHandle, hops: &[Hop], keepalive: bool, out: 
     let forwards: Forwards = Default::default();
     let mut prev: Option<Arc<Handle>> = None;
     let mut jumps = Vec::new();
+    // Only the server itself (the last hop) gets to open X11 channels.
+    let mut x11 = X11Slot::default();
     for (i, hop) in hops.iter().enumerate() {
         let via = if i + 1 < hops.len() { " (jump host)" } else { "" };
         if i == 0 && !hop.via_wg.is_empty() {
@@ -577,7 +602,15 @@ pub async fn connect_chain(app: &AppHandle, hops: &[Hop], keepalive: bool, out: 
             }
         }
         out.info(&format!("Connecting to {}:{}{}...", hop.host, hop.port, via));
-        let handler = Client { app: app.clone(), host: hop.host.clone(), port: hop.port, forwards: forwards.clone(), agent_forward: hop.agent_forward };
+        x11 = X11Slot::default();
+        let handler = Client {
+            app: app.clone(),
+            host: hop.host.clone(),
+            port: hop.port,
+            forwards: forwards.clone(),
+            agent_forward: hop.agent_forward,
+            x11: x11.clone(),
+        };
         let fut = async {
             match &prev {
                 None if !hop.via_wg.is_empty() => {
@@ -604,7 +637,7 @@ pub async fn connect_chain(app: &AppHandle, hops: &[Hop], keepalive: bool, out: 
         prev = Some(Arc::new(h));
     }
     let handle = prev.ok_or_else(|| anyhow!("no host to connect to"))?;
-    Ok(SshConn { handle, _jumps: jumps, sftp: tokio::sync::Mutex::new(None), forwards })
+    Ok(SshConn { handle, _jumps: jumps, sftp: tokio::sync::Mutex::new(None), forwards, x11 })
 }
 
 fn str_of(v: &Value, k: &str) -> String {
@@ -664,6 +697,7 @@ pub async fn run_terminal(
     };
     let state = app.state::<AppState>();
     state.ssh.lock().insert(id.clone(), conn.clone());
+    let x11 = bool_of(&session.data, "x11", false).then(|| crate::x11::Forward::new(app.clone(), out.clone()));
 
     let result: Result<()> = async {
         let mut channel = conn.handle.channel_open_session().await?;
@@ -673,6 +707,9 @@ pub async fn run_terminal(
         };
         if bool_of(&session.data, "agent_forward", false) {
             channel.agent_forward(false).await?;
+        }
+        if let Some(fwd) = &x11 {
+            request_x11(&mut channel, &conn, fwd, &out).await?;
         }
         channel.request_pty(false, &term_type, cols as u32, rows as u32, 0, 0, &[]).await?;
         channel.request_shell(true).await?;
@@ -711,6 +748,10 @@ pub async fn run_terminal(
     .await;
 
     state.ssh.lock().remove(&id);
+    conn.x11.lock().take();
+    if let Some(fwd) = &x11 {
+        fwd.release().await;
+    }
     let _ = conn.handle.disconnect(Disconnect::ByApplication, "", "en").await;
     match result {
         Ok(()) => {
@@ -722,6 +763,33 @@ pub async fn run_terminal(
             out.status("closed", &e.to_string());
         }
     }
+}
+
+/// Asks the server to forward X11 for this session, and waits for its answer: a server that does not allow it
+/// leaves the session as it is, with a line saying why.
+async fn request_x11(channel: &mut russh::Channel<client::Msg>, conn: &SshConn, fwd: &Arc<crate::x11::Forward>, out: &TermOut) -> Result<()> {
+    *conn.x11.lock() = Some(fwd.clone());
+    channel.request_x11(true, false, crate::x11::PROTOCOL, fwd.fake_cookie(), 0).await?;
+    let answer = tokio::time::timeout(Duration::from_secs(15), async {
+        loop {
+            match channel.wait().await {
+                Some(ChannelMsg::Success) => return Some(true),
+                Some(ChannelMsg::Failure) => return Some(false),
+                None => return None,
+                _ => {}
+            }
+        }
+    })
+    .await;
+    match answer {
+        Ok(Some(true)) => {}
+        Ok(Some(false)) | Err(_) => {
+            conn.x11.lock().take();
+            out.info("This server does not allow showing Linux windows on this PC (X11Forwarding is off in its SSH server settings).");
+        }
+        Ok(None) => bail!("The connection to the server was lost."),
+    }
+    Ok(())
 }
 
 struct StatusSink {

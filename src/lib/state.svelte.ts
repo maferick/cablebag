@@ -114,6 +114,7 @@ export const FOLDER_DEFAULTS: { key: string; label: string; kinds: string[] }[] 
   { key: "vault_item", label: "vault login", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet", "ftp"] },
   { key: "jump_hosts", label: "jump hosts", kinds: ["ssh", "sftp"] },
   { key: "wireguard", label: "WireGuard network", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet", "browser"] },
+  { key: "x11", label: "Linux windows on this PC", kinds: ["ssh"] },
   { key: "tab_color", label: "tab colour", kinds: [] },
 ];
 

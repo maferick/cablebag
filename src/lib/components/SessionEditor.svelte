@@ -63,12 +63,12 @@
   // What the session's folder gives it where it has no value of its own.
   const folderValues = $derived(app.folderDefaults(s.folder_id));
   const inherited = $derived(
-    FOLDER_DEFAULTS.filter((d) => d.key in folderValues.values && (!d.kinds.length || d.kinds.includes(s.kind)))
+    FOLDER_DEFAULTS.filter((d) => d.key in folderValues.values && (!d.kinds.length || d.kinds.includes(s.kind)) && folderValues.values[d.key] !== false)
       .filter((d) => (d.key === "username" ? !s.username : !(Array.isArray(s.data[d.key]) ? s.data[d.key].length : s.data[d.key])))
       .map((d) => {
         const v = folderValues.values[d.key];
         const shown =
-          d.key === "jump_hosts" ? v.map((j: any) => j.host).join(", ") : d.key === "vault_item" ? "set" : d.key === "tab_color" ? "" : d.key === "wireguard" ? wireguard.name(v) : v;
+          d.key === "jump_hosts" ? v.map((j: any) => j.host).join(", ") : d.key === "vault_item" ? "set" : d.key === "tab_color" || d.key === "x11" ? "" : d.key === "wireguard" ? wireguard.name(v) : v;
         return `${d.label}${shown ? ` ${shown}` : ""} (${folderValues.from[d.key]})`;
       }),
   );
@@ -355,7 +355,7 @@
         <label class="check"><input type="checkbox" checked={s.data.keepalive !== false} onchange={(e) => (s.data.keepalive = (e.target as HTMLInputElement).checked)} /> Keep the connection alive when idle</label>
         <label class="check" title="The server can use the keys in Pageant or the Windows OpenSSH agent while you are connected, for example to log in further from there. Only for servers you trust."><input type="checkbox" bind:checked={s.data.agent_forward} /> Forward your SSH agent (only to servers you trust)</label>
         <label class="check"><input type="checkbox" checked={s.data.stay_after_command !== false} onchange={(e) => (s.data.stay_after_command = (e.target as HTMLInputElement).checked)} /> Stay logged in after the command ends</label>
-        <label class="check" title="Cablebag has no X server yet, so programs with windows cannot be shown"><input type="checkbox" disabled checked={!!s.data.x11} /> X11 forwarding <em class="soon">not available yet</em></label>
+        <label class="check" title="Programs with windows that you start on the server, such as a graphical editor, open as windows on this PC. The server needs X11 forwarding switched on and the xauth program installed."><input type="checkbox" checked={!!(s.data.x11 ?? folderValues.values.x11)} onchange={(e) => (s.data.x11 = (e.target as HTMLInputElement).checked)} /> Show Linux windows on this PC (X11)</label>
       </div>
       <label class="field"><span>Terminal type reported to the server</span>
         <select bind:value={s.data.term_type}>
@@ -603,11 +603,6 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px 16px;
-  }
-  .soon {
-    font-style: normal;
-    font-size: 11px;
-    color: var(--faint);
   }
   .jumps {
     border: 1px solid var(--border);
