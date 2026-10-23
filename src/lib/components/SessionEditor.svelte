@@ -378,9 +378,9 @@
             <input bind:value={j.user} placeholder="User" class="small" />
             <input type="number" bind:value={j.port} class="tiny" />
             <input bind:value={j.key_path} placeholder="Key file (optional)" />
-            <button class="icon-btn" title="Move up" disabled={i === 0} onclick={() => moveJump(i, -1)}><ArrowUp size={14} /></button>
-            <button class="icon-btn" title="Move down" disabled={i === s.data.jump_hosts.length - 1} onclick={() => moveJump(i, 1)}><ArrowDown size={14} /></button>
-            <button class="icon-btn" title="Remove" onclick={() => (s.data.jump_hosts = s.data.jump_hosts.filter((_: unknown, x: number) => x !== i))}><Trash2 size={14} /></button>
+            <button class="icon-btn" title="Move up" aria-label="Move up" disabled={i === 0} onclick={() => moveJump(i, -1)}><ArrowUp size={14} /></button>
+            <button class="icon-btn" title="Move down" aria-label="Move down" disabled={i === s.data.jump_hosts.length - 1} onclick={() => moveJump(i, 1)}><ArrowDown size={14} /></button>
+            <button class="icon-btn" title="Remove" aria-label="Remove" onclick={() => (s.data.jump_hosts = s.data.jump_hosts.filter((_: unknown, x: number) => x !== i))}><Trash2 size={14} /></button>
           </div>
         {/each}
       </div>

@@ -69,9 +69,9 @@
 
 <div class="browser" style:display={visible ? "flex" : "none"}>
   <div class="bar">
-    <button class="icon-btn" title="Back" onclick={() => go("back")}><ArrowLeft size={15} /></button>
-    <button class="icon-btn" title="Forward" onclick={() => go("forward")}><ArrowRight size={15} /></button>
-    <button class="icon-btn" class:spin={loading} title="Reload" onclick={() => go("reload")}><RotateCw size={15} /></button>
+    <button class="icon-btn" title="Back" aria-label="Back" onclick={() => go("back")}><ArrowLeft size={15} /></button>
+    <button class="icon-btn" title="Forward" aria-label="Forward" onclick={() => go("forward")}><ArrowRight size={15} /></button>
+    <button class="icon-btn" class:spin={loading} title="Reload" aria-label="Reload" onclick={() => go("reload")}><RotateCw size={15} /></button>
     <form
       class="addr"
       onsubmit={(e) => {
@@ -82,7 +82,7 @@
       <Globe size={13} />
       <input id={`addr-${tab.id}`} bind:value={address} spellcheck="false" autocomplete="off" aria-label="Address" />
     </form>
-    <button class="icon-btn" title="Open in the web browser on this PC" onclick={() => openUrl(current)}><ExternalLink size={15} /></button>
+    <button class="icon-btn" title="Open in the web browser on this PC" aria-label="Open in the web browser on this PC" onclick={() => openUrl(current)}><ExternalLink size={15} /></button>
   </div>
   <div class="area" bind:this={area}>
     {#if error}

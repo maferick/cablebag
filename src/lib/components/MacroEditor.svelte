@@ -81,9 +81,9 @@
           <input type="number" class="tiny" bind:value={s.timeout} title="Give up after this many milliseconds" />
         {/if}
         <span class="tools">
-          <button class="icon-btn" title="Move up" disabled={i === 0} onclick={() => move(i, -1)}><ArrowUp size={13} /></button>
-          <button class="icon-btn" title="Move down" disabled={i === m.steps.length - 1} onclick={() => move(i, 1)}><ArrowDown size={13} /></button>
-          <button class="icon-btn" title="Remove" onclick={() => (m.steps = m.steps.filter((_, x) => x !== i))}><Trash2 size={13} /></button>
+          <button class="icon-btn" title="Move up" aria-label="Move up" disabled={i === 0} onclick={() => move(i, -1)}><ArrowUp size={13} /></button>
+          <button class="icon-btn" title="Move down" aria-label="Move down" disabled={i === m.steps.length - 1} onclick={() => move(i, 1)}><ArrowDown size={13} /></button>
+          <button class="icon-btn" title="Remove" aria-label="Remove" onclick={() => (m.steps = m.steps.filter((_, x) => x !== i))}><Trash2 size={13} /></button>
         </span>
       </div>
     {/each}

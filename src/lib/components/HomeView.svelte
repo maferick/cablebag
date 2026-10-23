@@ -70,7 +70,7 @@
               <span class="nm">{w.name}</span>
               <span class="muted small">{w.tabs.length} tabs</span>
             </button>
-            <button class="icon-btn" title="Remove the workspace" onclick={() => workspaces.remove(w)}><X size={13} /></button>
+            <button class="icon-btn" title="Remove the workspace" aria-label="Remove the workspace" onclick={() => workspaces.remove(w)}><X size={13} /></button>
           </div>
         {:else}
           <p class="muted empty">A workspace opens a set of tabs in one go, such as everything for one customer.</p>

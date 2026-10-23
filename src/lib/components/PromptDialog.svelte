@@ -34,7 +34,7 @@
         <dt>{k}</dt>
         <dd class="mono">
           <span>{v}</span>
-          <button class="icon-btn" title="Copy" onclick={() => writeText(v)}><Copy size={13} /></button>
+          <button class="icon-btn" title="Copy" aria-label="Copy" onclick={() => writeText(v)}><Copy size={13} /></button>
         </dd>
       {/each}
     </dl>

@@ -30,7 +30,7 @@
     <header>
       <FolderTree size={13} />
       <span class="t">Remote files of {ssh.title}</span>
-      <button class="icon-btn" title="Hide the remote files (Ctrl+Shift+E)" onclick={() => (app.filesOpen = false)}><X size={13} /></button>
+      <button class="icon-btn" title="Hide the remote files (Ctrl+Shift+E)" aria-label="Hide the remote files (Ctrl+Shift+E)" onclick={() => (app.filesOpen = false)}><X size={13} /></button>
     </header>
     {#if ssh.status === "connected"}
       {#key ssh.id + ":" + ssh.gen}

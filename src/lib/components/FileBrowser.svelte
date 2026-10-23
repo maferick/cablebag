@@ -225,16 +225,16 @@
 
 <div class="fb">
   <div class="tools">
-    <button class="icon-btn" title="Parent folder" onclick={parent}><ArrowUp size={15} /></button>
-    <button class="icon-btn" title="Home folder" onclick={() => load("")}><House size={15} /></button>
-    <button class="icon-btn" title="Refresh" onclick={() => load(path)}><RefreshCw size={15} class={loading ? "spin" : ""} /></button>
+    <button class="icon-btn" title="Parent folder" aria-label="Parent folder" onclick={parent}><ArrowUp size={15} /></button>
+    <button class="icon-btn" title="Home folder" aria-label="Home folder" onclick={() => load("")}><House size={15} /></button>
+    <button class="icon-btn" title="Refresh" aria-label="Refresh" onclick={() => load(path)}><RefreshCw size={15} class={loading ? "spin" : ""} /></button>
     <span class="gap"></span>
-    <button class="icon-btn" title="Upload files" onclick={upload}><Upload size={15} /></button>
-    <button class="icon-btn" title="Download selected" onclick={() => download()} disabled={!selected.size}><Download size={15} /></button>
-    <button class="icon-btn" title="New folder" onclick={mkdir}><FolderPlus size={15} /></button>
-    <button class="icon-btn" title="New file" onclick={newFile}><FilePlus size={15} /></button>
-    <button class="icon-btn" title="Delete selected" onclick={() => remove()} disabled={!selected.size}><Trash2 size={15} /></button>
-    <button class="icon-btn" class:active={showHidden} title={showHidden ? "Hide dot files" : "Show dot files"} onclick={() => (showHidden = !showHidden)}>
+    <button class="icon-btn" title="Upload files" aria-label="Upload files" onclick={upload}><Upload size={15} /></button>
+    <button class="icon-btn" title="Download selected" aria-label="Download selected" onclick={() => download()} disabled={!selected.size}><Download size={15} /></button>
+    <button class="icon-btn" title="New folder" aria-label="New folder" onclick={mkdir}><FolderPlus size={15} /></button>
+    <button class="icon-btn" title="New file" aria-label="New file" onclick={newFile}><FilePlus size={15} /></button>
+    <button class="icon-btn" title="Delete selected" aria-label="Delete selected" onclick={() => remove()} disabled={!selected.size}><Trash2 size={15} /></button>
+    <button class="icon-btn" class:active={showHidden} title={showHidden ? "Hide dot files" : "Show dot files"} aria-label={showHidden ? "Hide dot files" : "Show dot files"} onclick={() => (showHidden = !showHidden)}>
       {#if showHidden}<Eye size={15} />{:else}<EyeOff size={15} />{/if}
     </button>
   </div>

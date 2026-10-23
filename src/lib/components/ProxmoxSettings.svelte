@@ -121,7 +121,7 @@
         <div class="muted small">{s.url} · {s.token_id || "token ID from the vault item"} · {where(s)}</div>
       </div>
       <button class="btn small" onclick={() => edit(s)}><Pencil size={13} /> Edit</button>
-      <button class="icon-btn" title="Remove" onclick={() => remove(s)}><Trash2 size={14} /></button>
+      <button class="icon-btn" title="Remove" aria-label="Remove" onclick={() => remove(s)}><Trash2 size={14} /></button>
     </div>
   {/if}
 {/each}

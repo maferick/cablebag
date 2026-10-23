@@ -60,7 +60,7 @@
             <td class="mono">{s.mac}</td>
             <td style="text-align: right; white-space: nowrap">
               <button class="btn" onclick={() => wake(s.mac, s.broadcast, s.name)}><Power size={14} /> Wake</button>
-              <button class="icon-btn" title="Forget" onclick={() => app.setSetting("wol.saved", saved.filter((x) => x.mac !== s.mac))}><Trash2 size={14} /></button>
+              <button class="icon-btn" title="Forget" aria-label="Forget" onclick={() => app.setSetting("wol.saved", saved.filter((x) => x.mac !== s.mac))}><Trash2 size={14} /></button>
             </td>
           </tr>
         {/each}

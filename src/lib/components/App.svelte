@@ -5,7 +5,7 @@
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import "../theme.css";
-  import { app, type Tab, type TabStatus, type Transfer } from "../state.svelte";
+  import { app, statusWord, type Tab, type TabStatus, type Transfer } from "../state.svelte";
   import { tiles, type Divider, type Rect } from "../tiles.svelte";
   import { Maximize2, Minimize2, X, EllipsisVertical, Plus, Minus, Equal, RotateCw, MoveHorizontal, MoveVertical, PanelLeft, Columns2, Rows2, ArrowLeft, ArrowRight, ArrowUp, ArrowDown } from "@lucide/svelte";
   import { menu, type MenuEntry } from "../menu.svelte";
@@ -364,6 +364,16 @@
     }
   }
 
+  /** The sidebar's width by keyboard: arrows move it (with Shift in larger steps), Home and End to the limits. */
+  function sidebarKeys(e: KeyboardEvent) {
+    const step = e.shiftKey ? 60 : 20;
+    const to = { ArrowLeft: sidebarWidth - step, ArrowRight: sidebarWidth + step, Home: 200, End: 600 }[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    sidebarWidth = Math.max(200, Math.min(600, to));
+    localStorage.setItem("sidebar.width", String(sidebarWidth));
+  }
+
   function dragSidebar(e: PointerEvent) {
     const startX = e.clientX;
     const start = sidebarWidth;
@@ -387,7 +397,21 @@
       <div class="side" style:width="{sidebarWidth}px">
         <Sidebar />
       </div>
-      <div class="splitter" role="separator" aria-orientation="vertical" onpointerdown={dragSidebar}></div>
+      <!-- A focusable separator with a value is ARIA's window splitter, an interactive control; Svelte's check does not know that pattern. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+      <div
+        class="splitter"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Sidebar width"
+        aria-valuemin={200}
+        aria-valuemax={600}
+        aria-valuenow={sidebarWidth}
+        tabindex="0"
+        title="Drag, or use the arrow keys, to change the width of the sidebar"
+        onpointerdown={dragSidebar}
+        onkeydown={sidebarKeys}
+      ></div>
     {/if}
     <div class="work">
       <!-- Only over a terminal: typing in a Remote Desktop or another tab does not go to the terminals. -->
@@ -441,15 +465,15 @@
                   ondblclick={() => tiles.toggleZoom(t.id)}
                   oncontextmenu={(e) => menu.show(e, paneMenu(t))}
                 >
-                  <span class="smark {t.status}"></span>
+                  <span class="smark {t.status}" role="img" aria-label={statusWord(t.status)} title={statusWord(t.status)}></span>
                   <span class="pt">{t.title}</span>
-                  <button class="icon-btn" title="Size, place and more (or right-click the header)" onclick={(e) => { e.stopPropagation(); menu.showAt(e.currentTarget as HTMLElement, paneMenu(t)); }}>
+                  <button class="icon-btn" title="Size, place and more (or right-click the header)" aria-label="Size, place and more (or right-click the header)" onclick={(e) => { e.stopPropagation(); menu.showAt(e.currentTarget as HTMLElement, paneMenu(t)); }}>
                     <EllipsisVertical size={12} />
                   </button>
-                  <button class="icon-btn" title={tiles.zoomed === t.id ? "Back to the tiles (Ctrl+Alt+Enter)" : "Fill the area (Ctrl+Alt+Enter)"} onclick={() => tiles.toggleZoom(t.id)}>
+                  <button class="icon-btn" title={tiles.zoomed === t.id ? "Back to the tiles (Ctrl+Alt+Enter)" : "Fill the area (Ctrl+Alt+Enter)"} aria-label={tiles.zoomed === t.id ? "Back to the tiles (Ctrl+Alt+Enter)" : "Fill the area (Ctrl+Alt+Enter)"} onclick={() => tiles.toggleZoom(t.id)}>
                     {#if tiles.zoomed === t.id}<Minimize2 size={12} />{:else}<Maximize2 size={12} />{/if}
                   </button>
-                  <button class="icon-btn" title="Close" onclick={() => app.closeTab(t.id)}><X size={13} /></button>
+                  <button class="icon-btn" title="Close" aria-label="Close" onclick={() => app.closeTab(t.id)}><X size={13} /></button>
                 </div>
               {/if}
               <div class="body" class:headed={headed && shown && !barred(t)}>
@@ -512,20 +536,20 @@
     ondblclick={() => tiles.toggleZoom(t.id)}
     oncontextmenu={(e) => menu.show(e, paneMenu(t))}
   >
-    <span class="smark {t.status}"></span>
+    <span class="smark {t.status}" role="img" aria-label={statusWord(t.status)} title={statusWord(t.status)}></span>
     <span class="pt">{t.title}</span>
   </span>
 {/snippet}
 
 {#snippet paneEnd(t: Tab)}
   <span class="tail">
-    <button class="icon-btn" title="Size, place and more (or right-click the name)" onclick={(e) => { e.stopPropagation(); menu.showAt(e.currentTarget as HTMLElement, paneMenu(t)); }}>
+    <button class="icon-btn" title="Size, place and more (or right-click the name)" aria-label="Size, place and more (or right-click the name)" onclick={(e) => { e.stopPropagation(); menu.showAt(e.currentTarget as HTMLElement, paneMenu(t)); }}>
       <EllipsisVertical size={12} />
     </button>
-    <button class="icon-btn" title={tiles.zoomed === t.id ? "Back to the tiles (Ctrl+Alt+Enter)" : "Fill the area (Ctrl+Alt+Enter)"} onclick={() => tiles.toggleZoom(t.id)}>
+    <button class="icon-btn" title={tiles.zoomed === t.id ? "Back to the tiles (Ctrl+Alt+Enter)" : "Fill the area (Ctrl+Alt+Enter)"} aria-label={tiles.zoomed === t.id ? "Back to the tiles (Ctrl+Alt+Enter)" : "Fill the area (Ctrl+Alt+Enter)"} onclick={() => tiles.toggleZoom(t.id)}>
       {#if tiles.zoomed === t.id}<Minimize2 size={12} />{:else}<Maximize2 size={12} />{/if}
     </button>
-    <button class="icon-btn" title="Close" onclick={() => app.closeTab(t.id)}><X size={13} /></button>
+    <button class="icon-btn" title="Close" aria-label="Close" onclick={() => app.closeTab(t.id)}><X size={13} /></button>
   </span>
 {/snippet}
 

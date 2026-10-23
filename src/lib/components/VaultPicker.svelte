@@ -40,7 +40,7 @@
         <span class="muted">unlock the vault to see which</span>
       {/if}
       <span class="grow"></span>
-      <button class="icon-btn" title="Remove the link" onclick={() => (itemId = "")}><X size={14} /></button>
+      <button class="icon-btn" title="Remove the link" aria-label="Remove the link" onclick={() => (itemId = "")}><X size={14} /></button>
     </div>
   {:else if !vault.status.unlocked}
     <button class="btn" disabled={vault.busy} onclick={async () => (await vault.unlock()) && startSearch()}>
@@ -52,8 +52,8 @@
     <div class="search">
       <Search size={14} />
       <!-- svelte-ignore a11y_autofocus -->
-      <input bind:value={query} placeholder="Name, user or address" autofocus onkeydown={(e) => e.key === "Escape" && (open = false)} />
-      <button class="icon-btn" title="Close" onclick={() => (open = false)}><X size={14} /></button>
+      <input bind:value={query} placeholder="Name, user or address" autofocus onkeydown={(e) => { if (e.key === "Escape") { e.preventDefault(); open = false; } }} />
+      <button class="icon-btn" title="Close" aria-label="Close" onclick={() => (open = false)}><X size={14} /></button>
     </div>
     <div class="list">
       {#each matches as i (i.id)}

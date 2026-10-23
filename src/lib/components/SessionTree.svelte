@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ask } from "../ask.svelte";
+  import { treeKeys } from "../keyNav";
   import { app, newSession } from "../state.svelte";
   import { menu } from "../menu.svelte";
   import { kindInfo } from "../kinds";
@@ -265,13 +266,14 @@
     <Search size={14} />
     <input bind:value={filter} placeholder="Find a session" />
     {#if filter}
-      <button class="icon-btn" title="Clear" onclick={() => (filter = "")}><X size={13} /></button>
+      <button class="icon-btn" title="Clear" aria-label="Clear" onclick={() => (filter = "")}><X size={13} /></button>
     {/if}
   </div>
   <div
     class="tree"
     role="tree"
     tabindex="-1"
+    onkeydown={treeKeys}
     oncontextmenu={(e) => folderMenu(e, null)}
     ondragover={(e) => e.preventDefault()}
     ondrop={() => dropOn(null)}
@@ -382,7 +384,7 @@
         {#if l?.error}
           <div class="row note bad" style:padding-left="38px" title={l.error}>
             <span class="name">{l.error}</span>
-            <button class="icon-btn" title="Try again" onclick={() => proxmox.refresh(src.id)}><RefreshCw size={12} /></button>
+            <button class="icon-btn" title="Try again" aria-label="Try again" onclick={() => proxmox.refresh(src.id)}><RefreshCw size={12} /></button>
           </div>
         {/if}
         {#each guests as g (`${g.node}:${g.vmid}`)}

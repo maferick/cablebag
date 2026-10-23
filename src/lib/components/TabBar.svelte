@@ -1,7 +1,8 @@
 <script lang="ts">
   // The one strip at the top: sidebar toggle, the tabs, the + menu, the search box, Layout and Settings.
   import { TAB_COLORS } from "../tabColors";
-  import { app, type Tab } from "../state.svelte";
+  import { tabKeys } from "../keyNav";
+  import { app, statusWord, type Tab } from "../state.svelte";
   import { menu, type MenuEntry } from "../menu.svelte";
   import { tiles } from "../tiles.svelte";
   import { workspaces } from "../workspaces.svelte";
@@ -127,12 +128,12 @@
   <button
     class="icon-btn side"
     class:on={app.settings["ui.sidebar"]}
-    title={app.settings["ui.sidebar"] ? "Hide the sessions" : "Show the sessions"}
+    title={app.settings["ui.sidebar"] ? "Hide the sessions" : "Show the sessions"} aria-label={app.settings["ui.sidebar"] ? "Hide the sessions" : "Show the sessions"}
     onclick={() => app.setSetting("ui.sidebar", !app.settings["ui.sidebar"])}
   >
     <PanelLeft size={16} />
   </button>
-  <div class="tabs" role="tablist">
+  <div class="tabs" role="tablist" tabindex="-1" onkeydown={tabKeys}>
     {#each shown as t (t.id)}
       {@const Icon = iconOf(t)}
       <div
@@ -151,7 +152,7 @@
       >
         <span class="kicon">
           <Icon size={14} />
-          {#if t.type !== "tool"}<span class="dot smark {t.status}"></span>{/if}
+          {#if t.type !== "tool"}<span class="dot smark {t.status}" role="img" aria-label={statusWord(t.status)} title={statusWord(t.status)}></span>{/if}
         </span>
         {#if renaming === t.id}
           <!-- svelte-ignore a11y_autofocus -->
@@ -183,19 +184,19 @@
     {/each}
   </div>
   <div class="plus">
-    <button class="icon-btn" title="New local terminal (Ctrl+Shift+T); right-click for more" onclick={() => app.openLocal()} oncontextmenu={(e) => plusMenu(e)}>
+    <button class="icon-btn" title="New local terminal (Ctrl+Shift+T); right-click for more" aria-label="New local terminal (Ctrl+Shift+T); right-click for more" onclick={() => app.openLocal()} oncontextmenu={(e) => plusMenu(e)}>
       <Plus size={16} />
     </button>
-    <button class="icon-btn drop" title="New session, local terminals and tools" onclick={(e) => plusMenu(e, e.currentTarget as HTMLElement)}>
+    <button class="icon-btn drop" title="New session, local terminals and tools" aria-label="New session, local terminals and tools" onclick={(e) => plusMenu(e, e.currentTarget as HTMLElement)}>
       <ChevronDown size={13} />
     </button>
   </div>
   <span class="spacer"></span>
   <CommandPalette />
-  <button class="icon-btn" title="Layout: {layoutName}" onclick={layoutMenu}>
+  <button class="icon-btn" title="Layout: {layoutName}" aria-label="Layout: {layoutName}" onclick={layoutMenu}>
     <LayoutIcon size={16} />
   </button>
-  <button class="icon-btn" title="Settings (Ctrl+,)" onclick={() => app.toggleTool("settings", "Settings")}>
+  <button class="icon-btn" title="Settings (Ctrl+,)" aria-label="Settings (Ctrl+,)" onclick={() => app.toggleTool("settings", "Settings")}>
     <Settings size={16} />
   </button>
 </div>
