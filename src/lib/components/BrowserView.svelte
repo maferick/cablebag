@@ -9,6 +9,7 @@
   import { tiles } from "../tiles.svelte";
   import { browserProfiles, PRIVATE, SHARED } from "../browserProfiles.svelte";
   import { unreadFromTitle } from "../unread";
+  import { pins } from "../pins.svelte";
   import { vault } from "../vault.svelte";
   import { ask } from "../ask.svelte";
   import FillLoginDialog from "./FillLoginDialog.svelte";
@@ -175,11 +176,11 @@
     });
     open(start);
     // A tab not looked at for the time set in Settings goes to sleep: its page is closed to free memory, and opens
-    // again where it was when the tab is shown. Tabs kept running (Teams, for its notifications) and private ones
+    // again where it was when the tab is shown. Tabs kept running or pinned (Teams, for its notifications) and private ones
     // (they would lose their login) stay awake.
     const sleeper = setInterval(() => {
       const minutes = Number(app.settings["browser.sleepMinutes"]) || 0;
-      if (!minutes || keepRunning || profileId === PRIVATE || visible || asleep || !opened) return;
+      if (!minutes || keepRunning || pins.covers(tab) || profileId === PRIVATE || visible || asleep || !opened) return;
       if (Date.now() - hiddenAt >= minutes * 60_000) {
         asleep = true;
         opened = false;

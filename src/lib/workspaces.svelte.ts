@@ -3,6 +3,7 @@
 import { app, type Tab, type LocalSpec } from "./state.svelte";
 import type { Session } from "./api";
 import { ask } from "./ask.svelte";
+import { openIn, pins, profileKey, profileOfTab } from "./pins.svelte";
 
 export type TabSpec =
   | { kind: "session"; title: string; session: Session }
@@ -42,8 +43,16 @@ class Workspaces {
     for (const s of specs) {
       if (s.kind === "session") {
         const now = s.session.id ? app.sessions.find((x) => x.id === s.session.id) : undefined;
-        // A web session that keeps running is open already (it opened by itself at the start).
-        if (now?.data?.keep_running && app.tabs.some((t) => t.session?.id === now.id)) continue;
+        if (now?.kind === "browser") {
+          // In the browser profile the tab had (it may have been opened once in another one), unless it is open
+          // already: a pinned site or one that keeps running opened by itself at the start.
+          const profile = profileKey(s.session.data?.browser_profile);
+          const there = app.tabs.some((t) => t.type === "browser" && t.session?.id === now.id && profileOfTab(t) === profile);
+          if (there && (now.data?.keep_running || pins.find(now.id, profile))) continue;
+          if (s.session.data?.browser_profile) openIn(now, s.session.data.browser_profile, !!pins.find(now.id, profile));
+          else app.openSession(now);
+          continue;
+        }
         app.openSession(now ?? s.session);
       } else if (s.kind === "local") {
         app.openLocalSpec(s.title, s.local);

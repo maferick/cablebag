@@ -9,14 +9,34 @@
   import { proxmox, isWindows } from "../proxmox.svelte";
   import { writeText } from "../clipboard";
   import { assistant } from "../assistant.svelte";
+  import { pins } from "../pins.svelte";
+  import { webItems } from "../webMenu.svelte";
   import type { ProxmoxGuest, ProxmoxSource } from "../api";
   import { api, type Folder, type Session } from "../api";
   import {
     ChevronRight, Folder as FolderIcon, FolderOpen, Search, Plus, FolderPlus, Settings2, ListChecks, Camera, ListOrdered, Play, Pencil, Copy, Trash2, X, Activity,
     ServerCog, Server, Monitor, MonitorPlay, Boxes, Terminal, Globe, Save, Power, RotateCw, Square, RefreshCw, Settings,
-  Shield, ShieldCheck, } from "@lucide/svelte";
+  Shield, ShieldCheck, Pin, Upload, } from "@lucide/svelte";
 
   let filter = $state("");
+  /** Servers: the session tree without folders of only web sessions. Web: the web sessions on their own. */
+  let view = $state<"servers" | "web">(stored("tree.view") === "web" ? "web" : "servers");
+  /** The web sessions by the folders they are in, or by site. */
+  let webBy = $state<"folder" | "site">(stored("tree.webBy") === "site" ? "site" : "folder");
+
+  function stored(k: string): string | null {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  }
+
+  function remember(k: string, v: string) {
+    try {
+      localStorage.setItem(k, v);
+    } catch {}
+  }
   let open = $state<Record<string, boolean>>(loadOpen());
   let selected = $state<string | null>(null);
 
@@ -63,6 +83,117 @@
 
   function allIn(folder: string): Session[] {
     return [...app.sessions.filter((s) => s.folder_id === folder), ...childFolders(folder).flatMap((f) => allIn(f.id))];
+  }
+
+  const isWeb = (s: Session) => s.kind === "browser";
+
+  /** Folders with web sessions somewhere inside, and those with nothing else (hidden in the Servers view). */
+  const webFolders = $derived.by(() => {
+    const some = new Set<string>();
+    const only = new Set<string>();
+    const walk = (id: string): { web: number; other: number } => {
+      let web = 0;
+      let other = 0;
+      for (const s of app.sessions) if (s.folder_id === id) isWeb(s) ? web++ : other++;
+      for (const f of app.folders) {
+        if (f.parent_id !== id) continue;
+        const c = walk(f.id);
+        web += c.web;
+        other += c.other;
+      }
+      if (web) some.add(id);
+      if (web && !other) only.add(id);
+      return { web, other };
+    };
+    for (const f of app.folders) if (!f.parent_id) walk(f.id);
+    return { some, only };
+  });
+
+  /** Folders as the Servers view shows them. */
+  function serverFolders(parent: string | null): Folder[] {
+    return childFolders(parent).filter((f) => !webFolders.only.has(f.id));
+  }
+
+  // ---- The Web view ----
+
+  const webSessions = $derived(app.sessions.filter(isWeb));
+
+  /** Folders with web sessions in them, and the web sessions directly in a folder. */
+  const webSubfolders = (parent: string | null) => childFolders(parent).filter((f) => webFolders.some.has(f.id));
+  const webIn = (parent: string | null) => webSessions.filter((s) => s.folder_id === parent);
+
+  /** A folder that only holds one other folder is skipped (Chrome's "Bookmarks" and "Bookmarks bar"). */
+  function through(f: Folder): Folder {
+    let cur = f;
+    for (let i = 0; i < 20; i++) {
+      const sub = webSubfolders(cur.id);
+      if (webIn(cur.id).length || sub.length !== 1) break;
+      cur = sub[0];
+    }
+    return cur;
+  }
+
+  /** What the Web view shows at the top: the import's wrapper folder left out, loose sites apart. */
+  const webTop = $derived.by(() => {
+    let folders = webSubfolders(null).map(through);
+    let loose = webIn(null);
+    if (folders.length === 1 && !loose.length) {
+      const only = folders[0];
+      loose = webIn(only.id);
+      folders = webSubfolders(only.id).map(through);
+    }
+    return { folders, loose };
+  });
+
+  const webCount = (id: string) => allIn(id).filter(isWeb).length;
+
+  /** The site of an address, without www. */
+  function siteOf(s: Session): string {
+    try {
+      return new URL(s.host.includes("://") ? s.host : `https://${s.host}`).hostname.replace(/^www\./, "").toLowerCase();
+    } catch {
+      return s.host.toLowerCase();
+    }
+  }
+
+  /** By site: sites with two or more saved pages get a group; the rest stay together. */
+  const bySite = $derived.by(() => {
+    const groups = new Map<string, Session[]>();
+    for (const s of webSessions) {
+      const k = siteOf(s);
+      groups.set(k, [...(groups.get(k) ?? []), s]);
+    }
+    const many = [...groups].filter(([, l]) => l.length > 1).sort(([a], [b]) => a.localeCompare(b));
+    const single = [...groups].filter(([, l]) => l.length === 1).flatMap(([, l]) => l).sort((a, b) => (a.name || a.host).localeCompare(b.name || b.host));
+    return { many, single };
+  });
+
+  /** The sites opened last, apart from the pinned ones. */
+  const recent = $derived(
+    webSessions
+      .filter((s) => s.last_used > 0 && !pins.any(s.id))
+      .sort((a, b) => b.last_used - a.last_used)
+      .slice(0, 3),
+  );
+
+  const webMatches = $derived(q ? webSessions.filter(matches) : []);
+
+  function ago(t: number): string {
+    const m = Math.floor((Date.now() / 1000 - t) / 60);
+    if (m < 1) return "now";
+    if (m < 60) return `${m} min`;
+    if (m < 60 * 24) return `${Math.floor(m / 60)} h`;
+    return `${Math.floor(m / 60 / 24)} d`;
+  }
+
+  function setView(v: "servers" | "web") {
+    view = v;
+    remember("tree.view", v);
+  }
+
+  function setWebBy(v: "folder" | "site") {
+    webBy = v;
+    remember("tree.webBy", v);
   }
 
   const keysOf = (list: Session[]) => [...new Set(list.map(reachKey).filter((k): k is string => !!k))];
@@ -154,7 +285,7 @@
   function sessionMenu(e: MouseEvent, s: Session) {
     selected = s.id;
     menu.show(e, [
-      { label: "Open", icon: Play, action: () => app.openSession(s) },
+      ...(isWeb(s) ? webItems(s) : [{ label: "Open", icon: Play, action: () => app.openSession(s) }]),
       { label: "Edit session", icon: Pencil, action: () => app.editSession(s) },
       {
         label: "Duplicate",
@@ -265,11 +396,22 @@
 <div class="tree-wrap">
   <div class="search">
     <Search size={14} />
-    <input bind:value={filter} placeholder="Find a session" />
+    <input bind:value={filter} placeholder={view === "web" ? "Find a site" : "Find a session"} aria-label={view === "web" ? "Find a site" : "Find a session"} />
     {#if filter}
       <button class="icon-btn" title="Clear" aria-label="Clear" onclick={() => (filter = "")}><X size={13} /></button>
     {/if}
   </div>
+  <div class="views" role="radiogroup" aria-label="Show">
+    <button role="radio" aria-checked={view === "servers"} class:on={view === "servers"} onclick={() => setView("servers")}>Servers</button>
+    <button role="radio" aria-checked={view === "web"} class:on={view === "web"} onclick={() => setView("web")}>
+      Web{#if webSessions.length}<span class="vcount">{webSessions.length}</span>{/if}
+    </button>
+  </div>
+  {#if view === "web"}
+    <div class="tree" role="tree" tabindex="-1" onkeydown={treeKeys} oncontextmenu={(e) => e.preventDefault()}>
+      {@render web()}
+    </div>
+  {:else}
   <div
     class="tree"
     role="tree"
@@ -290,10 +432,11 @@
       <p class="empty muted">Nothing matches "{filter}".</p>
     {/if}
   </div>
+  {/if}
 </div>
 
 {#snippet level(parent: string | null, depth: number)}
-  {#each childFolders(parent) as f (f.id)}
+  {#each serverFolders(parent) as f (f.id)}
     {#if !q || hasMatch(f.id)}
       {@const isOpen = !!q || open[f.id]}
       <div
@@ -364,6 +507,146 @@
       {/if}
     </div>
   {/each}
+{/snippet}
+
+{#snippet web()}
+  {#if !webSessions.length}
+    <div class="empty">
+      <p>No web sessions yet. Bring in your bookmarks from Chrome, Edge or Firefox, or add a site.</p>
+      <button class="btn" onclick={() => (app.importOpen = true)}><Upload size={14} /> Import bookmarks</button>
+      <button class="btn" onclick={() => (app.editing = newSession("browser"))}><Plus size={14} /> New web session</button>
+    </div>
+  {:else if q}
+    {#each webMatches as s (s.id)}
+      {@render webRow(s, 0, app.folders.find((f) => f.id === s.folder_id)?.name ?? "")}
+    {:else}
+      <p class="empty muted">No site matches "{filter}".</p>
+    {/each}
+  {:else}
+    {#if !pins.list.length}
+      <p class="hintline"><Pin size={12} /> Right-click a site and choose Pin to keep it on the strip at the left, with its unread count.</p>
+    {/if}
+    {#if recent.length}
+      <div class="cap">Recent</div>
+      {#each recent as s (s.id)}
+        {@render webRow(s, 0, ago(s.last_used))}
+      {/each}
+    {/if}
+    <div class="cap">
+      <span>Sites</span>
+      <span class="by" role="radiogroup" aria-label="Group the sites">
+        <button role="radio" aria-checked={webBy === "folder"} class:on={webBy === "folder"} onclick={() => setWebBy("folder")}>by folder</button>
+        <button role="radio" aria-checked={webBy === "site"} class:on={webBy === "site"} onclick={() => setWebBy("site")}>by site</button>
+      </span>
+    </div>
+    {#if webBy === "folder"}
+      {#each webTop.folders as f (f.id)}
+        {@render webFolder(f, 0)}
+      {/each}
+      {#if webTop.folders.length && webTop.loose.length}
+        {@render group("web:loose", "Loose bookmarks", webTop.loose, 0)}
+      {:else}
+        {#each webTop.loose as s (s.id)}
+          {@render webRow(s, 0)}
+        {/each}
+      {/if}
+    {:else}
+      {#each bySite.many as [site, list] (site)}
+        {@render group(`site:${site}`, site, list, 0)}
+      {/each}
+      {#if bySite.many.length && bySite.single.length}
+        {@render group("site:other", "Other sites", bySite.single, 0)}
+      {:else}
+        {#each bySite.single as s (s.id)}
+          {@render webRow(s, 0)}
+        {/each}
+      {/if}
+    {/if}
+  {/if}
+{/snippet}
+
+{#snippet webFolder(f: Folder, depth: number)}
+  {@const key = `web:${f.id}`}
+  <div
+    class="row folder"
+    role="treeitem"
+    tabindex="0"
+    aria-selected="false"
+    aria-expanded={!!open[key]}
+    style:padding-left="{6 + depth * 14}px"
+    onclick={() => toggle(key)}
+    onkeydown={(e) => e.key === "Enter" && toggle(key)}
+    oncontextmenu={(e) => folderMenu(e, f)}
+    ondragover={(e) => e.preventDefault()}
+    ondrop={(e) => {
+      e.stopPropagation();
+      dropOn(f.id);
+    }}
+  >
+    <span class="chev" class:open={open[key]}><ChevronRight size={13} /></span>
+    {#if open[key]}<FolderOpen size={15} class="ficon" />{:else}<FolderIcon size={15} class="ficon" />{/if}
+    <span class="name">{f.name}</span>
+    <span class="count">{webCount(f.id)}</span>
+  </div>
+  {#if open[key]}
+    {#each webSubfolders(f.id).map(through) as sub (sub.id)}
+      {@render webFolder(sub, depth + 1)}
+    {/each}
+    {#each webIn(f.id) as s (s.id)}
+      {@render webRow(s, depth + 1)}
+    {/each}
+  {/if}
+{/snippet}
+
+{#snippet group(key: string, name: string, list: Session[], depth: number)}
+  <div
+    class="row folder"
+    role="treeitem"
+    tabindex="0"
+    aria-selected="false"
+    aria-expanded={!!open[key]}
+    style:padding-left="{6 + depth * 14}px"
+    onclick={() => toggle(key)}
+    onkeydown={(e) => e.key === "Enter" && toggle(key)}
+  >
+    <span class="chev" class:open={open[key]}><ChevronRight size={13} /></span>
+    {#if open[key]}<FolderOpen size={15} class="ficon" />{:else}<FolderIcon size={15} class="ficon" />{/if}
+    <span class="name">{name}</span>
+    <span class="count">{list.length}</span>
+  </div>
+  {#if open[key]}
+    {#each list as s (s.id)}
+      {@render webRow(s, depth + 1)}
+    {/each}
+  {/if}
+{/snippet}
+
+{#snippet webRow(s: Session, depth: number, note = "")}
+  {@const live = liveState(s)}
+  {@const ident = app.withFolderDefaults(s).data?.browser_profile}
+  <div
+    class="row session {live ? `open ${live}` : ''}"
+    class:selected={selected === s.id}
+    role="treeitem"
+    tabindex="0"
+    aria-selected={selected === s.id}
+    draggable="true"
+    style:padding-left="{24 + depth * 14}px"
+    title={`${s.host}${s.comment ? `\n${s.comment}` : ""}`}
+    onclick={() => (selected = s.id)}
+    ondblclick={() => app.openSession(s)}
+    onkeydown={(e) => e.key === "Enter" && app.openSession(s)}
+    oncontextmenu={(e) => sessionMenu(e, s)}
+    ondragstart={() => (dragId = s.id)}
+  >
+    <span class="kicon"><Globe size={14} /></span>
+    <span class="name">{s.name || s.host}</span>
+    {#if ident && ident !== "none" && browserProfiles.get(ident)}
+      <span class="idot" style:background={browserProfiles.color(ident) ?? "var(--faint)"} title="Browser profile: {browserProfiles.name(ident)}"></span>
+    {/if}
+    {#if pins.any(s.id)}<span class="pinned" title="Pinned to the strip"><Pin size={11} /></span>{/if}
+    {#if note}<span class="count note-r">{note}</span>{/if}
+  </div>
 {/snippet}
 
 {#snippet pveFolders()}
@@ -594,5 +877,71 @@
     height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
+  }
+  .views {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin: 0 8px 6px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .views button {
+    border: none;
+    border-radius: 0;
+    background: none;
+    padding: 3px 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .views button.on {
+    background: var(--raised);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .vcount {
+    margin-left: 5px;
+    font-weight: 400;
+    color: var(--faint);
+  }
+  .cap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 10px 6px 3px;
+    font-size: 11px;
+    color: var(--faint);
+  }
+  .by {
+    display: inline-flex;
+    gap: 2px;
+  }
+  .by button {
+    border: none;
+    background: none;
+    padding: 0 4px;
+    font-size: 11px;
+    color: var(--faint);
+  }
+  .by button.on {
+    color: var(--text);
+    text-decoration: underline;
+  }
+  .hintline {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    margin: 4px 6px 6px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .pinned {
+    display: inline-flex;
+    color: var(--faint);
+  }
+  .note-r {
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 </style>

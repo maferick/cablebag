@@ -11,6 +11,8 @@
   import { menu, type MenuEntry } from "../menu.svelte";
   import type { PromptRequest } from "../api";
   import Sidebar from "./Sidebar.svelte";
+  import PinStrip from "./PinStrip.svelte";
+  import { pins } from "../pins.svelte";
   import TabBar from "./TabBar.svelte";
   import StatusBar from "./StatusBar.svelte";
   import FilesColumn from "./FilesColumn.svelte";
@@ -304,6 +306,7 @@
         assistant.load();
         workspaces.start();
         app.openKeptRunning();
+        pins.openAll();
       });
     return () => unlisten.forEach((u) => u.then((f) => f()));
   });
@@ -403,6 +406,7 @@
 <div class="app">
   <TabBar />
   <div class="main">
+    {#if pins.list.length}<PinStrip />{/if}
     {#if app.settings["ui.sidebar"]}
       <div class="side" style:width="{sidebarWidth}px">
         <Sidebar />

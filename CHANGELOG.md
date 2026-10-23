@@ -6,6 +6,19 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.18.0 · not released yet
+
+**Your servers and your web sessions apart, and pinned sites**
+
+- The sidebar switches between **Servers** and **Web**. Servers is the session tree without folders that only hold
+  web sessions (such as imported bookmarks); a web page saved with a server stays next to it. Web shows the sites
+  you opened last, then your bookmark folders without Chrome's own "Bookmarks bar" level, by folder or by site.
+- **Pinned sites** sit on a strip at the left edge with their browser profile's colour and unread count. A click
+  goes to the site's tab, or opens it; drag to change the order. Pin the same site once per profile, such as Teams
+  for two tenants. Pinned sites open when Cablebag starts and keep running. Sync takes them to your other PCs.
+- Right-click a web session for **Open in...** (another profile, once, or a private tab), **Pin** and **Always open
+  in...**. Tabs that come back at the start keep the profile they were opened in.
+
 ## 0.17.1 · 23 October 2026
 
 **Settings, tidied**

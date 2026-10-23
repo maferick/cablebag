@@ -68,6 +68,9 @@ tabs, at the same time.
 - **SFTP and FTP** as file sessions.
 - **Local shells and WSL** in the same tabs as everything else (Ctrl+Shift+T).
 - **Web pages** in a tab, optionally through a WireGuard network.
+- **Web view and pinned sites**: the sidebar switches between your servers and your web sessions (imported
+  bookmarks keep their folders, with the most recent sites on top). Pin a site to the strip at the left edge, once
+  per browser profile, and it keeps running with its unread count in view.
 - **Tabs, split view and tiling.** Split the window for terminals, or tile every open tab and resize, swap, zoom
   and focus panes from the keyboard.
 - **Search box (Ctrl+K).** Type a few letters to open any session, tab, Proxmox machine, tool, macro or setting;
@@ -127,7 +130,7 @@ tabs, at the same time.
 ## Sync
 
 Sessions, folders, folder settings, macros, tunnels, WireGuard networks, credential sources (without their
-secrets), browser profiles (without their cookies), workspaces and the assistant's memory sync through a private git repository of your own, encrypted.
+secrets), browser profiles (without their cookies), pinned sites, workspaces and the assistant's memory sync through a private git repository of your own, encrypted.
 Passwords and private keys stay out. When the same item changed on two PCs, Settings, Sync names the conflict
 and says whose version was kept.
 

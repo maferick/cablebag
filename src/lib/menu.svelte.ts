@@ -45,6 +45,12 @@ class MenuState {
     this.open = true;
   }
 
+  /** A second menu where the first one was (for "Open in..." and other choices of a menu item). */
+  again(items: MenuEntry[]) {
+    this.items = items;
+    this.open = true;
+  }
+
   close(restoreFocus = false) {
     this.open = false;
     if (restoreFocus && this.before?.isConnected) this.before.focus();
