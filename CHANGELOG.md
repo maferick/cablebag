@@ -6,7 +6,7 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.18.0 · not released yet
+## 0.18.0 · 23 October 2026
 
 **Your servers and your web sessions apart, and pinned sites**
 
