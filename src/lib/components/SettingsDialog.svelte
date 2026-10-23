@@ -521,7 +521,10 @@
           </SettingsRow>
         </SettingsSection>
 
-        <SettingsSection title="Problems" desc="Open an issue on the project page and paste the details of this PC with it.">
+        <SettingsSection title="Problems" desc="Tell the makers what goes wrong. You read it over and submit it on GitHub, in your web browser.">
+          <SettingsRow label="Report a problem" help="A few questions, then GitHub's form opens with your answers and the details of this PC filled in.">
+            <button class="btn primary" onclick={() => app.openReport()}>Report a problem...</button>
+          </SettingsRow>
           <SettingsRow label="This PC" help={details.split("\n").join(", ")}>
             <div class="btns">
               <button class="btn" disabled={!details} onclick={() => writeText(details).then(() => app.notify("Details copied"))}>Copy details</button>

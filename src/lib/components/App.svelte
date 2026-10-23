@@ -36,6 +36,7 @@
   import PromptDialog from "./PromptDialog.svelte";
   import SessionEditor from "./SessionEditor.svelte";
   import ImportDialog from "./ImportDialog.svelte";
+  import ReportDialog from "./ReportDialog.svelte";
   import Modal from "./Modal.svelte";
   import ProxmoxSettings from "./ProxmoxSettings.svelte";
   import ContextMenu from "./ContextMenu.svelte";
@@ -561,6 +562,9 @@
 {#if app.importOpen}
   <ImportDialog />
 {/if}
+{#if app.reporting}
+  <ReportDialog start={app.reporting} />
+{/if}
 {#if proxmox.dialog}
   <ProxmoxDialog />
 {/if}
@@ -581,7 +585,13 @@
   <AskDialog />
 {/if}
 {#if app.toast}
-  <div class="toast" class:error={app.toast.kind === "error"} role="status">{app.toast.text}</div>
+  {@const t = app.toast}
+  <div class="toast" class:error={t.kind === "error"} role="status">
+    {t.text}
+    {#if t.kind === "error"}
+      <button class="report" title="Tell the makers of Cablebag about this message" onclick={() => app.openReport(t.text)}>Report</button>
+    {/if}
+  </div>
 {/if}
 
 <style>
@@ -759,5 +769,13 @@
   .toast.error {
     border-color: var(--danger);
     color: var(--danger-text);
+  }
+  .toast .report {
+    margin-left: 10px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--text);
+    text-decoration: underline;
   }
 </style>
