@@ -4,7 +4,9 @@
 
 use anyhow::{anyhow, Result};
 use serde::Serialize;
-use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent, WebviewBuilder};
+use std::sync::atomic::{AtomicU32, Ordering};
+use tauri::webview::{DownloadEvent, NewWindowFeatures, NewWindowResponse, PageLoadEvent, WebviewBuilder};
+use tauri::WebviewWindowBuilder;
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Url, WebviewUrl};
 
 #[derive(Clone, Serialize)]
@@ -107,9 +109,10 @@ pub fn forget_profile(profile: &str) {
 
 /// `wireguard`: the WireGuard network the page goes through (Cablebag's own proxy for it, and a browser
 /// profile of its own: WebView2 sets the proxy per profile). `profile`: the browser profile whose cookies and
-/// logins it uses; `private`: nothing is kept after the tab closes.
+/// logins it uses; `private`: nothing is kept after the tab closes. `who`: the profile's name, for the titles of
+/// the tab's pop-up windows.
 #[allow(clippy::too_many_arguments)]
-pub async fn open(app: &AppHandle, id: &str, url: &str, wireguard: Option<String>, profile: Option<String>, private: bool, x: f64, y: f64, w: f64, h: f64) -> Result<()> {
+pub async fn open(app: &AppHandle, id: &str, url: &str, wireguard: Option<String>, profile: Option<String>, private: bool, who: String, x: f64, y: f64, w: f64, h: f64) -> Result<()> {
     let url = parse(url)?;
     let label = label(id);
     if let Some(wv) = app.get_webview(&label) {
@@ -119,6 +122,7 @@ pub async fn open(app: &AppHandle, id: &str, url: &str, wireguard: Option<String
     let window = app.get_window("main").ok_or_else(|| anyhow!("main window missing"))?;
     let (app1, app2, app3, id1, id2, id3) = (app.clone(), app.clone(), app.clone(), id.to_string(), id.to_string(), id.to_string());
     let (app4, app5, id4, id5) = (app.clone(), app.clone(), id.to_string(), id.to_string());
+    let popups = AtomicU32::new(0);
     let opened_recently = std::sync::Mutex::new(std::collections::VecDeque::new());
     let mut builder = WebviewBuilder::new(&label, WebviewUrl::External(url))
         .data_directory(profile_dir(profile.as_deref(), wireguard.as_deref()))
@@ -149,16 +153,19 @@ pub async fn open(app: &AppHandle, id: &str, url: &str, wireguard: Option<String
             let _ = app3.emit("browser-event", BrowserEvent { id: id3.clone(), url, title, loading: false });
         })
         // A link that opens a new tab becomes a Cablebag tab with the same profile and network. A window the page
-        // sizes itself (a sign-in pop-up) stays a pop-up of WebView2's own, in the same profile, so the page can
-        // still talk to it.
+        // sizes itself (a sign-in pop-up), or an empty one it sends somewhere after, becomes a pop-up window of
+        // Cablebag's (see `popup`), so the page can still talk to it.
         // A page can call window.open in a loop (WebView2 has no pop-up blocker): at most a few per tab at a time.
-        // An empty window (about:blank) stays a pop-up too: pages open one first and send it somewhere after.
         .on_new_window(move |u, features| {
             if !allowed(&u) || !opened_recently.lock().map(|mut t| allow_another(&mut t)).unwrap_or(false) {
                 return NewWindowResponse::Deny;
             }
             if features.size().is_some() || u.as_str() == "about:blank" {
-                return NewWindowResponse::Allow;
+                let n = popups.fetch_add(1, Ordering::Relaxed);
+                return match popup(&app4, &id4, n, &who, private, &u, features) {
+                    Ok(window) => NewWindowResponse::Create { window },
+                    Err(_) => NewWindowResponse::Deny,
+                };
             }
             let _ = app4.emit("browser-new-tab", NewTab { from: id4.clone(), url: u.to_string() });
             NewWindowResponse::Deny
@@ -173,6 +180,67 @@ pub async fn open(app: &AppHandle, id: &str, url: &str, wireguard: Option<String
     let wv = window.add_child(builder, LogicalPosition::new(x, y), LogicalSize::new(w.max(1.0), h.max(1.0)))?;
     crate::webnotify::attach(app, id, &wv);
     Ok(())
+}
+
+fn popup_prefix(tab: &str) -> String {
+    format!("popup-{}-", clean(tab))
+}
+
+/// A pop-up window a web tab's page opens itself (a sign-in window, or an empty one it fills after), as a
+/// window of Cablebag's: in the tab's own profile (WebView2 takes the opener's environment, and private stays
+/// private), so a sign-in lands in the right identity and the page can still talk to it. Its title names the
+/// profile and the page, it has Cablebag's icon, it stays with Cablebag's window and it closes with its tab. It
+/// only shows web pages and opens no further windows.
+fn popup(app: &AppHandle, tab: &str, n: u32, who: &str, private: bool, url: &Url, features: NewWindowFeatures) -> Result<tauri::WebviewWindow> {
+    let prefix = if who.is_empty() { String::new() } else { format!("{who}: ") };
+    let first = url.host_str().map(str::to_string).unwrap_or_else(|| "Opening...".into());
+    let named = prefix.clone();
+    let mut builder = WebviewWindowBuilder::new(app, format!("{}{n}", popup_prefix(tab)), WebviewUrl::External("about:blank".parse()?))
+        .title(format!("{prefix}{first}"))
+        .inner_size(960.0, 720.0)
+        .center()
+        .incognito(private)
+        .on_navigation(allowed)
+        .on_new_window(|_, _| NewWindowResponse::Deny)
+        .on_document_title_changed(move |w, title| {
+            let _ = w.set_title(&format!("{named}{title}"));
+        })
+        .window_features(features);
+    if let Some(icon) = app.default_window_icon().cloned() {
+        builder = builder.icon(icon)?;
+    }
+    // Owned by Cablebag's window: it stays in front of it and minimises with it. (The main window holds the web
+    // tabs' views too, so it is not a plain webview window; its handle is used directly.)
+    #[cfg(windows)]
+    if let Some(main) = app.get_window("main").and_then(|w| w.hwnd().ok()) {
+        builder = builder.owner_raw(main);
+    }
+    let window = builder.build()?;
+    // window.close() in the page (a sign-in window closing itself when done) only asks; the window is closed here.
+    #[cfg(windows)]
+    {
+        let w = window.clone();
+        let _ = window.with_webview(move |p| unsafe {
+            let Ok(core) = p.controller().CoreWebView2() else { return };
+            let handler = webview2_com::WindowCloseRequestedEventHandler::create(Box::new(move |_, _| {
+                let _ = w.close();
+                Ok(())
+            }));
+            let mut token = 0i64;
+            let _ = core.add_WindowCloseRequested(&handler, &mut token);
+        });
+    }
+    Ok(window)
+}
+
+/// Closes the pop-up windows of a web tab (all of them without `tab`, when Cablebag closes).
+pub fn close_popups(app: &AppHandle, tab: Option<&str>) {
+    let prefix = tab.map(popup_prefix).unwrap_or_else(|| "popup-".into());
+    for (label, w) in app.webview_windows() {
+        if label.starts_with(&prefix) {
+            let _ = w.close();
+        }
+    }
 }
 
 pub fn bounds(app: &AppHandle, id: &str, x: f64, y: f64, w: f64, h: f64) -> Result<()> {
@@ -210,6 +278,7 @@ pub fn command(app: &AppHandle, id: &str, what: &str, url: Option<String>) -> Re
 /// Closing a child web view in Tauri only forgets it: the window stays on screen. So it is hidden, the
 /// browser inside is shut down and its window destroyed here, before Tauri forgets it.
 pub fn close(app: &AppHandle, id: &str) {
+    close_popups(app, Some(id));
     let Some(wv) = app.get_webview(&label(id)) else { return };
     let _ = wv.hide();
     #[cfg(windows)]

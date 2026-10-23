@@ -24,8 +24,9 @@ installs it and starts Cablebag again. Every version is also on the
 - **Keep running**: a web session can open when Cablebag starts and keep running in the background, so its
   notifications keep coming. Other web tabs can go to sleep after a while to save memory (off unless you
   choose it) and open again where they were.
-- Links that open a new tab now open in a Cablebag tab with the same profile and network; sign-in pop-ups stay
-  pop-ups. Finished downloads are announced.
+- Links that open a new tab now open in a Cablebag tab with the same profile and network. Sign-in pop-ups open
+  as Cablebag windows in the same profile, titled with the profile and page, and close with their tab. Finished
+  downloads are announced.
 - **Import bookmarks** from Chrome, Edge and Firefox (Import sessions, in Settings, General or the command palette) as web sessions in the same folders.
   Importing again updates them instead of adding copies.
 

@@ -208,22 +208,29 @@ fn term_open_stream(
 /// Async on purpose: making a web view inside a synchronous command deadlocks on Windows.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-async fn browser_open(app: AppHandle, id: String, url: String, wireguard: Option<String>, profile: Option<String>, x: f64, y: f64, w: f64, h: f64) -> CmdResult<()> {
+async fn browser_open(app: AppHandle, id: String, url: String, wireguard: Option<String>, profile: Option<String>, who: Option<String>, x: f64, y: f64, w: f64, h: f64) -> CmdResult<()> {
     let set = |v: Option<String>| v.filter(|v| !v.is_empty() && v != "none");
     let profile = set(profile);
     let private = profile.as_deref() == Some("private");
-    browser::open(&app, &id, &url, set(wireguard), profile.filter(|p| p != "private"), private, x, y, w, h).await.map_err(err)
+    browser::open(&app, &id, &url, set(wireguard), profile.filter(|p| p != "private"), private, who.unwrap_or_default(), x, y, w, h).await.map_err(err)
 }
 
 /// The badge on Cablebag's taskbar button (the unread count of the web tabs): square RGBA pixels, or none.
 #[tauri::command]
 fn window_badge(app: AppHandle, rgba: Option<Vec<u8>>, size: u32) -> CmdResult<()> {
-    let window = app.get_window("main").ok_or("main window missing")?;
     if size == 0 || size > 256 {
         return Err("The badge is 1 to 256 pixels square.".into());
     }
-    let icon = rgba.filter(|p| p.len() == (size * size * 4) as usize).map(|p| tauri::image::Image::new_owned(p, size, size));
-    window.set_overlay_icon(icon).map_err(err)
+    // The overlay on the taskbar button is Windows' own; elsewhere there is nothing to set.
+    #[cfg(windows)]
+    {
+        let window = app.get_window("main").ok_or("main window missing")?;
+        let icon = rgba.filter(|p| p.len() == (size * size * 4) as usize).map(|p| tauri::image::Image::new_owned(p, size, size));
+        window.set_overlay_icon(icon).map_err(err)?;
+    }
+    #[cfg(not(windows))]
+    let _ = (app, rgba);
+    Ok(())
 }
 
 /// Shows a web tab's notification as a Windows notification (the window has decided it should show). Async, so
@@ -1241,6 +1248,12 @@ pub fn run() {
         .expect("error while running Cablebag")
         .run(|app, event| {
             // Sign out of CyberArk and Secret Server and check in what was checked out, without holding up the exit long.
+            // Pop-ups of web tabs go with Cablebag's window (otherwise Cablebag would keep running for them).
+            if let tauri::RunEvent::WindowEvent { label, event: tauri::WindowEvent::CloseRequested { .. }, .. } = &event {
+                if label == "main" {
+                    browser::close_popups(app, None);
+                }
+            }
             if let tauri::RunEvent::Exit = event {
                 let app = app.clone();
                 tauri::async_runtime::block_on(async move {

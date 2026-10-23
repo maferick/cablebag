@@ -111,7 +111,7 @@
 
   function open(url: string) {
     api
-      .browserOpen(tab.id, url, tab.session?.data?.wireguard, profileId, rect())
+      .browserOpen(tab.id, url, tab.session?.data?.wireguard, profileId, profile?.name, rect())
       .then(() => {
         // Made while the tab may not have its size yet: place it now (the effect above keeps it placed).
         opened = true;
