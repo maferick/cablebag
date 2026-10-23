@@ -447,6 +447,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | tauri-runtime-wry (Rust) | 2.12.3 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | tauri-utils (Rust) | 2.10.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | tauri-winres (Rust) | 0.3.7 | MIT | https://github.com/tauri-apps/winres |
+| tauri-winrt-notification (Rust) | 0.8.1 | MIT OR Apache-2.0 | https://github.com/tauri-apps/winrt-notification |
 | tempfile (Rust) | 3.27.0 | MIT OR Apache-2.0 | https://github.com/Stebalien/tempfile |
 | tendril (Rust) | 0.5.1 | MIT OR Apache-2.0 | https://github.com/servo/html5ever |
 | thiserror (Rust) | 1.0.69 | MIT OR Apache-2.0 | https://github.com/dtolnay/thiserror |
