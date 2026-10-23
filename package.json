@@ -11,7 +11,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri",
-    "build:rdp": "dotnet publish rdp-helper/CablebagRdp.csproj -c Release -o rdp-helper/publish -nologo -v q",
+    "build:rdp": "dotnet publish rdp-helper/CablebagRdp.csproj -c Release -o rdp-helper/publish -nologo -v q && node scripts/sign.mjs rdp-helper/publish/cablebag-rdp.exe",
     "build:xserver": "node scripts/xserver.mjs",
     "build:all": "npm run build:rdp && npm run build:xserver && npm run build"
   },
