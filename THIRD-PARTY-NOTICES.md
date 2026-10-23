@@ -70,6 +70,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | alloc-stdlib (Rust) | 0.3.0 | BSD-3-Clause | https://github.com/dropbox/rust-alloc-no-stdlib |
 | anyhow (Rust) | 1.0.104 | MIT OR Apache-2.0 | https://github.com/dtolnay/anyhow |
 | argon2 (Rust) | 0.6.0 | MIT OR Apache-2.0 | https://github.com/RustCrypto/password-hashes |
+| assert-json-diff (Rust) | 2.0.2 | MIT | https://github.com/davidpdrsn/assert-json-diff.git |
 | async_io_stream (Rust) | 0.3.3 | Unlicense | https://github.com/najamelan/async_io_stream |
 | async-trait (Rust) | 0.1.92 | MIT OR Apache-2.0 | https://github.com/dtolnay/async-trait |
 | atomic-waker (Rust) | 1.1.2 | Apache-2.0 OR MIT | https://github.com/smol-rs/atomic-waker |
@@ -137,6 +138,8 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | darling_macro (Rust) | 0.24.1 | MIT | https://github.com/TedDriggs/darling |
 | dashmap (Rust) | 6.2.1 | MIT | https://github.com/xacrimon/dashmap |
 | data-encoding (Rust) | 2.11.1 | MIT | https://github.com/ia0/data-encoding |
+| deadpool (Rust) | 0.12.3 | MIT OR Apache-2.0 | https://github.com/bikeshedder/deadpool |
+| deadpool-runtime (Rust) | 0.1.4 | MIT OR Apache-2.0 | https://github.com/bikeshedder/deadpool |
 | defmt (Rust) | 1.2.0 | MIT OR Apache-2.0 | https://github.com/knurling-rs/defmt |
 | defmt-macros (Rust) | 1.2.0 | MIT OR Apache-2.0 | https://github.com/knurling-rs/defmt |
 | defmt-parser (Rust) | 1.1.0 | MIT OR Apache-2.0 | https://github.com/knurling-rs/defmt |
@@ -214,6 +217,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | http-body (Rust) | 1.1.0 | MIT | https://github.com/hyperium/http-body |
 | http-body-util (Rust) | 0.1.5 | MIT | https://github.com/hyperium/http-body |
 | httparse (Rust) | 1.10.1 | MIT OR Apache-2.0 | https://github.com/seanmonstar/httparse |
+| httpdate (Rust) | 1.0.3 | MIT OR Apache-2.0 | https://github.com/pyfisch/httpdate |
 | hybrid-array (Rust) | 0.4.15 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hybrid-array |
 | hyper (Rust) | 1.12.0 | MIT | https://github.com/hyperium/hyper |
 | hyper-rustls (Rust) | 0.27.10 | Apache-2.0 OR ISC OR MIT | https://github.com/rustls/hyper-rustls |
@@ -277,6 +281,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | new_debug_unreachable (Rust) | 1.0.6 | MIT | https://github.com/mbrubeck/rust-debug-unreachable |
 | nix (Rust) | 0.28.0 | MIT | https://github.com/nix-rust/nix |
 | ntapi (Rust) | 0.4.3 | Apache-2.0 OR MIT | https://github.com/MSxDOS/ntapi |
+| num_cpus (Rust) | 1.17.0 | MIT OR Apache-2.0 | https://github.com/seanmonstar/num_cpus |
 | num-bigint (Rust) | 0.5.1 | MIT OR Apache-2.0 | https://github.com/rust-num/num-bigint |
 | num-bigint-dig (Rust) | 0.8.6 | MIT/Apache-2.0 | https://github.com/dignifiedquire/num-bigint |
 | num-conv (Rust) | 0.2.2 | MIT OR Apache-2.0 | https://github.com/jhpratt/num-conv |
@@ -528,6 +533,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | winnow (Rust) | 1.0.4 | MIT | https://github.com/winnow-rs/winnow |
 | winreg (Rust) | 0.10.1 | MIT | https://github.com/gentoo90/winreg-rs |
 | winreg (Rust) | 0.56.0 | MIT | https://github.com/gentoo90/winreg-rs |
+| wiremock (Rust) | 0.6.5 | MIT/Apache-2.0 | https://github.com/LukeMathWalker/wiremock-rs |
 | wnaf (Rust) | 0.14.1 | Apache-2.0 OR MIT | https://github.com/RustCrypto/elliptic-curves |
 | writeable (Rust) | 0.6.4 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | wry (Rust) | 0.57.0 | Apache-2.0 OR MIT | https://github.com/tauri-apps/wry |
