@@ -6,6 +6,7 @@ export const SOURCE_KINDS: { kind: SourceKind; label: string }[] = [
   { kind: "vaultwarden", label: "Vaultwarden or Bitwarden" },
   { kind: "cyberark", label: "CyberArk (Privilege Cloud or PVWA)" },
   { kind: "delinea", label: "Delinea Secret Server" },
+  { kind: "protonpass", label: "Proton Pass" },
 ];
 
 /** The credential sources and the logins of the open ones. */
@@ -69,7 +70,7 @@ class VaultStore {
     const ok = await this.run(s.id, () => api.sourceUnlock(s.id));
     if (ok) {
       const n = this.source(s.id)?.items ?? 0;
-      app.notify(`${s.name} ${s.kind === "vaultwarden" ? "unlocked" : "signed in"}: ${n} logins`);
+      app.notify(`${s.name} ${s.kind === "vaultwarden" ? "unlocked" : s.kind === "protonpass" ? "opened" : "signed in"}: ${n} logins`);
     }
     return ok;
   }

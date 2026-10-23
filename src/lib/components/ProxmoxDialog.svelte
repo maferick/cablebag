@@ -24,9 +24,9 @@
   let log = $state("");
 
   onMount(() => {
-    app.dialogOpen = true;
+    app.dialogs++;
     load();
-    return () => (app.dialogOpen = false);
+    return () => app.dialogs--;
   });
 
   async function load() {

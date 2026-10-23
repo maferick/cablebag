@@ -8,6 +8,7 @@
   import SettingsRow from "./SettingsRow.svelte";
   import CyberArkFields from "./sources/CyberArkFields.svelte";
   import DelineaFields from "./sources/DelineaFields.svelte";
+  import ProtonPassFields from "./sources/ProtonPassFields.svelte";
   import { Plus, Pencil, Trash2, Lock, LockOpen, RefreshCw, ArrowUp, Undo2 } from "@lucide/svelte";
 
   let editing = $state<SourceConfig | null>(null);
@@ -39,7 +40,7 @@
 
   async function save() {
     if (!editing) return;
-    if (!editing.url.trim()) {
+    if (!editing.url.trim() && editing.kind !== "protonpass") {
       error = "Fill in the address of the server.";
       return;
     }
@@ -49,6 +50,8 @@
     }
     try {
       const saved = await vault.save($state.snapshot(editing) as SourceConfig);
+      // Where pass-cli is stays a setting of this PC (the backend keeps it out of the synced list).
+      if (editing.kind === "protonpass") app.settings[`protonpass.cli.${saved.id}`] = String(editing.options?.cli ?? "").trim().replace(/^"|"$/g, "");
       app.notify(`${saved.name} saved`);
       editing = null;
     } catch (e) {
@@ -97,7 +100,7 @@
       </SettingsRow>
     {/each}
   {:else}
-    <SettingsRow help="No source yet. Add one below: a Vaultwarden or Bitwarden vault, CyberArk, or Delinea Secret Server.">
+    <SettingsRow help="No source yet. Add one below: a Vaultwarden or Bitwarden vault, CyberArk, Delinea Secret Server or Proton Pass.">
       <span></span>
     </SettingsRow>
   {/each}
@@ -128,6 +131,8 @@
       <CyberArkFields bind:source={editing} />
     {:else if editing.kind === "delinea"}
       <DelineaFields bind:source={editing} />
+    {:else if editing.kind === "protonpass"}
+      <ProtonPassFields bind:source={editing} />
     {/if}
     {#if error}
       <SettingsRow><p class="bad">{error}</p></SettingsRow>

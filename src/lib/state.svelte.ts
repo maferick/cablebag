@@ -192,7 +192,8 @@ class AppState {
   /** Tabs with changes that are not saved yet (editors): closing them asks first. */
   unsaved = new SvelteSet<string>();
   /** Another dialog over the tabs (Proxmox snapshots or tasks), so remote screens step aside. */
-  dialogOpen = $state(false);
+  /** Dialogs of their own that are open (they hide the web pages and remote screens under them). */
+  dialogs = $state(0);
   /** The folder "Run on many servers" starts with (from a folder's menu). */
   runManyFolder = $state<string | null>(null);
   toast = $state<{ text: string; kind: "info" | "error" } | null>(null);
@@ -200,7 +201,7 @@ class AppState {
 
   /** True while something is drawn over the tab area, so native RDP windows must step aside. */
   get overlay(): boolean {
-    return !!(this.prompts.length || this.editing || this.importOpen || this.reporting || this.paletteOpen || this.proxmoxEditing || this.folderEditing || this.dialogOpen || ask.current);
+    return !!(this.prompts.length || this.editing || this.importOpen || this.reporting || this.paletteOpen || this.proxmoxEditing || this.folderEditing || this.dialogs > 0 || ask.current);
   }
 
   get active(): Tab | undefined {

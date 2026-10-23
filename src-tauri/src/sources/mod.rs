@@ -1,6 +1,6 @@
 //! Credential sources: where logins come from besides Cablebag's own store. Any number of them, each with
 //! a name and a kind: Vaultwarden or Bitwarden ("vaultwarden"), CyberArk Privilege Cloud or a self-hosted
-//! PVWA ("cyberark") and Delinea Secret Server ("delinea").
+//! PVWA ("cyberark"), Delinea Secret Server ("delinea") and Proton Pass through its pass-cli ("protonpass").
 //!
 //! Sessions, folders, Proxmox servers, WireGuard networks, AI hosts and the sync refer to one login by a
 //! reference: "source:item", or a bare item id for the first vault (from before there were several
@@ -10,6 +10,7 @@
 pub mod cyberark;
 pub mod delinea;
 pub mod matching;
+pub mod protonpass;
 pub mod vaultwarden;
 pub mod webauth;
 
@@ -35,7 +36,7 @@ pub struct SourceConfig {
     pub id: String,
     #[serde(default)]
     pub name: String,
-    /// "vaultwarden", "cyberark" or "delinea".
+    /// "vaultwarden", "cyberark", "delinea" or "protonpass".
     pub kind: String,
     /// The server: the vault, the PVWA or Privilege Cloud address, the Secret Server address.
     #[serde(default)]
@@ -104,7 +105,7 @@ pub struct SourceStatus {
     pub options: Value,
     /// Enough is filled in to sign in.
     pub configured: bool,
-    /// Open (Vaultwarden) or signed in (CyberArk, Delinea).
+    /// Open (Vaultwarden, Proton Pass) or signed in (CyberArk, Delinea).
     pub unlocked: bool,
     /// This PC keeps something that opens it again after a restart.
     pub remembered: bool,
@@ -197,6 +198,7 @@ pub enum Backend {
     Vaultwarden(vaultwarden::Vaultwarden),
     CyberArk(cyberark::CyberArk),
     Delinea(delinea::Delinea),
+    ProtonPass(protonpass::ProtonPass),
 }
 
 impl Backend {
@@ -205,6 +207,7 @@ impl Backend {
             "vaultwarden" => Backend::Vaultwarden(Default::default()),
             "cyberark" => Backend::CyberArk(Default::default()),
             "delinea" => Backend::Delinea(Default::default()),
+            "protonpass" => Backend::ProtonPass(Default::default()),
             other => bail!("Cablebag does not know credential sources of the kind \"{other}\"."),
         })
     }
@@ -217,6 +220,7 @@ macro_rules! each {
             Backend::Vaultwarden($x) => $e,
             Backend::CyberArk($x) => $e,
             Backend::Delinea($x) => $e,
+            Backend::ProtonPass($x) => $e,
         }
     };
 }
@@ -277,6 +281,17 @@ impl Sources {
         cfg.account = cfg.account.trim().to_string();
         if !cfg.options.is_object() {
             cfg.options = json!({});
+        }
+        // Where pass-cli is stays on this PC: a program path from the sync would be another PC's choice to run here.
+        if cfg.kind == "protonpass" {
+            let cli = cfg.options.as_object_mut().and_then(|o| o.remove("cli")).and_then(|v| v.as_str().map(str::to_string));
+            if let Some(cli) = cli {
+                let checked = protonpass::check_cli(&cli)?;
+                if cfg.id.is_empty() {
+                    cfg.id = uuid::Uuid::new_v4().simple().to_string()[..12].to_string();
+                }
+                app.state::<AppState>().store.lock().set_setting(&protonpass::cli_setting(&cfg.id), &json!(checked))?;
+            }
         }
         let mut list = configs(app);
         if cfg.id.is_empty() {
@@ -569,6 +584,7 @@ pub fn kind_name(kind: &str) -> &'static str {
         "vaultwarden" => "Vaultwarden",
         "cyberark" => "CyberArk",
         "delinea" => "Delinea Secret Server",
+        "protonpass" => "Proton Pass",
         _ => "Credential source",
     }
 }

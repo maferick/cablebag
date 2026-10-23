@@ -9,7 +9,10 @@
   import { tiles } from "../tiles.svelte";
   import { browserProfiles, PRIVATE, SHARED } from "../browserProfiles.svelte";
   import { unreadFromTitle } from "../unread";
-  import { ArrowLeft, ArrowRight, RotateCw, ExternalLink, Globe, ChevronDown } from "@lucide/svelte";
+  import { vault } from "../vault.svelte";
+  import { ask } from "../ask.svelte";
+  import FillLoginDialog from "./FillLoginDialog.svelte";
+  import { ArrowLeft, ArrowRight, RotateCw, ExternalLink, Globe, ChevronDown, KeyRound } from "@lucide/svelte";
 
   let { tab, visible }: { tab: Tab; visible: boolean } = $props();
   let area: HTMLDivElement;
@@ -49,6 +52,67 @@
     if (profileId) items.push({ label: "Open this page in the shared profile", action: () => openIn(SHARED) });
     items.push("sep", { label: "Browser profiles...", action: () => app.openSettings("browsers") });
     return items;
+  }
+
+  // ---- Filling a login from the credential sources (only when asked, with the login the person picks) ----
+
+  /** The page's site while "Choose another login" is open. */
+  let pickFor = $state<string | null>(null);
+  /** The page is not encrypted (http), as the last menu found. */
+  let plain = false;
+  let asking = false;
+
+  /** Fills a login; `confirmedHost` when the person confirmed one not saved for this site (it must still be there). */
+  async function fill(id: string, name: string, confirmedHost?: string) {
+    try {
+      await invoke("browser_fill", { id: tab.id, item: id, confirmedHost: confirmedHost ?? null });
+      app.notify(plain ? `Filled ${name}. This page is not encrypted (http): what you send can be read on the way.` : `Filled ${name}`);
+    } catch (e) {
+      app.notify(String(e), "error");
+    }
+  }
+
+  async function fillMenu(el: HTMLElement) {
+    if (asking) return;
+    const configured = vault.sources.filter((s) => s.configured);
+    if (!configured.length) {
+      menu.showAt(el, [{ label: "Set up a credential source to fill logins from...", action: () => app.openSettings("vault") }]);
+      return;
+    }
+    let found: { host: string; plain: boolean; choices: { id: string; name: string; username: string; source: string; fits: boolean }[] };
+    asking = true;
+    try {
+      found = await invoke("browser_fill_choices", { id: tab.id });
+    } catch (e) {
+      app.notify(String(e), "error");
+      return;
+    } finally {
+      asking = false;
+    }
+    if (!el.isConnected) return;
+    plain = found.plain;
+    const several = configured.length > 1;
+    const label = (c: { name: string; username: string }) => (c.username ? `${c.name} · ${c.username}` : c.name);
+    const items: MenuEntry[] = found.choices
+      .filter((c) => c.fits)
+      .map((c) => ({ label: label(c), hint: several ? c.source : undefined, action: () => fill(c.id, c.name) }));
+    const named = found.choices.filter((c) => !c.fits);
+    if (named.length) {
+      if (items.length) items.push("sep");
+      for (const c of named)
+        items.push({
+          label: label(c),
+          hint: "not saved for this site",
+          action: async () => {
+            if (await ask.confirm(`Fill ${c.name}?`, `This login is not saved for ${found.host}. Fill it into this page on ${found.host} anyway?`, { okLabel: "Fill" })) fill(c.id, c.name, found.host);
+          },
+        });
+    }
+    if (!items.length) items.push({ label: `No saved login for ${found.host}`, disabled: true });
+    const locked = configured.filter((s) => !s.unlocked);
+    if (locked.length) items.push("sep", ...locked.map((s) => ({ label: `Open ${s.name} for more logins`, action: () => vault.unlock(s.id) })));
+    items.push("sep", { label: "Choose another login...", action: () => (pickFor = found.host) });
+    menu.showAt(el, items);
   }
 
   // The page is a web view of its own over this area; it steps aside for dialogs and menus.
@@ -174,6 +238,7 @@
       <Globe size={13} />
       <input id={`addr-${tab.id}`} bind:value={address} spellcheck="false" autocomplete="off" aria-label="Address" />
     </form>
+    <button class="icon-btn" title="Fill a login from your credential sources" aria-label="Fill a login from your credential sources" onclick={(e) => fillMenu(e.currentTarget as HTMLElement)}><KeyRound size={15} /></button>
     {#if profile || browserProfiles.list.length}
       <button
         class="profile"
@@ -199,6 +264,18 @@
     </div>
   </div>
 </div>
+
+{#if pickFor}
+  <FillLoginDialog
+    host={pickFor}
+    onclose={() => (pickFor = null)}
+    onpick={(id, name) => {
+      const host = pickFor ?? "";
+      pickFor = null;
+      fill(id, name, host);
+    }}
+  />
+{/if}
 
 <style>
   .browser {

@@ -30,6 +30,11 @@ installs it and starts Cablebag again. Every version is also on the
 - Links that open a new tab now open in a Cablebag tab with the same profile and network. Sign-in pop-ups open
   as Cablebag windows in the same profile, titled with the profile and page, and close with their tab. Finished
   downloads are announced.
+- **Fill logins** in web tabs from your credential sources: the key button in the address bar offers the logins
+  saved for the page's site (on Microsoft's and Google's sign-in pages, those saved for their sites), and fills the
+  one you pick. Nothing is filled by itself; a login saved for another site is only filled after you confirm it.
+- **Proton Pass** as a credential source, through Proton's own command-line tool pass-cli (it keeps its own
+  sign-in through your web browser). Where pass-cli is stays a setting of this PC and never goes into the sync.
 - **Import bookmarks** from Chrome, Edge and Firefox (Import sessions, in Settings, General or the command palette) as web sessions in the same folders.
   Importing again updates them instead of adding copies.
 

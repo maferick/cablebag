@@ -156,7 +156,7 @@ export interface SyncResult {
 }
 
 /** The kinds of credential source. */
-export type SourceKind = "vaultwarden" | "cyberark" | "delinea";
+export type SourceKind = "vaultwarden" | "cyberark" | "delinea" | "protonpass";
 
 /** A credential source as set up in Settings. No secrets: this syncs. */
 export interface SourceConfig {

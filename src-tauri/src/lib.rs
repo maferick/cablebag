@@ -26,6 +26,7 @@ mod tunnels;
 mod updater;
 mod vault;
 mod vnc;
+mod webfill;
 mod webnotify;
 mod wg;
 mod winrm;
@@ -231,6 +232,19 @@ fn window_badge(app: AppHandle, rgba: Option<Vec<u8>>, size: u32) -> CmdResult<(
     #[cfg(not(windows))]
     let _ = (app, rgba);
     Ok(())
+}
+
+/// The logins the credential sources hold for a web tab's page, saved for it first.
+#[tauri::command]
+fn browser_fill_choices(app: AppHandle, id: String) -> CmdResult<webfill::Choices> {
+    webfill::choices(&app, &id).map_err(err)
+}
+
+/// Fills a login into a web tab's page; `confirmed_host` after the person confirmed one not saved for the page's
+/// site, for that site.
+#[tauri::command]
+async fn browser_fill(app: AppHandle, id: String, item: String, confirmed_host: Option<String>) -> CmdResult<()> {
+    webfill::fill(&app, &id, &item, confirmed_host).await.map_err(err)
 }
 
 /// Shows a web tab's notification as a Windows notification (the window has decided it should show). Async, so
@@ -1150,6 +1164,8 @@ pub fn run() {
             browser_profile_forget,
             window_badge,
             browser_notify,
+            browser_fill_choices,
+            browser_fill,
             sftp_home,
             sftp_list,
             sftp_mkdir,

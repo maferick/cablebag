@@ -13,7 +13,7 @@
 Cablebag is a free remote access app for Windows 10 and 11. It puts SSH, Remote Desktop (RDP), VNC, Telnet,
 serial ports, SFTP and FTP, PowerShell remoting (WinRM), local shells and WSL, web pages and Proxmox consoles in
 tabs in one window, with remote files beside every SSH tab, logins from your credential sources (Vaultwarden or
-Bitwarden, CyberArk, Delinea Secret Server), session sync, and an assistant that can work on your servers.
+Bitwarden, CyberArk, Delinea Secret Server, Proton Pass), session sync, and an assistant that can work on your servers.
 It can run WireGuard inside the app, per session, so two customers' VPNs with the same address ranges can be
 open at the same time. It is made for system administrators, IT consultants and MSP staff who look after many
 customer networks, and for homelab users who want their servers, Proxmox machines and consoles in one place.
@@ -111,8 +111,10 @@ tabs, at the same time.
 - **Logins from your credential sources**: as many Vaultwarden or Bitwarden vaults as you use (work and home
   side by side, unlocked with Windows Hello), CyberArk (Privilege Cloud or your own PVWA, with single sign-on in a
   Cablebag window, reasons and tickets, check-out and check-in) and Delinea Secret Server (with two-factor codes,
-  comments, tickets and check-out). API keys and WireGuard private keys can come from there as well. The login
-  picker shows the logins of every open source, grouped by source.
+  comments, tickets and check-out), and Proton Pass through Proton's own pass-cli. API keys and WireGuard private
+  keys can come from there as well. The login picker shows the logins of every open source, grouped by source.
+- **Fill logins in web tabs**: the key button in the address bar offers the logins saved for the page's site and
+  fills the one you pick; nothing is filled by itself, and a login for another site needs your yes first.
 - **Through CyberArk PSM**: a session or a whole folder can connect over SSH or SFTP through PSM for SSH, or over
   Remote Desktop through the PSM server, so the target's password never reaches your PC.
 - CyberArk and Delinea Secret Server were built from their documentation; reports from people who use them are
