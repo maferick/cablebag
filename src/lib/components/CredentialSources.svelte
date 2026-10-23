@@ -76,7 +76,7 @@
   {#each vault.sources as s, i (s.id)}
     <SettingsRow label={s.name} help={line(s)}>
       <div class="btns end">
-        {#if i > 0}<button class="icon-btn" title="Move up: the first source opens when a connect needs a login and none is open" onclick={() => up(i)}><ArrowUp size={14} /></button>{/if}
+        {#if i > 0}<button class="icon-btn" title="Move up: the first source opens when a connect needs a login and none is open" aria-label="Move up: the first source opens when a connect needs a login and none is open" onclick={() => up(i)}><ArrowUp size={14} /></button>{/if}
         {#if s.configured}
           {#if s.unlocked}
             <button class="btn" disabled={vault.busyIds.includes(s.id)} title="Load the logins again" onclick={() => vault.sync(s.id)}><RefreshCw size={14} /></button>
@@ -88,7 +88,7 @@
           {/if}
         {/if}
         <button class="btn" onclick={() => edit(s)}><Pencil size={13} /> Edit</button>
-        <button class="icon-btn" title="Remove" onclick={() => remove(s)}><Trash2 size={14} /></button>
+        <button class="icon-btn" title="Remove" aria-label="Remove" onclick={() => remove(s)}><Trash2 size={14} /></button>
       </div>
     </SettingsRow>
     {#each s.checked_out as c (c.id)}

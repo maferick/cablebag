@@ -213,7 +213,7 @@ async fn find_login(app: &AppHandle, session: &Session, out: &TermOut) -> Option
     let mut user = session.username.trim().to_string();
     let item = s(session, "vault_item");
     if !item.is_empty() {
-        match state.vw.login(app, &item).await {
+        match state.creds.login(app, &item).await {
             Ok((u, pw)) => {
                 if user.is_empty() {
                     user = u;
@@ -233,13 +233,13 @@ async fn find_login(app: &AppHandle, session: &Session, out: &TermOut) -> Option
         }
     }
     if item.is_empty() {
-        match state.vw.pick_login(app, "winrm", &host, &user, &session.name).await {
+        match state.creds.pick_login(app, "winrm", &host, &user, &session.name).await {
             Ok(Some((found, name, u, pw))) if !pw.is_empty() => {
                 if user.is_empty() {
                     user = u;
                 }
                 out.info(&format!("Using the vault login \"{name}\"."));
-                crate::bitwarden::link_session(app, &session.id, &found);
+                crate::sources::link_session(app, &session.id, &found);
                 return Some((Login { user, password: pw }, false));
             }
             Ok(_) => {}
