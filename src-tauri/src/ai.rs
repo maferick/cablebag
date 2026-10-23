@@ -338,6 +338,9 @@ pub async fn chat(app: AppHandle, req: ChatRequest, out: Channel<ChatEvent>) -> 
     Ok(())
 }
 
+/// The most one streamed answer may hold (text, tool calls and what is still waiting for a line end).
+const MAX_ANSWER: usize = 16 * 1024 * 1024;
+
 /// Reads the server-sent events of a streamed answer. Tool calls arrive in pieces and are put together here.
 async fn stream(h: &Host, key: &str, body: &Value, out: &Channel<ChatEvent>, stopped: &mut watch::Receiver<bool>) -> Result<(String, String)> {
     let http = client()?;
@@ -359,6 +362,10 @@ async fn stream(h: &Host, key: &str, body: &Value, out: &Channel<ChatEvent>, sto
         };
         let Some(chunk) = chunk else { break };
         buf.push_str(&String::from_utf8_lossy(&chunk));
+        // A broken or hostile endpoint could stream without end; no real answer comes near this.
+        if buf.len() + all.len() + calls.iter().map(|c| c.2.len()).sum::<usize>() > MAX_ANSWER {
+            bail!("The answer from {} grew larger than {} MB, so Cablebag stopped it.", h.name, MAX_ANSWER / (1024 * 1024));
+        }
         while let Some(pos) = buf.find('\n') {
             let line = buf[..pos].trim().to_string();
             buf.drain(..=pos);

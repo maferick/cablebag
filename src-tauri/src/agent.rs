@@ -39,11 +39,11 @@ pub struct Verdict {
 
 /// Programs that only read, whatever their arguments (apart from the exceptions in `reads`).
 const READ_PROGRAMS: &[&str] = &[
-    "ls", "ll", "cat", "head", "tail", "grep", "egrep", "fgrep", "zgrep", "zcat", "wc", "sort", "uniq", "cut", "awk", "column",
+    "ls", "ll", "cat", "head", "tail", "grep", "egrep", "fgrep", "zgrep", "zcat", "wc", "cut", "column",
     "df", "du", "free", "uptime", "ps", "pgrep", "pstree", "top", "uname", "hostname", "hostnamectl", "whoami", "id", "groups",
     "who", "w", "last", "date", "timedatectl", "stat", "file", "which", "whereis", "type", "lsblk", "blkid", "lscpu", "lsmem",
     "lspci", "lsusb", "lsof", "mount", "findmnt", "ip", "ss", "netstat", "ping", "traceroute", "tracepath", "dig", "nslookup",
-    "host", "getent", "env", "printenv", "echo", "printf", "pwd", "realpath", "readlink", "basename", "dirname", "md5sum",
+    "host", "getent", "printenv", "echo", "printf", "pwd", "realpath", "readlink", "basename", "dirname", "md5sum",
     "sha1sum", "sha256sum", "diff", "cmp", "tree", "nproc", "vmstat", "iostat", "mpstat", "dmesg", "journalctl", "uptime",
     "pveversion", "pvesm", "zfs", "zpool", "nginx", "apachectl", "openssl", "curl", "wget", "jq", "yq", "less", "more", "true",
 ];
@@ -95,20 +95,55 @@ fn reads(words: &[&str]) -> bool {
     let rest = &words[1.min(words.len())..];
     let has = |x: &str| rest.iter().any(|w| *w == x);
     match w0 {
-        "find" => !rest.iter().any(|w| matches!(*w, "-delete" | "-exec" | "-execdir" | "-ok" | "-fprint" | "-fprintf" | "-fls")),
-        "sed" => !rest.iter().any(|w| w.starts_with("-i") || *w == "--in-place"),
+        "find" => !rest.iter().any(|w| *w == "-delete" || w.starts_with("-exec") || w.starts_with("-ok") || w.starts_with("-fprint") || *w == "-fls"),
+        "sed" => sed_reads(rest),
+        "awk" | "gawk" | "mawk" | "nawk" => awk_reads(rest),
+        // env with a program runs that program.
+        "env" => rest.iter().all(|w| w.starts_with('-')),
+        "sort" => !rest.iter().any(|w| w.starts_with("--output") || w.starts_with("--compress-program") || short_option(w, "o")),
+        // uniq's second file is where it writes.
+        "uniq" => {
+            let mut files = 0;
+            let mut skip = false;
+            for w in rest {
+                if std::mem::take(&mut skip) {
+                    continue;
+                }
+                if matches!(*w, "-f" | "-s" | "-w") {
+                    skip = true;
+                } else if !w.starts_with('-') {
+                    files += 1;
+                }
+            }
+            files <= 1
+        }
+        "tree" => !has("-o"),
+        "yq" => !rest.iter().any(|w| w.starts_with("--inplace") || short_option(w, "i")),
+        "less" | "more" => !rest.iter().any(|w| matches!(*w, "-o" | "-O") || w.starts_with("--log-file") || w.starts_with("--LOG-FILE")),
+        "ss" => !rest.iter().any(|w| *w == "--kill" || short_option(w, "K")),
+        "file" => !rest.iter().any(|w| *w == "--compile" || short_option(w, "C")),
         // Options may come before the subcommand (systemctl --no-pager --failed); without one it lists units.
         "systemctl" => match rest.iter().find(|w| !w.starts_with('-')) {
             Some(s) => matches!(*s, "status" | "is-active" | "is-enabled" | "is-failed" | "list-units" | "list-unit-files" | "list-timers" | "list-sockets" | "show" | "cat" | "list-dependencies"),
             None => true,
         },
         "journalctl" => !rest.iter().any(|w| w.starts_with("--vacuum") || *w == "--rotate" || *w == "--flush"),
-        "ip" => !rest.iter().any(|w| matches!(*w, "add" | "del" | "delete" | "set" | "change" | "replace" | "flush" | "append")),
+        // ip netns exec runs any program; -batch reads its commands from a file.
+        "ip" => !rest.iter().any(|w| matches!(*w, "add" | "del" | "delete" | "set" | "change" | "replace" | "flush" | "append" | "exec" | "-b" | "-batch" | "-force")),
         "docker" | "podman" if rest.first() == Some(&"compose") => rest.get(1).is_some_and(|s| matches!(*s, "ps" | "logs" | "config" | "images" | "top" | "ls" | "version")),
         "docker" | "podman" => rest.first().is_some_and(|s| matches!(*s, "ps" | "logs" | "inspect" | "images" | "stats" | "top" | "version" | "info" | "port" | "diff" | "history")),
         "docker-compose" => rest.first().is_some_and(|s| matches!(*s, "ps" | "logs" | "config" | "images" | "top")),
         "kubectl" => rest.first().is_some_and(|s| matches!(*s, "get" | "describe" | "logs" | "top" | "version" | "explain" | "api-resources" | "cluster-info")),
-        "git" => rest.first().is_some_and(|s| matches!(*s, "status" | "log" | "diff" | "show" | "branch" | "remote" | "rev-parse" | "describe" | "blame")),
+        "git" if rest.iter().any(|w| w.starts_with("--output")) => false,
+        // git branch name creates a branch, -d deletes one; git remote add adds one.
+        "git" if rest.first() == Some(&"branch") => {
+            let opts = &rest[1..];
+            let list = opts.iter().any(|w| matches!(*w, "-l" | "--list" | "--contains" | "--no-contains" | "--merged" | "--no-merged" | "--points-at"));
+            !opts.iter().any(|w| matches!(*w, "-d" | "-D" | "--delete" | "-m" | "-M" | "--move" | "-c" | "-C" | "--copy" | "-f" | "--force" | "-u" | "--unset-upstream" | "--edit-description" | "-t" | "--track" | "--no-track") || w.starts_with("--set-upstream"))
+                && (list || opts.iter().all(|w| w.starts_with('-')))
+        }
+        "git" if rest.first() == Some(&"remote") => rest.get(1).is_none_or(|s| matches!(*s, "-v" | "--verbose" | "show" | "get-url")),
+        "git" => rest.first().is_some_and(|s| matches!(*s, "status" | "log" | "diff" | "show" | "rev-parse" | "describe" | "blame")),
         "apt" => rest.first().is_some_and(|s| matches!(*s, "list" | "show" | "search" | "policy")),
         "apt-cache" | "dpkg-query" => true,
         "dpkg" => rest.first().is_some_and(|s| matches!(*s, "-l" | "-L" | "-s" | "--list" | "--status" | "--listfiles")),
@@ -118,16 +153,37 @@ fn reads(words: &[&str]) -> bool {
         "zpool" => rest.first().is_some_and(|s| matches!(*s, "status" | "list" | "iostat" | "get" | "history")),
         "zfs" => rest.first().is_some_and(|s| matches!(*s, "list" | "get")),
         "pvesm" => rest.first().is_some_and(|s| matches!(*s, "status" | "list")),
-        "nginx" => has("-t") || has("-T") || has("-v") || has("-V"),
-        "apachectl" => has("-t") || has("-S") || has("configtest"),
-        "openssl" => rest.first().is_some_and(|s| matches!(*s, "x509" | "s_client" | "version" | "crl" | "verify")),
-        "curl" => !rest.iter().any(|w| matches!(*w, "-X" | "--request" | "-d" | "--data" | "-F" | "--form" | "-T" | "--upload-file" | "-o" | "-O" | "--output")),
-        "wget" => has("--spider") || has("-O-") || has("-qO-"),
+        // Only testing and showing; -s would signal the server and -g adds directives. -c and -p take a path.
+        "nginx" => {
+            let mut ok = false;
+            let mut i = 0;
+            while i < rest.len() {
+                match rest[i] {
+                    "-t" | "-T" | "-v" | "-V" => ok = true,
+                    "-q" => {}
+                    "-c" | "-p" => i += 1,
+                    _ => return false,
+                }
+                i += 1;
+            }
+            ok
+        }
+        "apachectl" => !rest.is_empty() && rest.iter().all(|w| matches!(*w, "-t" | "-S" | "-M" | "-v" | "-V" | "-l" | "-L" | "configtest")),
+        "openssl" => {
+            rest.first().is_some_and(|s| matches!(*s, "x509" | "s_client" | "version" | "crl" | "verify"))
+                && !rest.iter().any(|w| matches!(w.to_ascii_lowercase().as_str(), "-out" | "-keyout" | "-sess_out" | "-msgfile" | "-keylogfile" | "-writerand" | "-cacreateserial"))
+        }
+        "curl" => curl_reads(rest),
+        "wget" => {
+            (has("--spider") || has("-O-") || has("-qO-"))
+                && !rest.iter().any(|w| {
+                    matches!(*w, "-o" | "-a" | "-e") || w.starts_with("--output-file") || w.starts_with("--append-output") || w.starts_with("--execute") || w.starts_with("--save-cookies") || w.starts_with("--post") || w.starts_with("--body") || w.starts_with("--method")
+                })
+        }
         "dmesg" => !has("-C") && !has("-c") && !has("--clear"),
         "hostname" | "hostnamectl" | "date" | "timedatectl" => rest.is_empty() || rest.first() == Some(&"status"),
         "top" => has("-b") || has("-bn1"),
         "mount" => rest.is_empty() || rest.iter().all(|w| w.starts_with('-') && (w.contains('l') || *w == "-t")),
-        "awk" => !rest.iter().any(|w| w.contains("system(") || w.contains("> ") || w.contains(">\"")),
         // `command -v x` only looks up where a program is; `command x` would run it.
         "command" => rest.first().is_some_and(|s| *s == "-v" || *s == "-V"),
         "test" | "[" | "[[" => true,
@@ -135,6 +191,198 @@ fn reads(words: &[&str]) -> bool {
         "chage" => has("-l") || has("--list"),
         _ => READ_PROGRAMS.contains(&w0),
     }
+}
+
+/// Whether a word is a short option (-x, or bundled ones such as -nx) that includes one of the letters.
+fn short_option(word: &str, letters: &str) -> bool {
+    word.len() > 1 && word.starts_with('-') && !word.starts_with("--") && word[1..].chars().any(|c| letters.contains(c))
+}
+
+/// sed only reads unless it edits in place, takes its script from a file, or the script writes or runs.
+fn sed_reads(rest: &[&str]) -> bool {
+    let sandbox = rest.contains(&"--sandbox");
+    let mut scripts: Vec<&str> = Vec::new();
+    let mut given = false;
+    let mut i = 0;
+    while i < rest.len() {
+        let w = rest[i];
+        if w == "--in-place" || w.starts_with("--in-place=") || w == "--file" || w.starts_with("--file=") {
+            return false;
+        }
+        if let Some(s) = w.strip_prefix("--expression=") {
+            given = true;
+            scripts.push(s);
+        } else if w == "--expression" {
+            given = true;
+            scripts.extend(rest.get(i + 1));
+            i += 1;
+        } else if w.starts_with('-') && !w.starts_with("--") && w.len() > 1 {
+            // -i edits in place, -f reads the script from a file; -e takes the script, attached or next.
+            let letters = &w[1..];
+            if let Some(pos) = letters.find(['i', 'f', 'e']) {
+                match letters.as_bytes()[pos] {
+                    b'e' => {
+                        given = true;
+                        let attached = &letters[pos + 1..];
+                        if attached.is_empty() {
+                            scripts.extend(rest.get(i + 1));
+                            i += 1;
+                        } else {
+                            scripts.push(attached);
+                        }
+                    }
+                    _ => return false,
+                }
+            }
+        } else if !w.starts_with('-') && !given && scripts.is_empty() {
+            scripts.push(w);
+        }
+        i += 1;
+    }
+    sandbox || !scripts.iter().any(|s| sed_script_writes(s))
+}
+
+/// Whether a sed script writes files or runs commands: the w, W and e commands and the w and e flags of s.
+/// Anything this code does not know counts as writing.
+fn sed_script_writes(script: &str) -> bool {
+    let c: Vec<char> = script.chars().collect();
+    // Past a part that ends with the delimiter d, minding backslash escapes.
+    let past = |mut i: usize, d: char| -> usize {
+        while i < c.len() && c[i] != d {
+            if c[i] == '\\' {
+                i += 1;
+            }
+            i += 1;
+        }
+        i + 1
+    };
+    let to_end = |mut i: usize, also_semicolon: bool| -> usize {
+        while i < c.len() && c[i] != '\n' && !(also_semicolon && c[i] == ';') {
+            i += 1;
+        }
+        i
+    };
+    let mut i = 0;
+    while i < c.len() {
+        match c[i] {
+            ' ' | '\t' | '\n' | ';' | '{' | '}' | '!' | ',' | '$' | '~' | '+' | 'I' | 'M' | '0'..='9' => i += 1,
+            '/' => i = past(i + 1, '/'),
+            '\\' => match c.get(i + 1) {
+                Some(&d) => i = past(i + 2, d),
+                None => return true,
+            },
+            's' | 'y' => {
+                let Some(&d) = c.get(i + 1).filter(|d| !matches!(d, '\n' | '\\')) else { return true };
+                i = past(past(i + 2, d), d);
+                if i > c.len() {
+                    return true;
+                }
+                // The flags, up to the end of this command.
+                while i < c.len() && !matches!(c[i], ';' | '\n' | '}') {
+                    if matches!(c[i], 'w' | 'W' | 'e') {
+                        return true;
+                    }
+                    i += 1;
+                }
+            }
+            'w' | 'W' | 'e' => return true,
+            '#' | 'a' | 'i' | 'c' | 'r' | 'R' | 'v' => i = to_end(i + 1, false),
+            ':' | 'b' | 't' | 'T' => i = to_end(i + 1, true),
+            'p' | 'P' | 'd' | 'D' | 'n' | 'N' | 'g' | 'G' | 'h' | 'H' | 'x' | 'l' | '=' | 'q' | 'Q' | 'z' | 'F' => i += 1,
+            _ => return true,
+        }
+    }
+    false
+}
+
+/// awk only reads unless it runs commands (system(), pipes into or out of a command), prints into a file,
+/// loads code, or takes its program from a file or include (gawk -i inplace edits files).
+fn awk_reads(rest: &[&str]) -> bool {
+    let mut program = None;
+    let mut i = 0;
+    while i < rest.len() {
+        let w = rest[i];
+        if matches!(w, "-F" | "-v") {
+            i += 1;
+        } else if w.starts_with("-F") || w.starts_with("-v") || w.starts_with("--field-separator") || w.starts_with("--assign") || w == "--" {
+        } else if w.starts_with('-') {
+            return false;
+        } else if program.is_none() {
+            program = Some(w);
+        }
+        i += 1;
+    }
+    let Some(p) = program else { return false };
+    // The code outside strings and regular expressions.
+    let mut code = String::new();
+    let chars: Vec<char> = p.chars().collect();
+    let mut j = 0;
+    while j < chars.len() {
+        let ch = chars[j];
+        let before = code.trim_end().chars().last();
+        if ch == '"' || (ch == '/' && before.is_none_or(|b| "(,~!{;&|\n?:".contains(b))) {
+            j += 1;
+            while j < chars.len() && chars[j] != ch {
+                if chars[j] == '\\' {
+                    j += 1;
+                }
+                j += 1;
+            }
+            code.push_str(" \"\" ");
+        } else {
+            code.push(ch);
+        }
+        j += 1;
+    }
+    let pipe = code.replace("||", "").contains('|');
+    let redirect = code.split([';', '{', '}', '\n']).any(|stmt| stmt.find("print").is_some_and(|at| stmt[at..].contains('>')));
+    !(pipe || redirect || code.contains("system") || code.contains("@load") || code.contains("@include"))
+}
+
+/// curl only fetches unless it sends data, uses another method, or writes files (-o, -O, cookie jars,
+/// header dumps, traces); output to the screen or /dev/null is fine.
+fn curl_reads(rest: &[&str]) -> bool {
+    const SENDS: &[&str] = &[
+        "-X", "--request", "-d", "-F", "-T", "--upload-file", "-K", "--config", "-O", "--remote-name", "--remote-name-all", "-J", "--remote-header-name", "--libcurl", "--output-dir", "--create-dirs",
+    ];
+    const WRITES: &[&str] = &["-o", "--output", "-c", "--cookie-jar", "-D", "--dump-header", "--trace", "--trace-ascii", "--stderr", "--etag-save", "--hsts", "--alt-svc"];
+    let harmless = |t: &str| matches!(t, "/dev/null" | "-");
+    let mut i = 0;
+    while i < rest.len() {
+        let w = rest[i];
+        // --name=value, -xVALUE (a value attached to one short option) or bundled short options (-sSo).
+        let (name, attached): (String, Option<&str>) = match w.split_once('=') {
+            Some((n, v)) if n.starts_with("--") => (n.to_string(), Some(v)),
+            _ if w.starts_with('-') && !w.starts_with("--") && w.len() > 2 => {
+                if w[1..].chars().all(|c| c.is_ascii_alphabetic()) {
+                    let letters = &w[1..];
+                    if letters.chars().any(|c| "OXdFTKJ".contains(c)) || letters[..letters.len() - 1].chars().any(|c| "ocD".contains(c)) {
+                        return false;
+                    }
+                    (format!("-{}", &letters[letters.len() - 1..]), None)
+                } else {
+                    (w[..2].to_string(), Some(&w[2..]))
+                }
+            }
+            _ => (w.to_string(), None),
+        };
+        let name = name.as_str();
+        if SENDS.contains(&name) || name.starts_with("--data") || name.starts_with("--upload") || name.starts_with("--form") || name.starts_with("--json") {
+            return false;
+        }
+        let takes = WRITES.contains(&name) || matches!(name, "-w" | "--write-out");
+        if takes {
+            let value = attached.or_else(|| rest.get(i + 1).copied()).unwrap_or("");
+            if WRITES.contains(&name) && !harmless(value) || value.contains("%output") {
+                return false;
+            }
+            if attached.is_none() {
+                i += 1;
+            }
+        }
+        i += 1;
+    }
+    true
 }
 
 /// Splits on ; && || | and newlines, outside quotes.
@@ -305,9 +553,33 @@ const PS_DANGEROUS: &[(&str, &str)] = &[
 
 /// Programs that only look.
 const PS_READ_PROGRAMS: &[&str] = &[
-    "hostname", "whoami", "ipconfig", "systeminfo", "tasklist", "netstat", "ping", "nslookup", "tracert", "route", "arp", "dir", "ls",
-    "type", "cat", "findstr", "where", "where.exe", "query", "quser", "gci", "gc", "gps", "gsv", "gwmi", "echo", "date",
+    "hostname", "whoami", "systeminfo", "tasklist", "netstat", "ping", "nslookup", "tracert", "dir", "ls", "type", "cat", "findstr",
+    "where", "where.exe", "query", "quser", "gci", "gc", "gps", "gsv", "gwmi", "echo", "date",
 ];
+
+/// Whether a program that is not a cmdlet only looks. route, arp and ipconfig also change routes, the ARP
+/// table and the network (ipconfig /release), so they count only with their showing arguments.
+fn ps_program_reads(w: &[String]) -> bool {
+    let first = w.first().map(String::as_str).unwrap_or("");
+    let rest = &w[1.min(w.len())..];
+    let first = first.strip_suffix(".exe").unwrap_or(first);
+    match first {
+        "route" => rest.first().is_some_and(|s| s == "print"),
+        "arp" => rest.iter().all(|s| !matches!(s.as_str(), "-d" | "/d" | "-s" | "/s")),
+        "ipconfig" => rest.iter().all(|s| matches!(s.as_str(), "/all" | "-all" | "/displaydns" | "/showclassid" | "/showclassid6" | "/?")),
+        _ => PS_READ_PROGRAMS.contains(&first),
+    }
+}
+
+/// Methods that only compute or look; any other method on an object (.Kill(), .Terminate(), .Delete(),
+/// .Put(), .Invoke...) counts as a change.
+fn ps_method_reads(name: &str) -> bool {
+    name.starts_with("get") || name.starts_with("to") || name.starts_with("trim") || name.starts_with("pad") || ["adddays", "addhours", "addminutes", "addseconds", "addmilliseconds", "addmonths", "addyears", "addticks"].contains(&name)
+        || matches!(
+            name,
+            "split" | "replace" | "substring" | "contains" | "startswith" | "endswith" | "indexof" | "lastindexof" | "equals" | "compareto" | "where" | "foreach" | "match" | "matches" | "ismatch" | "count" | "normalize" | "format" | "join"
+        )
+}
 
 /// Kinds of expressions that only compute something: strings, variables, numbers, .NET types such as [math].
 fn ps_expression(word: &str) -> bool {
@@ -385,17 +657,27 @@ pub fn classify_powershell(line: &str) -> Verdict {
         if let Some(c) = changing {
             effect = Effect::Changes;
             why = format!("{c} can change the computer");
-        } else if cmdlets.is_empty() && !expression && !PS_READ_PROGRAMS.contains(&first.as_str()) {
+        } else if cmdlets.is_empty() && !expression && !ps_program_reads(&w) {
             effect = Effect::Changes;
             why = format!("{first} can change the computer");
         } else if seg.contains("::") && !expression {
             effect = Effect::Changes;
             why = "calls .NET directly, which cannot be checked".into();
         }
-        // Methods on objects that stop, delete or change things.
-        if effect == Effect::Reads && [".delete(", ".kill(", ".stop(", ".remove(", ".set", ".write", ".create("].iter().any(|m| seg.to_ascii_lowercase().contains(m)) {
-            effect = Effect::Changes;
-            why = "calls a method that can change the computer".into();
+        // Methods on objects (.Kill(), .Terminate(), .Delete()...): only the ones known to just look are fine.
+        if effect == Effect::Reads {
+            let lower = seg.to_ascii_lowercase();
+            let b = lower.as_bytes();
+            let method = lower.match_indices('.').find_map(|(at, _)| {
+                let name: String = lower[at + 1..].chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+                let after = lower[at + 1 + name.len()..].trim_start();
+                let is_call = !name.is_empty() && !name.as_bytes()[0].is_ascii_digit() && after.starts_with('(') && (at == 0 || b[at - 1] != b'.');
+                (is_call && !ps_method_reads(&name)).then_some(name)
+            });
+            if let Some(m) = method {
+                effect = Effect::Changes;
+                why = format!("calls the method {m}, which can change the computer");
+            }
         }
     }
     // Writing into a file (but not into $null), and running code that cannot be read first.
@@ -667,6 +949,92 @@ mod tests {
         }
         assert_eq!(classify("sudo systemctl restart nginx").kind, "systemctl restart");
         assert_eq!(classify("echo hi > /etc/motd").kind, "");
+    }
+
+    /// Commands that look like reading but write files or run other programs (from a review of the classifier).
+    #[test]
+    fn reading_programs_that_can_write_or_run() {
+        for c in [
+            "sed -n 'w /tmp/copy' /etc/shadow",
+            "sed 's/a/b/w /tmp/out' /etc/hosts",
+            "sed -n '1e id' /etc/hosts",
+            "sed -e p -e 'w /tmp/x' /etc/hosts",
+            "sed -ne 'b end; w /tmp/x' /etc/hosts",
+            "sed -f script.sed /etc/hosts",
+            "sed -ni p /etc/hosts",
+            "awk 'BEGIN { \"id\" | getline x; print x }'",
+            "awk '{ print | \"sh\" }' /etc/hosts",
+            "awk '{ print $1 > \"/tmp/out\" }' /etc/hosts",
+            "awk 'BEGIN { system (\"id\") }'",
+            "awk -f prog.awk /etc/hosts",
+            "gawk -i inplace '{ print }' /etc/hosts",
+            "env rm -rf /tmp/x",
+            "env VAR=1 sh -c id",
+            "ip netns exec blue sh",
+            "ip -batch /tmp/cmds",
+            "sort -o /etc/hosts /tmp/x",
+            "sort -uo /etc/hosts /tmp/x",
+            "sort --compress-program=sh /tmp/x",
+            "uniq /tmp/a /etc/hosts",
+            "tree -o /tmp/out /etc",
+            "yq -i '.a = 1' x.yml",
+            "openssl x509 -in a.pem -out /etc/ssl/b.pem",
+            "curl -o /tmp/x http://h",
+            "curl -sSo /tmp/x http://h",
+            "curl -c /tmp/jar http://h",
+            "curl -D /tmp/headers http://h",
+            "curl --data-binary @f http://h",
+            "curl -K /tmp/conf http://h",
+            "curl -w '%output{/tmp/x}' http://h",
+            "wget -qO- http://h -o /tmp/log",
+            "find / -fprint0 /tmp/x",
+            "find / -okdir rm {} ;",
+            "nginx -t -s stop",
+            "nginx -t -g 'pid /tmp/x;'",
+            "apachectl -t -k stop",
+            "git branch new-branch",
+            "git branch -D old",
+            "git remote add x http://h",
+            "git log --output=/tmp/x",
+            "ss -K dst 10.0.0.1",
+            "less -o /tmp/log /etc/hosts",
+        ] {
+            assert_ne!(e(c), Effect::Reads, "{c}");
+        }
+        for c in [
+            "sed -n 's/^#//p' /etc/ssh/sshd_config",
+            "sed 's/hello/world/g' /etc/hosts",
+            "sed -n '/start/,/end/p' /etc/hosts",
+            "sed --sandbox 'w /tmp/x' /etc/hosts",
+            "sed -E 's#/usr/#/opt/#g' /etc/profile",
+            "awk '{print $1}' /etc/hosts",
+            "awk -F: '$3 >= 1000 {print $1}' /etc/passwd",
+            "awk '/error|fail/ {n++} END {print n}' /var/log/syslog",
+            "awk '{ if ($5 > 80) print $1 }' /tmp/df",
+            "env",
+            "sort -n -k2 /tmp/x",
+            "uniq -c /tmp/x",
+            "curl -s http://h",
+            "curl -sS -o /dev/null -w '%{http_code}' http://h",
+            "curl -I https://h",
+            "wget -qO- http://h",
+            "openssl x509 -in a.pem -noout -dates",
+            "nginx -t",
+            "nginx -T -c /etc/nginx/nginx.conf",
+            "git branch -a",
+            "git branch --list 'feat*'",
+            "git remote -v",
+            "git log --oneline -5",
+        ] {
+            assert_eq!(e(c), Effect::Reads, "{c}: {}", classify(c).why);
+        }
+        let p = |c: &str| classify_powershell(c).effect;
+        for c in ["route delete 0.0.0.0", "route add 10.0.0.0 mask 255.0.0.0 10.0.0.1", "arp -d *", "ipconfig /release", "Get-WmiObject Win32_Process -Filter \"Name='x.exe'\" | ForEach-Object { $_.Terminate() }", "(Get-Service spooler).Stop()", "Tee-Object -FilePath C:/x.txt"] {
+            assert_ne!(p(c), Effect::Reads, "{c}");
+        }
+        for c in ["route print", "arp -a", "ipconfig", "(Get-Date).AddDays(-1).ToString('yyyy-MM-dd')", "\"a,b\".Split(',').Count", "(Get-Item C:/x.txt).GetType().Name"] {
+            assert_eq!(p(c), Effect::Reads, "{c}: {}", classify_powershell(c).why);
+        }
     }
 
     #[test]

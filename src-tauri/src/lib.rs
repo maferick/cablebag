@@ -335,8 +335,8 @@ async fn sftp_read_text(app: AppHandle, tab: String, path: String) -> CmdResult<
 }
 
 #[tauri::command]
-async fn sftp_write_text(app: AppHandle, tab: String, path: String, text: String, mtime: u64, backup: bool) -> CmdResult<u64> {
-    files::write_text(&app, &tab, &path, &text, mtime, backup).await.map_err(err)
+async fn sftp_write_text(app: AppHandle, tab: String, path: String, text: String, version: String, backup: bool) -> CmdResult<String> {
+    files::write_text(&app, &tab, &path, &text, &version, backup).await.map_err(err)
 }
 
 #[tauri::command]

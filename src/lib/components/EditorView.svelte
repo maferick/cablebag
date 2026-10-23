@@ -13,7 +13,7 @@
 
   let original = $state("");
   let text = $state("");
-  let mtime = 0;
+  let version = "";
   let loading = $state(true);
   let error = $state("");
   let saving = $state(false);
@@ -41,10 +41,10 @@
     loading = true;
     error = "";
     try {
-      const f = await invoke<{ text: string; mtime: number }>("sftp_read_text", { tab: edit.tab, path: edit.path });
+      const f = await invoke<{ text: string; version: string }>("sftp_read_text", { tab: edit.tab, path: edit.path });
       original = f.text;
       text = f.text;
-      mtime = f.mtime;
+      version = f.version;
     } catch (e) {
       error = String(e);
     } finally {
@@ -60,7 +60,7 @@
   async function save() {
     saving = true;
     try {
-      mtime = await invoke<number>("sftp_write_text", { tab: edit.tab, path: edit.path, text, mtime, backup });
+      version = await invoke<string>("sftp_write_text", { tab: edit.tab, path: edit.path, text, version, backup });
       original = text;
       review = false;
       app.notify(`Saved ${edit.path}${backup ? ` (the previous version is ${edit.path.split("/").pop()}.bak)` : ""}`);

@@ -42,6 +42,35 @@ pub fn join(dir: &str, name: &str) -> String {
     if dir.ends_with('/') { format!("{dir}{name}") } else { format!("{dir}/{name}") }
 }
 
+/// The last part of a path on the server, as a file name that is safe on this PC. A server may name a file
+/// ..\..\x or C:\x (on Linux those are ordinary names), and Windows reads \ and : as parts of a path, so such a
+/// name would otherwise land outside the chosen folder. Characters Windows does not allow become _, as do
+/// trailing dots and spaces (Windows drops them, so .. would be the folder above), and device names such as
+/// CON or COM1 get a _ in front.
+pub fn local_name(remote: &str) -> String {
+    let last = remote.trim_end_matches('/').rsplit('/').next().unwrap_or("");
+    let mut s: String = last
+        .chars()
+        .map(|c| if c < ' ' || matches!(c, '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|') { '_' } else { c })
+        .collect();
+    let keep = s.trim_end_matches(['.', ' ']).len();
+    if keep < s.len() {
+        s = format!("{}{}", &s[..keep], "_".repeat(s.len() - keep));
+    }
+    if s.is_empty() {
+        return "download".into();
+    }
+    let stem = s.split('.').next().unwrap_or("").trim_end().to_ascii_uppercase();
+    let device = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$")
+        || ((stem.starts_with("COM") || stem.starts_with("LPT"))
+            && stem.chars().count() == 4
+            && stem.chars().last().is_some_and(|c| c.is_ascii_digit() || matches!(c, '¹' | '²' | '³')));
+    if device {
+        s.insert(0, '_');
+    }
+    s
+}
+
 fn perm_string(mode: u32, is_dir: bool, is_link: bool) -> String {
     let mut s = String::with_capacity(10);
     s.push(if is_link { 'l' } else if is_dir { 'd' } else { '-' });
@@ -180,8 +209,7 @@ async fn download_file(app: &AppHandle, tab: &str, s: &SftpSession, remote: &str
 }
 
 async fn download_inner(app: &AppHandle, tab: &str, s: &SftpSession, remote: &str, local_dir: &Path) -> Result<()> {
-    let name = remote.trim_end_matches('/').rsplit('/').next().unwrap_or("download").to_string();
-    let target = local_dir.join(&name);
+    let target = local_dir.join(local_name(remote));
     if s.metadata(remote).await?.is_dir() {
         tokio::fs::create_dir_all(&target).await?;
         for e in s.read_dir(remote).await? {
@@ -261,9 +289,15 @@ pub async fn upload(app: &AppHandle, tab: &str, locals: &[String], remote_dir: &
 #[derive(Serialize)]
 pub struct TextFile {
     pub text: String,
-    /// The modification time when it was read, to notice a change on the server before saving.
-    pub mtime: u64,
+    /// A fingerprint of the content when it was read, to notice a change on the server before saving. The
+    /// content itself, not the modification time: that counts in whole seconds, so two quick changes look alike.
+    pub version: String,
     pub size: u64,
+}
+
+fn fingerprint(content: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    hex::encode(Sha256::digest(content))
 }
 
 /// Larger files are opened with a program on this PC instead.
@@ -282,22 +316,27 @@ pub async fn read_text(app: &AppHandle, tab: &str, path: &str) -> Result<TextFil
     if buf.contains(&0) {
         return Err(anyhow!("It is not a text file; open it with a program on this PC instead."));
     }
+    let version = fingerprint(&buf);
     let text = String::from_utf8(buf).map_err(|_| anyhow!("It is not UTF-8 text; open it with a program on this PC instead."))?;
-    Ok(TextFile { text, mtime: meta.mtime.unwrap_or(0) as u64, size })
+    Ok(TextFile { text, version, size })
 }
 
-/// Saves the editor's text. Refuses when the file changed on the server since it was read; with `backup`, the
-/// version on the server is kept first as name.bak. The file keeps its owner and permissions (it is written in
-/// place). Returns the new modification time.
-pub async fn write_text(app: &AppHandle, tab: &str, path: &str, text: &str, read_mtime: u64, backup: bool) -> Result<u64> {
+/// Saves the editor's text. Refuses when the file changed on the server since it was read (its content, by
+/// the fingerprint `read_version`); with `backup`, the version on the server is kept first as name.bak. The
+/// file keeps its owner and permissions (it is written in place). Returns the new fingerprint.
+pub async fn write_text(app: &AppHandle, tab: &str, path: &str, text: &str, read_version: &str, backup: bool) -> Result<String> {
     let s = sftp(app, tab).await?;
     if let Ok(meta) = s.metadata(path).await {
-        if meta.mtime.unwrap_or(0) as u64 != read_mtime {
-            return Err(anyhow!("The file changed on the server since you opened it. Open it again to see that version."));
+        let changed = anyhow!("The file changed on the server since you opened it. Open it again to see that version.");
+        if meta.size.unwrap_or(0) > EDIT_MAX {
+            return Err(changed);
+        }
+        let mut old = Vec::new();
+        s.open(path).await?.read_to_end(&mut old).await?;
+        if fingerprint(&old) != read_version {
+            return Err(changed);
         }
         if backup {
-            let mut old = Vec::new();
-            s.open(path).await?.read_to_end(&mut old).await?;
             let bak_path = format!("{path}.bak");
             let mut bak = s.open_with_flags(&bak_path, OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE).await?;
             bak.write_all(&old).await?;
@@ -314,7 +353,7 @@ pub async fn write_text(app: &AppHandle, tab: &str, path: &str, text: &str, read
     let mut f = s.open_with_flags(path, OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE).await?;
     f.write_all(text.as_bytes()).await?;
     f.shutdown().await?;
-    Ok(s.metadata(path).await.ok().and_then(|m| m.mtime).unwrap_or(0) as u64)
+    Ok(fingerprint(text.as_bytes()))
 }
 
 /// Downloads one file into a private temp folder so it can be opened locally.
@@ -322,8 +361,7 @@ pub async fn fetch_temp(app: &AppHandle, tab: &str, remote: &str) -> Result<Path
     let s = sftp(app, tab).await?;
     let dir = std::env::temp_dir().join("Cablebag").join(uuid::Uuid::new_v4().to_string());
     tokio::fs::create_dir_all(&dir).await?;
-    let name = remote.rsplit('/').next().unwrap_or("file");
-    let local = dir.join(name);
+    let local = dir.join(local_name(remote));
     download_file(app, tab, &s, remote, &local).await?;
     Ok(local)
 }
@@ -332,4 +370,36 @@ pub async fn fetch_temp(app: &AppHandle, tab: &str, remote: &str) -> Result<Path
 pub async fn push_back(app: &AppHandle, tab: &str, local: &str, remote: &str) -> Result<()> {
     let s = sftp(app, tab).await?;
     upload_file(app, tab, &s, Path::new(local), remote).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::local_name;
+    use std::path::{Component, Path};
+
+    #[test]
+    fn names_from_the_server_stay_in_the_folder() {
+        let dir = Path::new(r"C:\Users\someone\Downloads");
+        for remote in [r"/srv/..\..\AppData\Roaming\x.ini", r"/srv/C:\Windows\x.dll", "/srv/..", "/srv/.", r"/srv/\server\share\x", "/srv/C:x", "/srv/a/../"] {
+            let name = local_name(remote);
+            let path = dir.join(&name);
+            assert_eq!(path.parent(), Some(dir), "{remote} became {name}");
+            assert!(Path::new(&name).components().all(|c| matches!(c, Component::Normal(_))), "{remote} became {name}");
+        }
+    }
+
+    #[test]
+    fn names_are_kept_where_they_are_safe() {
+        assert_eq!(local_name("/etc/nginx/nginx.conf"), "nginx.conf");
+        assert_eq!(local_name("/var/log/"), "log");
+        assert_eq!(local_name("/"), "download");
+        assert_eq!(local_name("/srv/a:b?.txt"), "a_b_.txt");
+        assert_eq!(local_name("/srv/.."), "__");
+        assert_eq!(local_name("/srv/name. "), "name__");
+        assert_eq!(local_name("/srv/con.txt"), "_con.txt");
+        assert_eq!(local_name("/srv/COM1"), "_COM1");
+        assert_eq!(local_name("/srv/LPT¹"), "_LPT¹");
+        assert_eq!(local_name("/srv/console.log"), "console.log");
+        assert_eq!(local_name("/srv/.bashrc"), ".bashrc");
+    }
 }

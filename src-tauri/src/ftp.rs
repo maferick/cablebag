@@ -1,7 +1,7 @@
 //! FTP sessions: the same file browser as SFTP, over FTP or FTPS (TLS from the start, or after AUTH TLS).
 //! One connection per tab; its commands run one after the other.
 
-use crate::files::{join, Entry, Listing};
+use crate::files::{join, local_name, Entry, Listing};
 use crate::store::Session;
 use crate::term::{TermCmd, TermOut};
 use crate::AppState;
@@ -333,7 +333,7 @@ async fn download_file(app: &AppHandle, tab: &str, c: &mut Conn, remote: &str, l
 
 fn download_inner<'a>(app: &'a AppHandle, tab: &'a str, c: &'a mut Conn, remote: &'a str, local_dir: &'a Path) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>> {
     Box::pin(async move {
-        let name = remote.trim_end_matches('/').rsplit('/').next().unwrap_or(remote).to_string();
+        let name = local_name(remote);
         let as_dir = match on!(&mut *c, f => f.mlsd(Some(remote)).await) {
             Ok(l) => Some(l.iter().filter_map(|l| suppaftp::list::ListParser::parse_mlsd(l).ok()).collect::<Vec<File>>()),
             Err(_) => None,
@@ -420,8 +420,7 @@ pub async fn upload(app: &AppHandle, tab: &str, locals: &[String], remote_dir: &
 pub async fn fetch_temp(app: &AppHandle, tab: &str, remote: &str) -> Result<std::path::PathBuf> {
     let dir = std::env::temp_dir().join("Cablebag").join(uuid::Uuid::new_v4().to_string());
     tokio::fs::create_dir_all(&dir).await?;
-    let name = remote.rsplit('/').next().unwrap_or("file");
-    let local = dir.join(name);
+    let local = dir.join(local_name(remote));
     let c = app.state::<AppState>().ftps.get(tab)?;
     let mut c = c.lock().await;
     download_file(app, tab, &mut c, remote, &local).await?;

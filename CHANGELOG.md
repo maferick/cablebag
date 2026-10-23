@@ -6,6 +6,23 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.16.1
+
+**Security fixes from a code review**
+
+- **Downloads stay in the folder you chose.** A server can name a file `..\..\something` or `C:\something`
+  (ordinary names on Linux); Windows reads those as paths, so downloading such a file over SFTP or FTP, or
+  opening it with a program on this PC, could write it elsewhere. Such characters now become `_`, and names
+  Windows reserves (such as CON or COM1) get a `_` in front.
+- **The assistant asks before more commands.** Some commands it treated as only reading can write files or
+  start other programs: sed's w and e commands, awk with pipes or `print > file`, `env some-program`,
+  `ip netns exec`, `sort -o`, `uniq in out`, `curl -o file` and cookie jars, `openssl ... -out`,
+  `git branch name`, `nginx -s`, and on Windows `route delete`, `arp -d`, `ipconfig /release` and method calls
+  such as `.Terminate()`. These now wait for your approval like any other change.
+- **The remote editor notices every change on the server** before it saves: it compares the content, not the
+  modification time (which counts in whole seconds).
+- An answer from an AI endpoint is stopped when it grows past 16 MB, so a broken endpoint cannot fill memory.
+
 ## 0.16.0 · 23 October 2026
 
 **Credential sources: several vaults, CyberArk and Delinea**
