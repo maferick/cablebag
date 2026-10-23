@@ -17,7 +17,9 @@ Bitwarden, CyberArk, Delinea Secret Server, Proton Pass), session sync, and an a
 It can run WireGuard inside the app, per session, so two customers' VPNs with the same address ranges can be
 open at the same time. It is made for system administrators, IT consultants and MSP staff who look after many
 customer networks, and for homelab users who want their servers, Proxmox machines and consoles in one place.
-It imports your sessions from MobaXterm, PuTTY, KiTTY, WinSCP, the OpenSSH config and `.rdp` files.
+Web pages get a browser profile per tenant or account, so two Microsoft 365 tenants or two Teams can be signed in
+side by side. It imports your sessions from MobaXterm, PuTTY, KiTTY, WinSCP, the OpenSSH config and `.rdp` files,
+and your bookmarks from Chrome, Edge and Firefox.
 
 ![Cablebag with tiled SSH sessions, remote files and the assistant](assets/screenshot.png)
 
@@ -67,10 +69,8 @@ tabs, at the same time.
 - **VNC**, **Telnet** and **serial ports**.
 - **SFTP and FTP** as file sessions.
 - **Local shells and WSL** in the same tabs as everything else (Ctrl+Shift+T).
-- **Web pages** in a tab, optionally through a WireGuard network.
-- **Web view and pinned sites**: the sidebar switches between your servers and your web sessions (imported
-  bookmarks keep their folders, with the most recent sites on top). Pin a site to the strip at the left edge, once
-  per browser profile, and it keeps running with its unread count in view.
+- **Web pages** in a tab, with a browser profile per tenant and through a WireGuard network if you like; see
+  [Web tabs](#web-tabs).
 - **Tabs, split view and tiling.** Split the window for terminals, or tile every open tab and resize, swap, zoom
   and focus panes from the keyboard.
 - **Search box (Ctrl+K).** Type a few letters to open any session, tab, Proxmox machine, tool, macro or setting;
@@ -83,8 +83,29 @@ tabs, at the same time.
 - **Workspaces and the tabs from last time.** Save the open tabs under a name (everything for one customer) and
   open them again from Home; or let Cablebag reopen what was open when it closed.
 - **Import.** MobaXterm (`MobaXterm.ini` or an `.mxtsessions` export), PuTTY and KiTTY saved sessions, WinSCP
-  sites, your OpenSSH config file and `.rdp` files. Each source gets its own folder, and importing again updates
-  instead of duplicating.
+  sites, your OpenSSH config file, `.rdp` files, and the bookmarks of Chrome, Edge and Firefox. Each source gets its
+  own folder, and importing again updates instead of duplicating.
+
+## Web tabs
+
+![The Web view with recent sites and bookmark folders, the strip of pinned sites with an unread count, and a web tab framed in the colour of its browser profile](assets/web-tabs.png)
+
+- **A browser profile per tenant or account.** Each profile keeps its own cookies and logins, so two Azure
+  tenants, two Teams or two of anything are signed in side by side. Choose one per web session or once for a
+  folder; **Private** keeps nothing after the tab closes. The tab, the pane header and a frame around the page show
+  the profile's name and colour, so two tenants never look alike.
+- **Servers and Web.** The sidebar switches between your servers and your web sessions. The Web view shows the
+  sites you opened last, then your bookmark folders (without Chrome's own "Bookmarks bar" level), by folder or by
+  site.
+- **Pinned sites** sit on a strip at the left edge with their profile's colour and the unread count of their
+  page. Pinned sites open at the start and keep running, so Teams keeps its notifications coming; the same site
+  can be pinned once per profile.
+- **Unread counts and notifications.** Teams, Outlook and other pages that show a count get a badge on their tab
+  and on the taskbar button, and their notifications show as Windows notifications with the profile's name.
+- **Fill logins** from your credential sources with the key button in the address bar: you pick the login, and
+  a login saved for another site needs your yes first.
+- Links that open a new tab stay in Cablebag with the same profile and network, sign-in pop-ups open as Cablebag
+  windows, and tabs you have not looked at for a while can go to sleep to save memory.
 
 ## Files
 
@@ -104,7 +125,7 @@ tabs, at the same time.
 - **Snapshots and tasks.** Take, roll back and delete snapshots (for a VM optionally with memory); see recent
   tasks of a server or a guest with what each one wrote.
 - **A shell on the node** over SSH, with your saved session for the node when there is one.
-- **Through WireGuard** when you choose a network for the server (Settings, Proxmox), including the sessions
+- **Through WireGuard** when you choose a network for the server (Settings, Proxmox servers), including the sessions
   Cablebag opens for its machines and the Proxmox web interface in a tab.
 - Uses an API token. Snapshots need `VM.Snapshot` (and `VM.Snapshot.Rollback`); the assistant inside a VM needs
   `VM.GuestAgent.Unrestricted` on Proxmox 9.
@@ -130,7 +151,8 @@ tabs, at the same time.
 ## Sync
 
 Sessions, folders, folder settings, macros, tunnels, WireGuard networks, credential sources (without their
-secrets), browser profiles (without their cookies), pinned sites, workspaces and the assistant's memory sync through a private git repository of your own, encrypted.
+secrets), browser profiles (without their cookies), pinned sites, workspaces and the assistant's memory sync
+through a private git repository of your own, encrypted.
 Passwords and private keys stay out. When the same item changed on two PCs, Settings, Sync names the conflict
 and says whose version was kept.
 
@@ -151,7 +173,7 @@ vLLM, Ollama on your own hardware, or a cloud service. Nothing is configured unt
 - **Secrets stay home.** Passwords it knows and anything that looks like a key, token or password hash are
   hidden before text is sent. Root is given from the vault without the AI seeing the password.
 - **It remembers** what it learns per server, per folder and in general, inside Cablebag, with Undo and an editor.
-- Settings, Assistant lists everything that was sent and what came back.
+- Settings, Assistant log lists everything that was sent and what came back.
 
 ## Tools
 
@@ -164,6 +186,10 @@ vLLM, Ollama on your own hardware, or a cloud service. Nothing is configured unt
 Download `Cablebag_<version>_x64-setup.exe` from the [latest release](https://github.com/maferick/cablebag/releases/latest)
 and run it. It installs for your Windows account only, no administrator rights needed. Cablebag keeps itself up to
 date: updates come from this page and nowhere else, and are installed only when they carry the Cablebag signature.
+
+The installer is not signed with a code-signing certificate, so Windows SmartScreen may say "Windows protected
+your PC" the first time: **More info**, **Run anyway**. On a work PC your organisation's policy may block it; then
+only your IT department can allow it.
 
 Needs Windows 10 or 11. Remote Desktop tabs need the
 [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0). The installer is about 47 MB because
@@ -195,10 +221,10 @@ network. No adapter is created, no route is added, and nothing else on the PC go
 not both at once; or make a key pair of Cablebag's own and add it to the server as a second peer.
 
 **Can I import from MobaXterm, PuTTY or WinSCP?** Yes: MobaXterm, PuTTY, KiTTY, WinSCP, the OpenSSH config and
-`.rdp` files. Cablebag is not a fork of any of them.
+`.rdp` files, and your Chrome, Edge and Firefox bookmarks. Cablebag is not a fork of any of them.
 
-**Where are my passwords kept?** Either in your credential sources (Vaultwarden, CyberArk, Secret Server), or on
-this PC, encrypted under your Windows account. They never go into Sync and are hidden from the assistant.
+**Where are my passwords kept?** Either in your credential sources (Vaultwarden or Bitwarden, CyberArk, Delinea
+Secret Server, Proton Pass), or on this PC, encrypted under your Windows account. They never go into Sync and are hidden from the assistant.
 
 **Does it work on Linux or macOS?** No, Windows 10 and 11 only.
 
@@ -248,8 +274,12 @@ Running the Remote Desktop helper needs the .NET 8 Desktop Runtime.
 ```
 npm install
 npm run build:xserver  # once: fetches and unpacks the X server (VcXsrv)
-npm run tauri dev      # run from source
+npm run tauri dev      # run from source (see below)
 npm run tauri build    # setup.exe in src-tauri/target/release/bundle/nsis
 ```
+
+A copy run from source uses the same data folder as the installed Cablebag (`%APPDATA%\Cablebag`) unless
+`CABLEBAG_DATA_DIR` points it at another folder. Give it a folder of its own, and never run it while the installed
+Cablebag is open on the same data.
 
 </details>

@@ -46,6 +46,9 @@ Everything here was checked in the source of the current version.
   with a right-click. The focus goes to the first entry; the arrow keys, Home and End move between
   entries, Enter runs one, Escape or Tab closes the menu and returns the focus.
 - Escape also closes the search box, the terminal Find bar and the rename box of a tab.
+- The Servers and Web switch at the top of the sidebar and the squares of pinned sites at the left edge
+  are buttons: Tab reaches them, Enter or Space uses them, and the context menu key or Shift+F10 opens a
+  pinned site's menu. Each square's name says the site, its browser profile and its unread count.
 - The sidebar's width can be changed with the keyboard: Tab to the line between the sidebar and the
   tabs, then the left and right arrows (with Shift in larger steps), Home and End for the narrowest and
   widest.
@@ -101,6 +104,7 @@ Everything here was checked in the source of the current version.
   cannot be changed. On keyboards with AltGr the right Alt key is left alone so that it keeps typing
   characters.
 - There is no high contrast theme; Windows high contrast mode has not been tested.
+- Pinned sites can only be put in another order by dragging them on the strip.
 
 ## Supported environments
 
