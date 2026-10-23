@@ -6,7 +6,7 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.16.1
+## 0.16.1 · 23 October 2026
 
 **Security fixes from a code review**
 
