@@ -82,7 +82,7 @@
         const v = folderValues.values[d.key];
         const shown =
           d.key === "jump_hosts" ? v.map((j: any) => j.host).join(", ") : d.key === "vault_item" ? "set" : d.key === "tab_color" || d.key === "x11" ? "" : d.key === "wireguard" ? wireguard.name(v) : d.key === "psm" ? (vault.source(v)?.name ?? "") : d.key === "browser_profile" ? browserProfiles.name(v) : v;
-        return `${d.label}${shown ? ` ${shown}` : ""} (${folderValues.from[d.key]})`;
+        return `${d.label}${shown ? ` ${shown}` : ""}, from the folder ${folderValues.from[d.key]}`;
       }),
   );
 
@@ -232,7 +232,7 @@
         </label>
       </div>
       {#if inherited.length}
-        <p class="muted small inherit">From the folder: {inherited.join(", ")}. Fill a field here to use something else for this session.</p>
+        <p class="muted small inherit">{inherited.join("; ").replace(/^./, (c) => c.toUpperCase())}. Fill a field here to use something else for this session.</p>
       {/if}
       {#if k.needsHost}
         <div class="row3">

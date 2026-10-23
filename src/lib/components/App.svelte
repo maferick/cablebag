@@ -46,6 +46,7 @@
   import { letter } from "../shortcuts";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { showOnTaskbar } from "../unread";
+  import ProfileLabel from "./ProfileLabel.svelte";
 
   let ready = $state(false);
 
@@ -475,7 +476,7 @@
                   oncontextmenu={(e) => menu.show(e, paneMenu(t))}
                 >
                   <span class="smark {t.status}" role="img" aria-label={statusWord(t.status)} title={statusWord(t.status)}></span>
-                  <span class="pt">{t.title}</span>
+                  <ProfileLabel tab={t} /><span class="pt">{t.title}</span>
                   <button class="icon-btn" title="Size, place and more (or right-click the header)" aria-label="Size, place and more (or right-click the header)" onclick={(e) => { e.stopPropagation(); menu.showAt(e.currentTarget as HTMLElement, paneMenu(t)); }}>
                     <EllipsisVertical size={12} />
                   </button>

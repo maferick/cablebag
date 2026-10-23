@@ -31,6 +31,15 @@ class BrowserProfiles {
     return this.get(id)?.name ?? "a browser profile that is gone";
   }
 
+  /** The profile a web tab uses, with its name and colour; null for other tabs and the shared profile. */
+  ofTab(tab: { type: string; session?: { data?: Record<string, any> } }): { name: string; color: string } | null {
+    if (tab.type !== "browser") return null;
+    const id = tab.session?.data?.browser_profile as string | undefined;
+    if (id === PRIVATE) return { name: "Private", color: "#7b7a74" };
+    const p = this.get(id);
+    return p ? { name: p.name, color: p.color || "#7b7a74" } : null;
+  }
+
   /** The colour a tab of this profile gets when the session sets none of its own. */
   color(id: string | undefined): string | undefined {
     return this.get(id)?.color || undefined;

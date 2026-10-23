@@ -315,6 +315,11 @@
         <span class="chev" class:open={isOpen}><ChevronRight size={13} /></span>
         {#if isOpen}<FolderOpen size={15} class="ficon" />{:else}<FolderIcon size={15} class="ficon" />{/if}
         <span class="name">{f.name}</span>
+        {#if f.data?.browser_profile && f.data.browser_profile !== "none"}
+          <span class="ident" title="Web sessions in this folder use the browser profile {browserProfiles.name(f.data.browser_profile)}">
+            <span class="idot" style:background={browserProfiles.color(f.data.browser_profile) ?? "var(--faint)"} aria-hidden="true"></span>{browserProfiles.name(f.data.browser_profile)}
+          </span>
+        {/if}
         <span class="count">{countIn(f.id)}</span>
       </div>
       {#if isOpen}

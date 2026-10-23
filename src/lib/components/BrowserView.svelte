@@ -5,11 +5,11 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { api } from "../api";
   import { app, type Tab } from "../state.svelte";
-  import { menu } from "../menu.svelte";
+  import { menu, type MenuEntry } from "../menu.svelte";
   import { tiles } from "../tiles.svelte";
-  import { browserProfiles, PRIVATE } from "../browserProfiles.svelte";
+  import { browserProfiles, PRIVATE, SHARED } from "../browserProfiles.svelte";
   import { unreadFromTitle } from "../unread";
-  import { ArrowLeft, ArrowRight, RotateCw, ExternalLink, Globe } from "@lucide/svelte";
+  import { ArrowLeft, ArrowRight, RotateCw, ExternalLink, Globe, ChevronDown } from "@lucide/svelte";
 
   let { tab, visible }: { tab: Tab; visible: boolean } = $props();
   let area: HTMLDivElement;
@@ -28,7 +28,28 @@
     const id = tab.session?.data?.browser_profile as string | undefined;
     return id === PRIVATE || browserProfiles.get(id) ? id : undefined;
   });
-  const profile = $derived(profileId && profileId !== "none" ? { name: browserProfiles.name(profileId), color: profileId === PRIVATE ? "" : browserProfiles.color(profileId) } : null);
+  const profile = $derived(browserProfiles.ofTab(tab));
+
+  /** Sign-in pages: their address only works in the profile that started the sign-in. */
+  const SIGN_IN_HOSTS = /(^|\.)(login\.microsoftonline\.com|login\.microsoft\.com|login\.live\.com|accounts\.google\.com|login\.windows\.net)$/i;
+
+  /** Opens this page again in another profile (or privately, or in the shared one) as a tab of its own; from a
+   * sign-in page, the session's own address, so the other profile starts its own sign-in. */
+  function otherProfiles(): MenuEntry[] {
+    const page = () => {
+      try {
+        return current && !SIGN_IN_HOSTS.test(new URL(current).hostname) ? current : start;
+      } catch {
+        return start;
+      }
+    };
+    const openIn = (id: string) => tab.session && app.openSession({ ...$state.snapshot(tab.session), id: "", name: "", host: page(), data: { ...$state.snapshot(tab.session.data), browser_profile: id } });
+    const items: MenuEntry[] = browserProfiles.list.filter((p) => p.id !== profileId).map((p) => ({ label: `Open this page in ${p.name}`, action: () => openIn(p.id) }));
+    if (profileId !== PRIVATE) items.push({ label: "Open this page privately", action: () => openIn(PRIVATE) });
+    if (profileId) items.push({ label: "Open this page in the shared profile", action: () => openIn(SHARED) });
+    items.push("sep", { label: "Browser profiles...", action: () => app.openSettings("browsers") });
+    return items;
+  }
 
   // The page is a web view of its own over this area; it steps aside for dialogs and menus.
   const show = $derived(visible && !app.overlay && !menu.open);
@@ -139,7 +160,7 @@
 </script>
 
 <div class="browser" style:display={visible ? "flex" : "none"}>
-  <div class="bar">
+  <div class="bar" class:profiled={!!profile} style:--pc={profile?.color}>
     <button class="icon-btn" title="Back" aria-label="Back" onclick={() => go("back")}><ArrowLeft size={15} /></button>
     <button class="icon-btn" title="Forward" aria-label="Forward" onclick={() => go("forward")}><ArrowRight size={15} /></button>
     <button class="icon-btn" class:spin={loading} title="Reload" aria-label="Reload" onclick={() => go("reload")}><RotateCw size={15} /></button>
@@ -153,21 +174,29 @@
       <Globe size={13} />
       <input id={`addr-${tab.id}`} bind:value={address} spellcheck="false" autocomplete="off" aria-label="Address" />
     </form>
-    {#if profile}
-      <span class="profile" title="This tab uses the cookies and logins of {profile.name}">
-        <span class="dot" style:background={profile.color || "var(--faint)"} aria-hidden="true"></span>{profile.name}
-      </span>
+    {#if profile || browserProfiles.list.length}
+      <button
+        class="profile"
+        title={profile ? `This tab uses the cookies and logins of ${profile.name}. Click to open this page in another profile.` : "This tab uses Cablebag's shared cookies and logins. Click to open this page in a profile."}
+        onclick={(e) => menu.showAt(e.currentTarget as HTMLElement, otherProfiles())}
+      >
+        <span class="dot" style:background={profile?.color || "var(--faint)"} aria-hidden="true"></span>{profile?.name ?? "Shared profile"}
+        <ChevronDown size={12} />
+      </button>
     {/if}
     <button class="icon-btn" title="Open in the web browser on this PC" aria-label="Open in the web browser on this PC" onclick={() => openUrl(current)}><ExternalLink size={15} /></button>
   </div>
-  <div class="area" bind:this={area}>
-    {#if error}
-      <div class="state"><p>{error}</p></div>
-    {:else if asleep}
-      <div class="state"><p class="muted">Asleep to save memory; it opens again in a moment.</p></div>
-    {:else if !show && visible}
-      <div class="state"><p class="muted">The page is hidden while a dialog is open.</p></div>
-    {/if}
+  <!-- A frame in the profile's colour around the page, so its identity shows wherever you look. -->
+  <div class="frame" class:profiled={!!profile} style:--pc={profile?.color}>
+    <div class="area" bind:this={area}>
+      {#if error}
+        <div class="state"><p>{error}</p></div>
+      {:else if asleep}
+        <div class="state"><p class="muted">Asleep to save memory; it opens again in a moment.</p></div>
+      {:else if !show && visible}
+        <div class="state"><p class="muted">The page is hidden while a dialog is open.</p></div>
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -206,19 +235,43 @@
     box-shadow: none;
     padding: 4px 0;
   }
+  .bar.profiled {
+    border-left: 4px solid var(--pc);
+    background: color-mix(in srgb, var(--pc) 14%, var(--panel));
+  }
   .profile {
     display: flex;
     align-items: center;
     gap: 6px;
-    max-width: 200px;
-    padding: 3px 8px;
+    max-width: 220px;
+    padding: 3px 6px 3px 8px;
     border: 1px solid var(--border);
     border-radius: 3px;
+    background: var(--raised);
     font-size: 12px;
-    color: var(--muted);
+    font-weight: 600;
+    color: var(--text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  .profile:hover {
+    background: var(--hover);
+  }
+  .profile :global(svg) {
+    flex-shrink: 0;
+    color: var(--muted);
+  }
+  .frame {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+  }
+  .frame.profiled {
+    padding: 0 3px 3px;
+    background: var(--pc);
   }
   .dot {
     width: 9px;
@@ -237,6 +290,7 @@
   .area {
     position: relative;
     flex: 1;
+    min-width: 0;
     min-height: 0;
     background: #fff;
   }

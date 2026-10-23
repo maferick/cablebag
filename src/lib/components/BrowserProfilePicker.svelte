@@ -15,7 +15,7 @@
 
 <div class="bpp">
   <select value={value ?? ""} onchange={(e) => (value = e.currentTarget.value)}>
-    <option value="">{inherited ? `As ${from}: ${browserProfiles.name(inherited)}` : "Cablebag's shared profile"}</option>
+    <option value="">{inherited ? `${browserProfiles.name(inherited)} (from ${from})` : "Cablebag's shared profile"}</option>
     {#if inherited}<option value={SHARED}>Cablebag's shared profile</option>{/if}
     {#each browserProfiles.list as p (p.id)}<option value={p.id}>Profile: {p.name}</option>{/each}
     <option value={PRIVATE}>Private (nothing kept once the last private tab closes)</option>

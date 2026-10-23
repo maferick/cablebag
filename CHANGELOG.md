@@ -14,8 +14,11 @@ installs it and starts Cablebag again. Every version is also on the
   can be signed in to two Azure tenants, two Teams or two of anything side by side. Choose a profile per web
   session or once for a folder, as with the WireGuard network. **Private** keeps nothing after the tab closes.
   "Sign out everywhere" clears a profile; the list of profiles goes along with Sync (cookies never do).
-- **Colour per identity**: a profile's tabs get its colour, the address bar shows which profile a tab uses, and
-  the session tree shows it next to each web session.
+- **Colour per identity**: a web tab shows its profile's name and colour on the tab and on the pane header, its
+  address bar and page get a frame in that colour, and the session tree shows the profile next to each web
+  session and folder. Two tabs of the same site in different tenants never look alike.
+- **Open this page in another profile**: click the profile's name in the address bar to open the same page in
+  another profile, privately, or in the shared one.
 - **Unread counts**: chat and mail pages that show a count in their title, such as Teams, get a badge on their
   tab, and the total shows on Cablebag's taskbar button.
 - **Notifications** from web tabs (a Teams message, for example) show as Windows notifications with the

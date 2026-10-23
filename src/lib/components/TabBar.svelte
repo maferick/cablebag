@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ProfileLabel from "./ProfileLabel.svelte";
   // The one strip at the top: sidebar toggle, the tabs, the + menu, the search box, Layout and Settings.
   import { TAB_COLORS } from "../tabColors";
   import { tabKeys } from "../keyNav";
@@ -170,7 +171,7 @@
             }}
           />
         {:else}
-          <span class="title">{t.title}</span>{#if t.unread}<span class="badge" title="{t.unread} unread" aria-label="{t.unread} unread">{t.unread > 99 ? "99+" : t.unread}</span>{/if}{#if app.unsaved.has(t.id)}<span class="unsaved" title="Not saved yet"></span>{/if}
+          <ProfileLabel tab={t} /><span class="title">{t.title}</span>{#if t.unread}<span class="badge" title="{t.unread} unread" aria-label="{t.unread} unread">{t.unread > 99 ? "99+" : t.unread}</span>{/if}{#if app.unsaved.has(t.id)}<span class="unsaved" title="Not saved yet"></span>{/if}
         {/if}
         <button
           class="close"
