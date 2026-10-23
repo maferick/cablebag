@@ -7,9 +7,15 @@
     scope,
     target = "",
     all = false,
-  }: { scope?: Memory["scope"]; target?: string; /** Every memory, grouped by where it belongs. */ all?: boolean } = $props();
+    filter = "",
+  }: { scope?: Memory["scope"]; target?: string; /** Every memory, grouped by where it belongs. */ all?: boolean; /** Only those holding these words. */ filter?: string } = $props();
 
-  const list = $derived(all ? [...memory.all].sort((a, b) => memory.label(a).localeCompare(memory.label(b)) || b.at - a.at) : scope ? memory.of(scope, target) : []);
+  const words = $derived(filter.trim().toLowerCase().split(/\s+/).filter(Boolean));
+  const list = $derived(
+    (all ? [...memory.all].sort((a, b) => memory.label(a).localeCompare(memory.label(b)) || b.at - a.at) : scope ? memory.of(scope, target) : []).filter((m) =>
+      words.every((w) => `${m.text} ${memory.label(m)}`.toLowerCase().includes(w)),
+    ),
+  );
   let editing = $state<string | null>(null);
   let text = $state("");
   let adding = $state("");
@@ -48,6 +54,8 @@
       </li>
     {/each}
   </ul>
+{:else if words.length}
+  <p class="muted small">Nothing remembered matches "{filter}".</p>
 {:else}
   <p class="muted small">Nothing remembered yet. The assistant adds what it learns while it works; you can add facts yourself too.</p>
 {/if}

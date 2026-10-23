@@ -1,41 +1,37 @@
 <script lang="ts">
-  // Settings, Assistant: the AI hosts and the log of what was sent to them.
+  // Settings, Assistant: the AI hosts, and what the assistant may do by itself (its memory and log have pages of
+  // their own: Assistant memory in SettingsDialog, AssistantLog).
   import { invoke } from "@tauri-apps/api/core";
-  import { assistant, type AiHost, type AiModel, type AiLogEntry } from "../assistant.svelte";
+  import { assistant, type AiHost, type AiModel } from "../assistant.svelte";
   import { ask } from "../ask.svelte";
   import { app } from "../state.svelte";
   import VaultPicker from "./VaultPicker.svelte";
-  import MemoryList from "./MemoryList.svelte";
   import SettingsSection from "./SettingsSection.svelte";
   import SettingsRow from "./SettingsRow.svelte";
-  import { memory } from "../memory.svelte";
-  import { Plus, Pencil, Trash2, RefreshCw, ChevronRight, X } from "@lucide/svelte";
+  import SettingsMore from "./SettingsMore.svelte";
+  import { Plus, Pencil, Trash2, RefreshCw, X } from "@lucide/svelte";
 
   let editing = $state<(AiHost & { key: string; keyFrom: "vault" | "pc" | "none" }) | null>(null);
   let models = $state<Record<string, AiModel[]>>({});
   let testing = $state<string | null>(null);
   let testError = $state<Record<string, string>>({});
-  let log = $state<AiLogEntry[]>([]);
-  let openLog = $state<number | null>(null);
-  let logFilter = $state("");
-  let logLimit = $state(100);
-
-  async function clearLog() {
-    if (!(await ask.confirm("Clear the log", "Remove everything listed in What was sent? The conversations themselves are not affected.", { okLabel: "Clear", danger: true }))) return;
-    await invoke("ai_log_clear").catch((e) => app.notify(String(e), "error"));
-    loadLog();
-  }
   let error = $state("");
   const protectedFolders = $derived(app.folders.filter((f) => ((app.settings["ai.protected"] as string[] | undefined) ?? []).includes(f.id)));
 
   $effect(() => {
     assistant.load();
-    loadLog();
   });
 
-  async function loadLog() {
-    log = await invoke<AiLogEntry[]>("ai_log", { limit: logLimit, filter: logFilter }).catch(() => []);
-  }
+  /** How much goes to the AI and how far it may go on one question; under More, with the unit in words. */
+  const LIMITS = [
+    { key: "ai.screenLines", label: "Terminal text sent with a question", unit: "lines", info: "The last lines of the terminal you are in.", def: 300 },
+    { key: "ai.maxSteps", label: "Commands per question", unit: "commands", info: "It stops and explains where it is when it reaches this.", def: 25 },
+    { key: "ai.maxMinutes", label: "Time per question", unit: "minutes", info: "Also a stop with an explanation.", def: 15 },
+    { key: "ai.outputKB", label: "Command output it reads", unit: "KB per command", info: "You always see all of the output in the card.", def: 48 },
+    { key: "ai.memoryChars", label: "Memory that goes along", unit: "characters", info: "What it remembers about this connection, its folder and in general, newest first.", def: 6000 },
+    { key: "ai.contextChars", label: "Conversation size", unit: "characters", info: "Above this, older questions lose their terminal text and the oldest turns are left out. Raise it for models with a large context.", def: 120000 },
+  ];
+  const limitsChanged = $derived(LIMITS.some((l) => app.settings[l.key] !== undefined && Number(app.settings[l.key]) !== l.def));
 
   function blank() {
     editing = { id: "", name: "", base_url: "", vault_item: "", model: "", vision_model: "", protected_ok: false, key: "", keyFrom: "vault" };
@@ -93,10 +89,9 @@
   }
 
   const can = (v: boolean | null, yes: string) => (v === true ? yes : v === false ? `no ${yes.toLowerCase()}` : "");
-  const time = (t: number) => new Date(t * 1000).toLocaleString();
 </script>
 
-<SettingsSection title="AI hosts" desc="Any service with an OpenAI-compatible API: LiteLLM, vLLM, Ollama or a cloud API. Before anything is sent, Cablebag hides the passwords it knows and text that looks like a secret.">
+<SettingsSection title="AI hosts" desc="Any service with an OpenAI-compatible API: LiteLLM, vLLM, Ollama or a cloud API." info="Before anything is sent, Cablebag hides the passwords it knows and text that looks like a secret." find="host model openai litellm ollama vllm key">
   <div class="inner">
 {#each assistant.hosts as h (h.id)}
   <div class="host">
@@ -169,18 +164,7 @@
   </div>
 </SettingsSection>
 
-<SettingsSection title="Memory" desc="What the assistant learns, kept here in Cablebag: per connection (see a session's editor), per folder and in general. It travels with Sync (Git), encrypted; secrets are hidden before anything is stored.">
-  <div class="inner">
-<strong class="sub">General, for every conversation</strong>
-<MemoryList scope="general" />
-<details class="allmem">
-  <summary>Everything the assistant remembers ({memory.all.length})</summary>
-  <MemoryList all />
-</details>
-  </div>
-</SettingsSection>
-
-<SettingsSection title="What it may do by itself" desc="For every server and screen it works on. Protected folders always ask for every command.">
+<SettingsSection title="What it may do by itself" desc="For every server and screen it works on." find="mode ask free dangerous protected folders always allowed rules snapshot limits commands minutes">
   <div class="modes" role="radiogroup" aria-label="What the assistant may do by itself">
     {#each [{ id: "ask", name: "Read by itself, ask before every change", help: "Looking around (status, logs, listings) runs at once. Anything that changes something waits for Run it, Always or Refuse." }, { id: "free", name: "Do what is needed, ask only before dangerous commands", help: "Changes, root and actions on a screen run without asking. Dangerous commands, such as rm -rf / or wiping a disk, still wait for you." }] as m}
       <label class="mode" class:on={assistant.mode === m.id}>
@@ -189,99 +173,58 @@
       </label>
     {/each}
   </div>
-</SettingsSection>
-
-<SettingsSection title="Proxmox guests" desc="When the assistant works inside a VM or container from its console tab.">
-  <SettingsRow label="Snapshot before the first change" help="Taken before the first command in a conversation that changes something, so you can roll back (the guest's Snapshots in the tree). With 'ask only before dangerous commands' it is taken without asking.">
+  <SettingsRow label="Snapshot of a Proxmox guest before the first change" info="When the assistant works inside a VM or container from its console tab: taken before the first command in a conversation that changes something, so you can roll back (the guest's Snapshots in the tree). With 'ask only before dangerous commands' it is taken without asking.">
     <select value={app.settings["ai.snapshot"] ?? "ask"} onchange={(e) => app.setSetting("ai.snapshot", (e.target as HTMLSelectElement).value)}>
       <option value="ask">Offer it</option>
       <option value="always">Always take one</option>
       <option value="never">Don't</option>
     </select>
   </SettingsRow>
-</SettingsSection>
-
-<SettingsSection title="Limits" desc="How much goes to the AI and how far the assistant may go on one question. Larger values cost more and fill the model's memory sooner.">
-  {#each [
-    { key: "ai.screenLines", label: "Terminal lines sent with a question", help: "The last lines of the terminal you are in.", def: 300 },
-    { key: "ai.maxSteps", label: "Commands per question", help: "It stops and explains where it is when it reaches this.", def: 25 },
-    { key: "ai.maxMinutes", label: "Minutes per question", help: "Also a stop with an explanation.", def: 15 },
-    { key: "ai.outputKB", label: "Command output it reads (KB)", help: "Per command; you always see all of it in the card.", def: 48 },
-    { key: "ai.memoryChars", label: "Memory that goes along (characters)", help: "What it remembers about this connection, its folder and in general, newest first.", def: 6000 },
-    { key: "ai.contextChars", label: "Conversation size (characters)", help: "Above this, older questions lose their terminal text and the oldest turns are left out. Raise it for models with a large context.", def: 120000 },
-  ] as l}
-    <SettingsRow label={l.label} help={l.help}>
-      <input type="number" min="1" value={app.settings[l.key] ?? l.def} onchange={(e) => app.setSetting(l.key, Number((e.target as HTMLInputElement).value) || l.def)} />
-    </SettingsRow>
-  {/each}
-</SettingsSection>
-
-<SettingsSection title="Protected folders" desc="Every command asks first, dangerous commands are refused, and only AI hosts that may see protected folders are used. Protect a folder with a right-click on it in the tree.">
-  <div class="inner">
-{#if protectedFolders.length}
-  <ul class="plain">
-    {#each protectedFolders as f (f.id)}
-      <li><span>{app.folderPath(f.id)}</span><button class="icon-btn" title="Lift the protection" aria-label="Lift the protection" onclick={() => assistant.setProtected(f.id, false)}><X size={13} /></button></li>
+  <SettingsRow label={`Protected folders (${protectedFolders.length})`} info="In a protected folder every command asks first, dangerous commands are refused, and only AI hosts that may see protected folders are used." stack>
+    {#if protectedFolders.length}
+      <ul class="plain">
+        {#each protectedFolders as f (f.id)}
+          <li><span>{app.folderPath(f.id)}</span><button class="icon-btn" title="Lift the protection" aria-label="Lift the protection" onclick={() => assistant.setProtected(f.id, false)}><X size={13} /></button></li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="muted small">None yet. Right-click a folder in the session tree and choose to protect it from the assistant.</p>
+    {/if}
+  </SettingsRow>
+  <SettingsRow label={`Always allowed (${assistant.rules.length})`} info="Kinds of commands you answered Always for: they run without asking on that server, never in a protected folder and never when dangerous." stack>
+    {#if assistant.rules.length}
+      <ul class="plain">
+        {#each assistant.rules as r (r.kind + r.host)}
+          <li><span><span class="mono">{r.kind}</span> on {r.host}</span><button class="icon-btn" title="Ask again from now on" aria-label="Ask again from now on" onclick={() => assistant.removeRule(r)}><X size={13} /></button></li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="muted small">None yet. When the assistant asks before a change, Always adds that kind of command here.</p>
+    {/if}
+  </SettingsRow>
+  <SettingsMore label="Limits per question" changed={limitsChanged}>
+    {#each LIMITS as l}
+      <SettingsRow label={l.label} info={l.info}>
+        <div class="unit">
+          <input type="number" min="1" value={app.settings[l.key] ?? l.def} onchange={(e) => app.setSetting(l.key, Number((e.target as HTMLInputElement).value) || l.def)} />
+          <span class="muted small">{l.unit}</span>
+        </div>
+      </SettingsRow>
     {/each}
-  </ul>
-{:else}
-  <p class="muted small">No folder is protected yet.</p>
-{/if}
-  </div>
-</SettingsSection>
-
-<SettingsSection title="Always allowed" desc="Kinds of commands you chose Always for: they run without asking on that server, never in a protected folder and never when dangerous.">
-  <div class="inner">
-{#if assistant.rules.length}
-  <ul class="plain">
-    {#each assistant.rules as r (r.kind + r.host)}
-      <li><span><span class="mono">{r.kind}</span> on {r.host}</span><button class="icon-btn" title="Ask again from now on" aria-label="Ask again from now on" onclick={() => assistant.removeRule(r)}><X size={13} /></button></li>
-    {/each}
-  </ul>
-{:else}
-  <p class="muted small">None yet.</p>
-{/if}
-  </div>
-</SettingsSection>
-
-<SettingsSection title="What was sent" desc="Every question with the screen text that went with it, every answer and every command that ran. The newest 2000 are kept.">
-  <div class="inner">
-  <div class="logbar">
-    <input placeholder="Show only a server, host or word" bind:value={logFilter} oninput={() => loadLog()} />
-    <button class="btn" disabled={!log.length} onclick={clearLog}>Clear the log</button>
-  </div>
-{#if !log.length}
-  <p class="muted small">Nothing yet. Every question, with the screen text that went with it, and every answer is listed here.</p>
-{:else}
-  <div class="log">
-    {#each log as l, i}
-      <button class="lrow" onclick={() => (openLog = openLog === i ? null : i)}>
-        <span class="chev" class:open={openLog === i}><ChevronRight size={12} /></span>
-        <span class="lt">{time(l.at)}</span>
-        <span class="ld {l.direction}">{({ sent: "Sent", received: "Answer", error: "Error", ran: "Ran" } as Record<string, string>)[l.direction] ?? l.direction}</span>
-        <span class="la">{l.host} · {l.about}</span>
-      </button>
-      {#if openLog === i}<pre class="ltext">{l.text}</pre>{/if}
-    {/each}
-  </div>
-  {#if log.length >= logLimit}
-    <button class="btn more" onclick={() => { logLimit += 200; loadLog(); }}>Show more</button>
-  {/if}
-{/if}
-  </div>
+  </SettingsMore>
 </SettingsSection>
 
 <style>
-  .logbar {
+  .unit {
     display: flex;
+    align-items: center;
     gap: 8px;
-    margin-bottom: 8px;
   }
-  .logbar input {
+  .unit input {
     flex: 1;
   }
-  .more {
-    margin-top: 8px;
+  .unit span {
+    white-space: nowrap;
   }
   .modes {
     display: flex;
@@ -371,19 +314,12 @@
   .small {
     font-size: 12px;
   }
+  p.small {
+    margin: 0;
+  }
   .err {
     color: var(--danger-text);
     margin: 0;
-  }
-  .sub {
-    font-size: 12px;
-    color: var(--muted);
-  }
-  .allmem summary {
-    font-size: 12px;
-    color: var(--muted);
-    cursor: pointer;
-    margin-bottom: 6px;
   }
   .plain {
     margin: 0;
@@ -402,61 +338,5 @@
   }
   .plain li:last-child {
     border-bottom: none;
-  }
-  .log {
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    max-height: 360px;
-    overflow: auto;
-  }
-  .lrow {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 5px 8px;
-    border: none;
-    border-bottom: 1px solid var(--border);
-    background: none;
-    text-align: left;
-    font-size: 12px;
-  }
-  .lrow:hover {
-    background: var(--hover);
-  }
-  .chev {
-    display: inline-flex;
-    color: var(--muted);
-  }
-  .chev.open {
-    transform: rotate(90deg);
-  }
-  .lt {
-    color: var(--muted);
-    white-space: nowrap;
-  }
-  .ld {
-    width: 52px;
-  }
-  .ld.error {
-    color: var(--danger-text);
-  }
-  .la {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .ltext {
-    margin: 0;
-    padding: 8px 10px;
-    max-height: 260px;
-    overflow: auto;
-    background: var(--bg);
-    border-bottom: 1px solid var(--border);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    white-space: pre-wrap;
-    word-break: break-word;
-    user-select: text;
   }
 </style>

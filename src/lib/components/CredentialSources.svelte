@@ -75,7 +75,7 @@
   }
 </script>
 
-<SettingsSection title="Sources" desc="Sessions, folders, Proxmox servers, WireGuard networks and AI hosts can take their login from these. What is opened stays in memory only; passwords never go into the sync.">
+<SettingsSection title={`Sources (${vault.sources.length})`} desc="Sessions, folders, Proxmox servers, networks and AI hosts take their logins from here." info="What is opened stays in memory only; passwords never go into the sync." find="source vault cyberark delinea proton add unlock">
   {#each vault.sources as s, i (s.id)}
     <SettingsRow label={s.name} help={line(s)}>
       <div class="btns end">
@@ -146,9 +146,9 @@
   </SettingsSection>
 {/if}
 
-<SettingsSection title="Opening after Cablebag starts">
+<SettingsSection title="At start" find="windows hello remember unlock start ask">
   <SettingsRow
-    label="Vaults and sign-ins this PC may keep"
+    label="Remember the unlock on this PC"
     help={app.settings["vault.unlock"] === "password"
       ? "Safest: nothing about your sources stays on this PC; every start asks for the master password or sign-in."
       : app.settings["vault.unlock"] === "hello"

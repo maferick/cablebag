@@ -17,8 +17,9 @@
 </script>
 
 <SettingsRow
-  label="Proton Pass command-line tool"
-  help="Cablebag reads Proton Pass through Proton's own pass-cli, which keeps its own sign-in (through your web browser). Leave this empty when pass-cli is on the PATH; otherwise fill in the full path of pass-cli (pass-cli.exe on Windows). This PC only: it does not go into the sync. Proton offers pass-cli at proton.me/pass/download."
+  label="Where pass-cli is"
+  help="Empty when it is on the PATH. This PC only; it does not go into the sync."
+  info="Cablebag reads Proton Pass through Proton's own command-line tool pass-cli (pass-cli.exe on Windows), which keeps its own sign-in through your web browser. Proton offers it at proton.me/pass/download."
 >
   <input bind:value={source.options.cli} placeholder="pass-cli" />
 </SettingsRow>

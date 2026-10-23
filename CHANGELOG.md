@@ -6,6 +6,22 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.17.1
+
+**Settings, tidied**
+
+- The pages are grouped (Cablebag, Logins and servers, Assistant, Elsewhere) and say things once: one line under
+  each title, and longer explanations behind an (i) next to the setting.
+- **Connections** is new: SSH (remote files, connecting again), keys from an agent, and the dots in the session
+  tree, which now check "Every 2 minutes" and so on instead of a number of seconds.
+- **Terminal** now also holds the words in colour (your own words in a fold that opens when you use them) and
+  writing terminals to files, with file names chosen by what they hold.
+- **Web tabs** holds the notifications, sleeping tabs and browser profiles. **Assistant** has its hosts and what it
+  may do, with the limits per question in a fold; its **memory** (with a search) and its **log** have pages of their own.
+- **Passwords on this PC** names what it keeps (a vault key, a kept sign-in) instead of a code, and **Trusted
+  servers** says the kind of key and since when. Lists show how many there are and get a search when they grow.
+- "Find a setting" jumps to the section the words are about. Import sessions is also in the + menu.
+
 ## 0.17.0 · 23 October 2026
 
 **Web sessions for more than one tenant or account**

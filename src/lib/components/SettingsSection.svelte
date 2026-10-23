@@ -1,12 +1,15 @@
 <script lang="ts">
-  // A group of settings on a Settings page: a card with a heading, an optional line about it, and rows.
+  // A group of settings on a Settings page: a card with a heading, an optional line about it (`info` for the
+  // longer explanation behind an (i)), and rows. `find` holds extra words "Find a setting" answers to with this
+  // section, besides its title.
   import type { Snippet } from "svelte";
-  let { title, desc = "", children }: { title: string; desc?: string; children: Snippet } = $props();
+  import Info from "./Info.svelte";
+  let { title, desc = "", info = "", find = "", children }: { title: string; desc?: string; info?: string; find?: string; children: Snippet } = $props();
 </script>
 
-<section class="sec">
+<section class="sec" data-find={`${title} ${desc} ${find}`.toLowerCase()}>
   <header>
-    <h3>{title}</h3>
+    <h3>{title}{#if info}<Info text={info} label={`More about ${title}`} />{/if}</h3>
     {#if desc}<p>{desc}</p>{/if}
   </header>
   <div class="rows">{@render children()}</div>
@@ -17,6 +20,11 @@
     border: 1px solid var(--border);
     border-radius: 3px;
     background: var(--chrome);
+    scroll-margin-top: 12px;
+  }
+  .sec:global(.found) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
   header {
     padding: 10px 14px 8px;

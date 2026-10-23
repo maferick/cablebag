@@ -7,6 +7,7 @@
   import { vault } from "../vault.svelte";
   import VaultPicker from "./VaultPicker.svelte";
   import WireGuardPicker from "./WireGuardPicker.svelte";
+  import SettingsMore from "./SettingsMore.svelte";
   import { Plus, Pencil, Trash2, PlugZap, Server, KeyRound } from "@lucide/svelte";
 
   let {
@@ -104,12 +105,8 @@
     s.vault_item ? `Token from the vault${vault.item(s.vault_item) ? `: ${vault.item(s.vault_item)!.name}` : ""}` : s.has_secret ? "Token secret kept on this PC" : "Token secret asked when connecting";
 </script>
 
-{#if !only}
-<p class="muted small">
-  The virtual machines and containers of these servers show up as a folder in the sessions tree, with SSH, RDP, the
-  console and start and stop right from the list. You can also add one from New session, or with a right-click in the
-  sessions tree.
-</p>
+{#if !only && !proxmox.sources.length && !editing}
+<p class="muted small">No Proxmox server yet. Add one here, from the + menu, or with a right-click in the session tree.</p>
 {/if}
 
 {#each only ? [] : proxmox.sources as s (s.id)}
@@ -156,18 +153,20 @@
         >
       </div>
     {/if}
-    <p class="muted small">
-      Make one under Datacenter, Permissions, API Tokens. To see the guests the token needs the PVEAuditor role on
-      /; to start and stop them also PVEVMUser (or VM.PowerMgmt). With "Privilege Separation" on, give the
-      token itself these roles.
-    </p>
+    <SettingsMore label="How to make the token in Proxmox">
+      <p class="muted small how">
+        Under Datacenter, Permissions, API Tokens. To see the guests the token needs the PVEAuditor role on /; to start
+        and stop them also PVEVMUser (or VM.PowerMgmt). With "Privilege Separation" on, give the token itself these roles.
+      </p>
+    </SettingsMore>
 
-    <strong class="sub">Opening a guest</strong>
-    <div class="row2">
-      <label class="field"><span>SSH user</span><input bind:value={editing.ssh_user} placeholder="root" /></label>
-      <label class="field grow"><span>SSH key file (optional)</span><input bind:value={editing.key_path} placeholder="C:\Users\you\.ssh\id_ed25519" /></label>
-      <label class="field"><span>RDP user (optional)</span><input bind:value={editing.rdp_user} placeholder="administrator" /></label>
-    </div>
+    <SettingsMore label="Opening a guest: SSH and Remote Desktop users" changed={!!(editing.key_path || editing.rdp_user || (editing.ssh_user && editing.ssh_user !== "root"))}>
+      <div class="row2 how">
+        <label class="field"><span>SSH user</span><input bind:value={editing.ssh_user} placeholder="root" /></label>
+        <label class="field grow"><span>SSH key file (optional)</span><input bind:value={editing.key_path} placeholder="C:\Users\you\.ssh\id_ed25519" /></label>
+        <label class="field"><span>RDP user (optional)</span><input bind:value={editing.rdp_user} placeholder="administrator" /></label>
+      </div>
+    </SettingsMore>
     {#if editing.fingerprint}
       <p class="muted small"><KeyRound size={12} /> Trusted certificate <span class="mono fp">{editing.fingerprint}</span></p>
     {/if}
@@ -242,6 +241,9 @@
   .small {
     font-size: 12px;
     margin: 0;
+  }
+  .how {
+    margin: 8px 0 4px;
   }
   .fp {
     word-break: break-all;

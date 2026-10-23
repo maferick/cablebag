@@ -12,7 +12,7 @@
   import CommandPalette from "./CommandPalette.svelte";
   import {
     Plus, X, Copy, RotateCw, Pencil, Palette, TerminalSquare, Save, ClipboardCopy, ChevronDown, PanelLeft, Settings, LayoutGrid,
-    Square, LayoutDashboard, Grid2x2, Columns2, Rows2, Equal, Radio, Circle, Server,
+    Square, LayoutDashboard, Grid2x2, Columns2, Rows2, Equal, Radio, Circle, Server, Download,
   } from "@lucide/svelte";
   import { save as saveDialog } from "@tauri-apps/plugin-dialog";
   import { api } from "../api";
@@ -86,6 +86,7 @@
     const items: MenuEntry[] = [
       { label: "New session", icon: Plus, hint: "Ctrl+Shift+N", action: () => app.editSession() },
       { label: "Add a Proxmox server", icon: Server, action: () => (app.proxmoxEditing = "new") },
+      { label: "Import sessions...", icon: Download, action: () => (app.importOpen = true) },
       "sep",
       ...app.shells.map((s, i) => ({ label: s.name, icon: TerminalSquare, hint: i === 0 ? "Ctrl+Shift+T" : undefined, action: () => app.openLocal(s) })),
       "sep",

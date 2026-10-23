@@ -6,6 +6,7 @@
   import { sync } from "../sync.svelte";
   import { vault } from "../vault.svelte";
   import VaultPicker from "./VaultPicker.svelte";
+  import Info from "./Info.svelte";
   import { RefreshCw, ExternalLink } from "@lucide/svelte";
 
   const KINDS = [
@@ -74,11 +75,20 @@
   );
 </script>
 
-<p class="muted small">
-  Keeps your sessions, folders, macros, tunnels and Proxmox servers in a private git repository, so every PC with
-  Cablebag has the same set and the repository keeps the history of every change. Passwords never go there: they stay
-  in the vault or encrypted on each PC.
-</p>
+{#if sync.last}
+  <p class="state" class:bad={!!sync.last.error}>{when(sync.last.at)}: {sync.summary(sync.last)}</p>
+  {#if sync.last.conflict_list?.length}
+    <div class="conflicts">
+      <p>Changed on this PC and on another one since the last sync. The version named here is kept; change the item again if the other one was right.</p>
+      <ul>
+        {#each sync.last.conflict_list as c}
+          <li><span class="muted">{c.what}</span> <strong>{c.name}</strong>: {c.kept}'s version kept</li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
+{/if}
+
 
 <div class="row2">
   <label class="field"><span>Git server</span>
@@ -97,7 +107,7 @@
   <label class="field"><span>Repository (made private if it does not exist)</span><input bind:value={repo} placeholder="owner/cablebag-sessions" /></label>
 
   <div class="field">
-    <span>Access token, with read and write on repositories (GitHub: a fine-grained token with Contents; GitLab: api scope)</span>
+    <span>Access token<Info text="With read and write on repositories. GitHub: a fine-grained token with Contents. GitLab: the api scope." label="More about the access token" /></span>
     <div class="choice">
       <label class="check"><input type="radio" bind:group={tokenFrom} value="vault" /> From a credential source (password = token)</label>
       <label class="check"><input type="radio" bind:group={tokenFrom} value="here" /> Type it here, kept encrypted on this PC</label>
@@ -133,8 +143,10 @@
   {#if encrypt === "off"}
     Anyone who can read the repository sees your hosts, user names and folders.
   {:else}
-    Each item is encrypted on its own (AES-256-GCM); only random item ids stay readable, so the history still shows when
-    something changed but not what. {encrypt === "vault" ? "The key never leaves Cablebag and the vault server does not know it." : "Without the passphrase nobody can read the files, you neither: keep it in the vault."}
+    Nobody can read the files in the repository without the key.<Info
+      text={`Each item is encrypted on its own (AES-256-GCM); only random item ids stay readable, so the history still shows when something changed but not what. ${encrypt === "vault" ? "The key never leaves Cablebag and the vault server does not know it." : "Without the passphrase nobody can read the files, you neither: keep it in the vault."}`}
+      label="More about the encryption"
+    />
   {/if}
 </p>
 
@@ -156,20 +168,7 @@
     <button class="btn" onclick={() => openUrl(webUrl)}><ExternalLink size={14} /> Open the repository</button>
   {/if}
 </div>
-
-{#if sync.last}
-  <p class="state" class:bad={!!sync.last.error}>{when(sync.last.at)}: {sync.summary(sync.last)}</p>
-  {#if sync.last.conflict_list?.length}
-    <div class="conflicts">
-      <p>Changed on this PC and on another one since the last sync. The version named here is kept; change the item again if the other one was right.</p>
-      <ul>
-        {#each sync.last.conflict_list as c}
-          <li><span class="muted">{c.what}</span> <strong>{c.name}</strong>: {c.kept}'s version kept</li>
-        {/each}
-      </ul>
-    </div>
-  {/if}
-{/if}
+<p class="muted small">Changes here apply when you press Save.</p>
 
 <style>
   .row2 {

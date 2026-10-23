@@ -91,22 +91,26 @@ export function statusWord(status: string): string {
 
 export type SplitMode = "1" | "2v" | "2h" | "4";
 
+/** The pages of Settings, in groups for the side navigation. */
 export const SETTINGS_PAGES = [
-  { id: "general", label: "General" },
-  { id: "terminal", label: "Terminal" },
-  { id: "highlighting", label: "Highlighting" },
-  { id: "logging", label: "Logging" },
-  { id: "ssh", label: "SSH" },
-  { id: "vault", label: "Credential sources" },
-  { id: "browsers", label: "Browser profiles" },
-  { id: "proxmox", label: "Proxmox" },
-  { id: "sync", label: "Sync (Git)" },
-  { id: "assistant", label: "Assistant" },
-  { id: "passwords", label: "Saved passwords" },
-  { id: "hosts", label: "Trusted servers" },
-  { id: "keyboard", label: "Keyboard shortcuts" },
-  { id: "about", label: "About Cablebag" },
+  { id: "general", label: "General", group: "Cablebag" },
+  { id: "terminal", label: "Terminal", group: "Cablebag" },
+  { id: "connections", label: "Connections", group: "Cablebag" },
+  { id: "browsers", label: "Web tabs", group: "Cablebag" },
+  { id: "vault", label: "Credential sources", group: "Logins and servers" },
+  { id: "proxmox", label: "Proxmox servers", group: "Logins and servers" },
+  { id: "passwords", label: "Passwords on this PC", group: "Logins and servers" },
+  { id: "hosts", label: "Trusted servers", group: "Logins and servers" },
+  { id: "assistant", label: "Assistant", group: "Assistant" },
+  { id: "memory", label: "Assistant memory", group: "Assistant" },
+  { id: "ailog", label: "Assistant log", group: "Assistant" },
+  { id: "sync", label: "Sync", group: "Elsewhere" },
+  { id: "keyboard", label: "Keyboard shortcuts", group: "Elsewhere" },
+  { id: "about", label: "About Cablebag", group: "Elsewhere" },
 ];
+
+/** Pages that were merged into others, so links to them still land in the right place. */
+const SETTINGS_MOVED: Record<string, string> = { ssh: "connections", highlighting: "terminal", logging: "terminal" };
 
 const uid = () => crypto.randomUUID();
 
@@ -406,7 +410,7 @@ class AppState {
 
   /** Opens Settings in its own tab, at a page. */
   openSettings(page = "general") {
-    this.settingsPage = page;
+    this.settingsPage = SETTINGS_MOVED[page] ?? page;
     this.openTool("settings", "Settings");
   }
 

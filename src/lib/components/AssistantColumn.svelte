@@ -138,7 +138,7 @@
             ? "Protected folder: every command asks you first."
             : `Can work ${assistant.guestOf(tab) ? "inside this guest, as root" : "on this server"}: ${assistant.mode === "free" ? "does what is needed by itself, asks only before dangerous commands" : "reads by itself, asks before every change"}.`}
           <button class="link" onclick={() => app.openSettings("assistant")}>Change</button>{/if}
-        <br />Memory: {memoryLine}
+        <br />Memory: {memoryLine} <button class="link" onclick={() => app.openSettings("memory")}>See all</button>
       </div>
       <div class="msgs" bind:this={list}>
         {#if !conv?.msgs.length}

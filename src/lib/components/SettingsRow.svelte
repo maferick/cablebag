@@ -1,14 +1,16 @@
 <script lang="ts">
   // One setting: its name and a short explanation on the left, the control on the right. With `stack` the
-  // control takes the full width under the name (lists, long fields).
+  // control takes the full width under the name (lists, long fields). `info` is the longer explanation, behind an
+  // (i) after the name.
   import type { Snippet } from "svelte";
-  let { label = "", help = "", stack = false, children }: { label?: string; help?: string; stack?: boolean; children: Snippet } = $props();
+  import Info from "./Info.svelte";
+  let { label = "", help = "", info = "", stack = false, children }: { label?: string; help?: string; info?: string; stack?: boolean; children: Snippet } = $props();
 </script>
 
 <div class="row" class:stack>
   {#if label || help}
     <div class="lbl">
-      {#if label}<span class="name">{label}</span>{/if}
+      {#if label}<span class="name">{label}{#if info}<Info text={info} label={`More about ${label}`} />{/if}</span>{/if}
       {#if help}<span class="help">{help}</span>{/if}
     </div>
   {/if}
