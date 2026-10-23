@@ -18,7 +18,7 @@
   let { session }: { session: Session } = $props();
   const initial = untrack(() => session);
   let s = $state<Session>(JSON.parse(JSON.stringify(initial)));
-  type Part = "basic" | "advanced" | "rdp" | "network" | "bookmark" | "memory";
+  type Part = "basic" | "advanced" | "rdp" | "winrm" | "network" | "bookmark" | "memory";
   /** The folded parts under the main form, open or closed. */
   let open = $state<Record<string, boolean>>({});
   let error = $state("");
@@ -57,8 +57,18 @@
   function pickKind(id: string) {
     const old = kindInfo(s.kind);
     s.kind = id;
-    if (!s.port || s.port === old.defaultPort) s.port = kindInfo(id).defaultPort;
+    if (!s.port || s.port === old.defaultPort || (old.id === "winrm" && s.port === 5986)) s.port = kindInfo(id).defaultPort;
+    if (id === "winrm" && s.data.https && s.port === 5985) s.port = 5986;
   }
+
+  /** PowerShell remoting: HTTP on 5985 or HTTPS on 5986, the port following unless it was changed. */
+  function setHttps(on: boolean) {
+    s.data.https = on;
+    if (on && (!s.port || s.port === 5985)) s.port = 5986;
+    if (!on && (!s.port || s.port === 5986)) s.port = 5985;
+    if (!on && s.data.auth === "basic") s.data.auth = "";
+  }
+  const winrmWindowsLogin = $derived(s.kind === "winrm" && s.data.auth !== "credssp" && s.data.auth !== "basic");
 
   // What the session's folder gives it where it has no value of its own.
   const folderValues = $derived(app.folderDefaults(s.folder_id));
@@ -109,7 +119,7 @@
 
   /** The session types, in groups, for the list on the left. */
   const GROUPS: { name: string; ids: string[] }[] = [
-    { name: "Terminal", ids: ["ssh", "telnet", "serial", "shell", "wsl", "mosh", "rsh"] },
+    { name: "Terminal", ids: ["ssh", "winrm", "telnet", "serial", "shell", "wsl", "mosh", "rsh"] },
     { name: "Remote desktop", ids: ["rdp", "vnc", "xdmcp"] },
     { name: "Files", ids: ["sftp", "ftp", "s3"] },
     { name: "Other", ids: ["browser", "file"] },
@@ -125,6 +135,7 @@
     [
       s.kind === "ssh" ? (["advanced", "SSH options and jump hosts"] as const) : null,
       s.kind === "rdp" ? (["rdp", "Screen, sharing and Remote Desktop options"] as const) : null,
+      s.kind === "winrm" ? (["winrm", "PowerShell remoting options"] as const) : null,
       s.kind === "rdp" || s.kind === "vnc" ? (["network", "Gateways"] as const) : null,
       ["bookmark", "Notes, tab colour and word colours"] as const,
       s.id ? (["memory", "What the assistant remembers about it"] as const) : null,
@@ -223,7 +234,7 @@
       {#if k.needsHost}
         <div class="row3">
           <label class="field grow"><span>Remote host</span><input bind:value={s.host} placeholder="Name or IP address" /></label>
-          <label class="field"><span>User name</span><input bind:value={s.username} placeholder={folderValues.values.username && FOLDER_DEFAULTS[0].kinds.includes(s.kind) ? `${folderValues.values.username} (folder)` : "Ask when connecting"} /></label>
+          <label class="field"><span>User name</span><input bind:value={s.username} placeholder={folderValues.values.username && FOLDER_DEFAULTS[0].kinds.includes(s.kind) ? `${folderValues.values.username} (folder)` : winrmWindowsLogin ? "Your Windows login" : "Ask when connecting"} /></label>
           <label class="field port"><span>Port</span><input type="number" bind:value={s.port} /></label>
         </div>
       {/if}
@@ -232,6 +243,38 @@
           <label class="check"><input type="checkbox" bind:checked={s.data.view_only} /> View only (no keyboard or mouse)</label>
           <label class="check"><input type="checkbox" checked={s.data.shared_clipboard !== false} onchange={(e) => (s.data.shared_clipboard = (e.target as HTMLInputElement).checked)} /> Copy the remote clipboard to this PC</label>
         </div>
+      {/if}
+      {#if s.kind === "winrm"}
+        <div class="grid2">
+          <label class="field"><span>Connection</span>
+            <select value={s.data.https ? "https" : "http"} onchange={(e) => setHttps((e.target as HTMLSelectElement).value === "https")}>
+              <option value="http">HTTP (port 5985)</option>
+              <option value="https">HTTPS (port 5986)</option>
+            </select>
+          </label>
+          <label class="field"><span>Log in with</span>
+            <select value={s.data.auth ?? ""} onchange={(e) => (s.data.auth = (e.target as HTMLSelectElement).value || undefined)}>
+              <option value="">Negotiate (the usual choice)</option>
+              <option value="kerberos">Kerberos only</option>
+              <option value="credssp">CredSSP</option>
+              <option value="basic" disabled={!s.data.https}>Basic (HTTPS only)</option>
+            </select>
+          </label>
+        </div>
+        {#if s.data.https}
+          <label class="check"><input type="checkbox" bind:checked={s.data.any_certificate} /> Accept any certificate (for a self-signed one; Cablebag then cannot tell the real server from an impostor)</label>
+        {/if}
+        <p class="muted small">
+          Opens Windows PowerShell on this PC, connected to the server. Over HTTP the login and the session are still encrypted.
+          {s.data.auth === "credssp"
+            ? "CredSSP lets the server log in further as you (to a file share or another server); it has to be allowed on this PC and on the server first."
+            : s.data.auth === "basic"
+              ? "Basic is for local accounts on servers outside a domain."
+              : s.data.auth === "kerberos"
+                ? "Kerberos needs a domain and the server's name, not its IP address."
+                : "Negotiate uses Kerberos in a domain and NTLM elsewhere."}
+          {winrmWindowsLogin ? "Without a user name it logs in as you, with your Windows login." : "It needs a user name and password."}
+        </p>
       {/if}
       {#if s.kind === "telnet"}
         <p class="muted small">With a user name, Cablebag answers the login and password prompts by itself (password from the vault or saved); without one you log in by hand.</p>
@@ -301,12 +344,12 @@
         </label>
         <p class="muted small">Opens with the program Windows uses for it; a folder opens in Explorer, a link in your web browser.</p>
       {/if}
-      {#if s.kind === "ssh" || s.kind === "rdp" || s.kind === "sftp" || s.kind === "vnc" || s.kind === "telnet" || s.kind === "ftp"}
+      {#if s.kind === "ssh" || s.kind === "rdp" || s.kind === "sftp" || s.kind === "vnc" || s.kind === "telnet" || s.kind === "ftp" || s.kind === "winrm"}
         <div class="field"><span>Login from the vault</span>
           <VaultPicker bind:itemId={s.data.vault_item} hint={s.host} />
         </div>
       {/if}
-      {#if s.kind === "ssh" || s.kind === "rdp" || s.kind === "sftp" || s.kind === "vnc" || s.kind === "telnet" || s.kind === "browser"}
+      {#if s.kind === "ssh" || s.kind === "rdp" || s.kind === "sftp" || s.kind === "vnc" || s.kind === "telnet" || s.kind === "winrm" || s.kind === "browser"}
         <div class="field"><span>Network</span>
           <WireGuardPicker bind:value={s.data.wireguard} inherited={folderValues.values.wireguard} from={`the folder ${folderValues.from.wireguard ?? ""}`} />
         </div>
@@ -418,6 +461,12 @@
         {/each}
       </div>
       <label class="field"><span>Start this program instead of the desktop</span><input bind:value={s.data.remote_program} placeholder="Full desktop" /></label>
+    {:else if section === "winrm"}
+      <label class="field"><span>Endpoint on the server</span><input bind:value={s.data.endpoint} placeholder="The standard one (Microsoft.PowerShell)" /></label>
+      <p class="muted small">For a restricted endpoint (Just Enough Administration) or PowerShell 7 on the server (PowerShell.7). Leave empty for the usual Windows PowerShell.</p>
+      {#if (s.data.wireguard || folderValues.values.wireguard) && s.data.wireguard !== "none"}
+        <p class="muted small">Through WireGuard, Cablebag checks the certificate's name itself and Windows checks who issued it. Kerberos does not work through WireGuard, and with HTTP Windows only sends the login to servers on its list of trusted hosts: use HTTPS.</p>
+      {/if}
     {:else if section === "network"}
       {#if s.kind === "rdp"}
       <strong class="sub">Remote Desktop Gateway</strong>
@@ -445,7 +494,7 @@
       <label class="field"><span>SSH key file for the gateway</span><input value={s.data.ssh_gateway?.key_path ?? ""} oninput={(e) => (s.data.ssh_gateway = { ...(s.data.ssh_gateway ?? { port: 22 }), key_path: (e.target as HTMLInputElement).value })} placeholder="None" /></label>
     {:else if section === "bookmark"}
       <label class="field"><span>Notes</span><textarea rows="3" bind:value={s.comment}></textarea></label>
-      {#if ["ssh", "shell", "wsl", "telnet", "serial", "mosh"].includes(s.kind)}
+      {#if ["ssh", "shell", "wsl", "telnet", "serial", "winrm", "mosh"].includes(s.kind)}
         <label class="field"><span>Colour words in the output</span>
           <select value={s.data.syntax ?? ""} onchange={(e) => (s.data.syntax = (e.target as HTMLSelectElement).value || undefined)}>
             <option value="">Same as the settings</option>

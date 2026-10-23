@@ -96,7 +96,28 @@ pub struct LocalSpec {
     pub startup: Option<String>,
 }
 
+/// A program running in a pseudo console: where to send input, its process id, and its exit code once it ends.
+pub struct Started {
+    pub tx: mpsc::UnboundedSender<TermCmd>,
+    pub pid: Option<u32>,
+    pub ended: tokio::sync::oneshot::Receiver<u32>,
+}
+
 pub fn spawn(spec: LocalSpec, cols: u16, rows: u16, out: TermOut) -> Result<mpsc::UnboundedSender<TermCmd>> {
+    let program = spec.program.clone();
+    let started = start(spec, cols, rows, out.clone()).map_err(|e| anyhow!("could not start {program}: {e}"))?;
+    out.status("connected", "");
+    let ended = started.ended;
+    std::thread::spawn(move || {
+        let code = ended.blocking_recv().unwrap_or(1);
+        out.info(&format!("\r\nProcess ended (exit code {code})."));
+        out.status("closed", "");
+    });
+    Ok(started.tx)
+}
+
+/// Starts the program and connects it to the terminal, without any status lines of its own.
+pub fn start(spec: LocalSpec, cols: u16, rows: u16, out: TermOut) -> Result<Started> {
     let pty = native_pty_system();
     let pair = pty
         .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
@@ -113,11 +134,9 @@ pub fn spawn(spec: LocalSpec, cols: u16, rows: u16, out: TermOut) -> Result<mpsc
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERM_PROGRAM", "Cablebag");
-    let mut child = pair
-        .slave
-        .spawn_command(cmd)
-        .map_err(|e| anyhow!("could not start {}: {e}", spec.program))?;
+    let mut child = pair.slave.spawn_command(cmd).map_err(|e| anyhow!("{e}"))?;
     drop(pair.slave);
+    let pid = child.process_id();
 
     let mut reader = pair.master.try_clone_reader().map_err(|e| anyhow!("{e}"))?;
     let mut writer = pair.master.take_writer().map_err(|e| anyhow!("{e}"))?;
@@ -128,13 +147,12 @@ pub fn spawn(spec: LocalSpec, cols: u16, rows: u16, out: TermOut) -> Result<mpsc
         let _ = tx.send(TermCmd::Input(format!("{}\r", s.replace('\n', "\r")).into_bytes()));
     }
 
-    let out_r = out.clone();
     std::thread::spawn(move || {
         let mut buf = vec![0u8; 32 * 1024];
         loop {
             match reader.read(&mut buf) {
                 Ok(0) | Err(_) => break,
-                Ok(n) => out_r.data(&buf[..n]),
+                Ok(n) => out.data(&buf[..n]),
             }
         }
     });
@@ -160,11 +178,10 @@ pub fn spawn(spec: LocalSpec, cols: u16, rows: u16, out: TermOut) -> Result<mpsc
         }
     });
 
-    out.status("connected", "");
+    let (done, ended) = tokio::sync::oneshot::channel();
     std::thread::spawn(move || {
         let code = child.wait().map(|s| s.exit_code()).unwrap_or(1);
-        out.info(&format!("\r\nProcess ended (exit code {code})."));
-        out.status("closed", "");
+        let _ = done.send(code);
     });
-    Ok(tx)
+    Ok(Started { tx, pid, ended })
 }

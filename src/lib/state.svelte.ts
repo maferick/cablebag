@@ -17,7 +17,7 @@ export interface Tab {
   id: string;
   title: string;
   type: "home" | "terminal" | "rdp" | "vnc" | "files" | "browser" | "tool" | "pending";
-  proto: "ssh" | "sftp" | "ftp" | "telnet" | "serial" | "local" | "rdp" | "vnc" | "browser" | "none";
+  proto: "ssh" | "sftp" | "ftp" | "telnet" | "serial" | "winrm" | "local" | "rdp" | "vnc" | "browser" | "none";
   session?: Session;
   local?: LocalSpec;
   status: TabStatus;
@@ -109,11 +109,11 @@ const uid = () => crypto.randomUUID();
 
 /** What a folder can give the sessions inside it, and for which kinds of session. */
 export const FOLDER_DEFAULTS: { key: string; label: string; kinds: string[] }[] = [
-  { key: "username", label: "user name", kinds: ["ssh", "sftp", "rdp", "telnet", "ftp"] },
+  { key: "username", label: "user name", kinds: ["ssh", "sftp", "rdp", "telnet", "ftp", "winrm"] },
   { key: "key_path", label: "key file", kinds: ["ssh", "sftp"] },
-  { key: "vault_item", label: "vault login", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet", "ftp"] },
+  { key: "vault_item", label: "vault login", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet", "ftp", "winrm"] },
   { key: "jump_hosts", label: "jump hosts", kinds: ["ssh", "sftp"] },
-  { key: "wireguard", label: "WireGuard network", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet", "browser"] },
+  { key: "wireguard", label: "WireGuard network", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet", "winrm", "browser"] },
   { key: "x11", label: "Linux windows on this PC", kinds: ["ssh"] },
   { key: "tab_color", label: "tab colour", kinds: [] },
 ];
@@ -309,7 +309,7 @@ class AppState {
     const color = s.data?.tab_color || undefined;
     if (s.kind === "ssh") {
       this.push({ id: uid(), title, type: "terminal", proto: "ssh", session: s, status: "connecting", color, gen: 0 });
-    } else if (s.kind === "telnet" || s.kind === "serial") {
+    } else if (s.kind === "telnet" || s.kind === "serial" || s.kind === "winrm") {
       this.push({ id: uid(), title, type: "terminal", proto: s.kind, session: s, status: "connecting", color, gen: 0 });
     } else if (s.kind === "ftp") {
       this.push({ id: uid(), title, type: "files", proto: "ftp", session: s, status: "connecting", color, gen: 0 });
@@ -432,7 +432,7 @@ class AppState {
     if (saved) return this.openSession(saved);
     let kind = "ssh";
     let rest = t;
-    const m = t.match(/^(ssh|rdp|vnc|telnet|sftp|ftp)(:\/\/|\s+)(.+)$/i);
+    const m = t.match(/^(ssh|rdp|vnc|telnet|sftp|ftp|winrm)(:\/\/|\s+)(.+)$/i);
     if (m) {
       kind = m[1].toLowerCase();
       rest = m[3].trim();

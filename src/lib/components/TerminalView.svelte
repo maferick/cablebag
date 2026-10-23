@@ -168,7 +168,7 @@
     const opened =
       tab.proto === "ssh" && tab.session
         ? api.openSsh(tab.id, $state.snapshot(tab.session), cols, rows, log, ch)
-        : (tab.proto === "telnet" || tab.proto === "serial") && tab.session
+        : (tab.proto === "telnet" || tab.proto === "serial" || tab.proto === "winrm") && tab.session
           ? api.openStream(tab.id, $state.snapshot(tab.session), cols, rows, log, ch)
           : api.openLocal(tab.id, $state.snapshot(tab.local!), cols, rows, log, ch);
     opened.catch((e) => {

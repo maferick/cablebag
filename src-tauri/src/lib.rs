@@ -25,6 +25,7 @@ mod updater;
 mod vault;
 mod vnc;
 mod wg;
+mod winrm;
 mod x11;
 
 use parking_lot::Mutex;
@@ -53,6 +54,8 @@ pub struct AppState {
     pub sync_lock: tokio::sync::Mutex<()>,
     pub ftps: ftp::Ftps,
     pub wg: wg::Tunnels,
+    /// Logins of the open PowerShell remoting tabs, for the assistant.
+    pub winrm: winrm::Logins,
 }
 
 type CmdResult<T> = Result<T, String>;
@@ -165,7 +168,7 @@ fn term_open_ssh(
     Ok(())
 }
 
-/// Telnet and serial sessions: terminals over a TCP connection or a COM port.
+/// Telnet, serial and PowerShell remoting sessions: terminals over a TCP connection, a COM port or WinRM.
 #[tauri::command]
 fn term_open_stream(
     app: AppHandle,
@@ -190,6 +193,9 @@ fn term_open_stream(
         }
         "serial" => {
             tauri::async_runtime::spawn(serial::run(session, out, rx));
+        }
+        "winrm" => {
+            tauri::async_runtime::spawn(winrm::run(app, id, session, cols, rows, out, rx));
         }
         other => return Err(format!("{other} is not a terminal session.")),
     }
@@ -881,7 +887,13 @@ fn agent_classify(command: String, powershell: Option<bool>) -> agent::Verdict {
 #[tauri::command]
 async fn agent_exec(app: AppHandle, tab_id: String, session: store::Session, command: String, root: bool, timeout_secs: Option<u64>) -> CmdResult<agent::ExecResult> {
     let secs = timeout_secs.unwrap_or(60).clamp(5, 600);
-    let res = agent::exec(&app, &tab_id, &session, &command, root, std::time::Duration::from_secs(secs)).await.map_err(err)?;
+    let timeout = std::time::Duration::from_secs(secs);
+    let res = if session.kind == "winrm" {
+        winrm::exec(&app, &tab_id, &session, &command, timeout).await
+    } else {
+        agent::exec(&app, &tab_id, &session, &command, root, timeout).await
+    }
+    .map_err(err)?;
     let state = app.state::<AppState>();
     let note = format!(
         "{}{}
@@ -1019,6 +1031,7 @@ pub fn run() {
             sync_lock: tokio::sync::Mutex::new(()),
             ftps: ftp::Ftps::default(),
             wg: wg::Tunnels::default(),
+            winrm: winrm::Logins::default(),
         })
         .setup(|app| {
             if let Some(w) = app.get_webview_window("main") {
