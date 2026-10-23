@@ -6,7 +6,7 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.17.0
+## 0.17.0 · 23 October 2026
 
 **Web sessions for more than one tenant or account**
 
@@ -35,8 +35,8 @@ installs it and starts Cablebag again. Every version is also on the
   one you pick. Nothing is filled by itself; a login saved for another site is only filled after you confirm it.
 - **Proton Pass** as a credential source, through Proton's own command-line tool pass-cli (it keeps its own
   sign-in through your web browser). Where pass-cli is stays a setting of this PC and never goes into the sync.
-- **Import bookmarks** from Chrome, Edge and Firefox (Import sessions, in Settings, General or the command palette) as web sessions in the same folders.
-  Importing again updates them instead of adding copies.
+- **Import bookmarks** from Chrome, Edge and Firefox (Import sessions, in Settings, General or the command
+  palette) as web sessions in the same folders. Importing again updates them instead of adding copies.
 
 ## 0.16.1 · 23 October 2026
 
