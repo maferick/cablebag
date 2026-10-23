@@ -173,8 +173,17 @@ pub fn delete(app: &AppHandle, id: &str) -> Result<()> {
     save_profiles(app, &list)?;
     let state = app.state::<AppState>();
     state.wg.proxies.lock().remove(id);
-    // Cookies of its web tabs; still in use when a tab is open, then they go the next time.
-    let _ = std::fs::remove_dir_all(web_profile_dir(id));
+    // Cookies of its web tabs (also those of browser profiles through it); still in use when a tab is open,
+    // then they go the next time.
+    let dir = web_profile_dir(id);
+    let _ = std::fs::remove_dir_all(&dir);
+    if let (Some(parent), Some(name)) = (dir.parent(), dir.file_name().map(|n| n.to_string_lossy().to_string())) {
+        for e in std::fs::read_dir(parent).into_iter().flatten().flatten() {
+            if e.file_name().to_string_lossy().starts_with(&format!("{name}-p-")) {
+                let _ = std::fs::remove_dir_all(e.path());
+            }
+        }
+    }
     forget_public(app, id);
     let store = state.store.lock();
     forget_keys(&store, id, None)

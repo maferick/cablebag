@@ -6,6 +6,29 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.17.0
+
+**Web sessions for more than one tenant or account**
+
+- **Browser profiles** (Settings, Browser profiles): each profile keeps its own cookies and logins, so web sessions
+  can be signed in to two Azure tenants, two Teams or two of anything side by side. Choose a profile per web
+  session or once for a folder, as with the WireGuard network. **Private** keeps nothing after the tab closes.
+  "Sign out everywhere" clears a profile; the list of profiles goes along with Sync (cookies never do).
+- **Colour per identity**: a profile's tabs get its colour, the address bar shows which profile a tab uses, and
+  the session tree shows it next to each web session.
+- **Unread counts**: chat and mail pages that show a count in their title, such as Teams, get a badge on their
+  tab, and the total shows on Cablebag's taskbar button.
+- **Notifications** from web tabs (a Teams message, for example) show as Windows notifications with the
+  profile's name; clicking one opens the tab. Switch them off in Settings, Browser profiles (do not disturb), or
+  per profile.
+- **Keep running**: a web session can open when Cablebag starts and keep running in the background, so its
+  notifications keep coming. Other web tabs can go to sleep after a while to save memory (off unless you
+  choose it) and open again where they were.
+- Links that open a new tab now open in a Cablebag tab with the same profile and network; sign-in pop-ups stay
+  pop-ups. Finished downloads are announced.
+- **Import bookmarks** from Chrome, Edge and Firefox (Import sessions, in Settings, General or the command palette) as web sessions in the same folders.
+  Importing again updates them instead of adding copies.
+
 ## 0.16.1 · 23 October 2026
 
 **Security fixes from a code review**

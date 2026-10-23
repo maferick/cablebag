@@ -1,5 +1,5 @@
 //! Importing sessions from other programs and files: PuTTY and KiTTY saved sessions, WinSCP sites, the
-//! OpenSSH config file, Remote Desktop (.rdp) files and MobaXterm (MobaXterm.ini or .mxtsessions, the format with
+//! OpenSSH config file, Remote Desktop (.rdp) files, the bookmarks of Chrome, Edge and Firefox, and MobaXterm (MobaXterm.ini or .mxtsessions, the format with
 //! one `Name= #icon#type%field1%field2...#terminal#start mode#comment#colour` line per session and the folder
 //! in each `[Bookmarks_N]` section's `SubRep=`).
 //!
@@ -86,6 +86,27 @@ pub fn sources() -> Vec<Source> {
             extensions: vec!["rdp"],
         },
         Source {
+            id: "chrome",
+            name: "Chrome bookmarks",
+            description: "Web addresses from Chrome's bookmarks, as web sessions in the same folders.".into(),
+            found: Some(count(bookmark_items(crate::bookmarks::chrome()))),
+            extensions: vec![],
+        },
+        Source {
+            id: "edge",
+            name: "Edge bookmarks",
+            description: "Web addresses from Microsoft Edge's favourites, as web sessions in the same folders.".into(),
+            found: Some(count(bookmark_items(crate::bookmarks::edge()))),
+            extensions: vec![],
+        },
+        Source {
+            id: "firefox",
+            name: "Firefox bookmarks",
+            description: "Web addresses from Firefox's bookmarks, as web sessions in the same folders.".into(),
+            found: Some(count(bookmark_items(crate::bookmarks::firefox()))),
+            extensions: vec![],
+        },
+        Source {
             id: "mobaxterm",
             name: "MobaXterm",
             description: match mobaxterm_ini() {
@@ -122,6 +143,9 @@ pub fn import(store: &Store, source: &str, paths: &[String]) -> Result<Report> {
             };
             (None, session_file(&p)?, p.display().to_string())
         }
+        "chrome" => (Some("Chrome bookmarks"), bookmark_items(crate::bookmarks::chrome())?, "Chrome's bookmarks".to_string()),
+        "edge" => (Some("Edge bookmarks"), bookmark_items(crate::bookmarks::edge())?, "Edge's favourites".to_string()),
+        "firefox" => (Some("Firefox bookmarks"), bookmark_items(crate::bookmarks::firefox())?, "Firefox's bookmarks".to_string()),
         _ => bail!("Unknown import source {source}."),
     };
     if items.is_empty() {
@@ -148,6 +172,14 @@ fn save(store: &Store, top: Option<&str>, items: Vec<Item>, label: String) -> Re
         }
         let existing = store.find_session(parent.as_deref(), &it.name)?;
         let updated = existing.is_some();
+        // Importing again keeps what was set here since (a browser profile, a tab colour, a note): the import's
+        // own values win, the rest stays.
+        let before = existing.as_deref().map(|id| store.session(id)).transpose()?.flatten();
+        let mut data = before.as_ref().map(|b| b.data.clone()).filter(Value::is_object).unwrap_or_else(|| json!({}));
+        if let (Some(d), Some(new)) = (data.as_object_mut(), it.data.as_object()) {
+            d.extend(new.clone());
+        }
+        let comment = if it.comment.is_empty() { before.as_ref().map(|b| b.comment.clone()).unwrap_or_default() } else { it.comment };
         store.save_session(&Session {
             id: existing.unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
             folder_id: parent,
@@ -156,10 +188,10 @@ fn save(store: &Store, top: Option<&str>, items: Vec<Item>, label: String) -> Re
             host: it.host,
             port: it.port,
             username: it.user,
-            data: it.data,
-            comment: it.comment,
-            sort: 0,
-            last_used: 0,
+            data,
+            comment,
+            sort: before.as_ref().map(|b| b.sort).unwrap_or(0),
+            last_used: before.as_ref().map(|b| b.last_used).unwrap_or(0),
         })?;
         if updated {
             report.updated += 1;
@@ -169,6 +201,24 @@ fn save(store: &Store, top: Option<&str>, items: Vec<Item>, label: String) -> Re
         *report.by_kind.entry(it.kind).or_default() += 1;
     }
     Ok(report)
+}
+
+/// Bookmarks as web sessions. Two bookmarks with the same name in one folder get (2), (3)..., as a session is
+/// found again by its folder and name.
+fn bookmark_items(list: Result<Vec<crate::bookmarks::Bookmark>>) -> Result<Vec<Item>> {
+    let mut seen: HashSet<(Vec<String>, String)> = HashSet::new();
+    Ok(list?
+        .into_iter()
+        .map(|b| {
+            let mut name = b.name.chars().take(120).collect::<String>();
+            let mut n = 1;
+            while !seen.insert((b.folder.clone(), name.to_lowercase())) {
+                n += 1;
+                name = format!("{} ({n})", b.name.chars().take(110).collect::<String>());
+            }
+            Item { folder: b.folder, name, kind: "browser".into(), host: b.url, port: 0, user: String::new(), data: json!({}), comment: String::new() }
+        })
+        .collect())
 }
 
 fn default_port(kind: &str) -> i64 {

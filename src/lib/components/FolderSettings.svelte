@@ -5,6 +5,8 @@
   import VaultPicker from "./VaultPicker.svelte";
   import PsmPicker from "./PsmPicker.svelte";
   import WireGuardPicker from "./WireGuardPicker.svelte";
+  import BrowserProfilePicker from "./BrowserProfilePicker.svelte";
+  import { browserProfiles } from "../browserProfiles.svelte";
   import { wireguard } from "../wireguard.svelte";
   import { app, FOLDER_DEFAULTS } from "../state.svelte";
   import { api, type Folder } from "../api";
@@ -40,7 +42,7 @@
     app.notify(`Settings of ${folder.name} saved`);
   }
 
-  const from = (key: string) => (above.from[key] ? `From ${above.from[key]}: ${key === "jump_hosts" ? above.values[key].map((j: any) => j.host).join(", ") : key === "wireguard" ? wireguard.name(above.values[key]) : above.values[key]}` : "");
+  const from = (key: string) => (above.from[key] ? `From ${above.from[key]}: ${key === "jump_hosts" ? above.values[key].map((j: any) => j.host).join(", ") : key === "wireguard" ? wireguard.name(above.values[key]) : key === "browser_profile" ? browserProfiles.name(above.values[key]) : above.values[key]}` : "");
 </script>
 
 <Modal title={`Folder ${folder.name}`} width={620} onclose={() => (app.folderEditing = null)}>
@@ -65,6 +67,9 @@
     </div>
     <div class="field"><span>Network (SSH, RDP, VNC, telnet, PowerShell remoting, web)</span>
       <WireGuardPicker bind:value={d.wireguard} inherited={above.values.wireguard} from={above.from.wireguard ?? ""} />
+    </div>
+    <div class="field"><span>Browser profile (web)</span>
+      <BrowserProfilePicker bind:value={d.browser_profile} inherited={above.values.browser_profile} from={above.from.browser_profile ?? ""} />
     </div>
     <div class="field">
       <span>Jump hosts (SSH)</span>

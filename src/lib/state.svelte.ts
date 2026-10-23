@@ -32,6 +32,8 @@ export interface Tab {
   lost?: string;
   /** For an editor tab: the remote file, and the tab whose SFTP connection reads and writes it. */
   edit?: { tab: string; path: string };
+  /** For a web tab: the unread count its page shows in the title. */
+  unread?: number;
 }
 
 export interface Transfer {
@@ -96,6 +98,7 @@ export const SETTINGS_PAGES = [
   { id: "logging", label: "Logging" },
   { id: "ssh", label: "SSH" },
   { id: "vault", label: "Credential sources" },
+  { id: "browsers", label: "Browser profiles" },
   { id: "proxmox", label: "Proxmox" },
   { id: "sync", label: "Sync (Git)" },
   { id: "assistant", label: "Assistant" },
@@ -116,8 +119,12 @@ export const FOLDER_DEFAULTS: { key: string; label: string; kinds: string[] }[] 
   { key: "wireguard", label: "WireGuard network", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet", "winrm", "browser"] },
   { key: "x11", label: "Linux windows on this PC", kinds: ["ssh"] },
   { key: "psm", label: "CyberArk PSM", kinds: ["ssh", "sftp", "rdp"] },
+  { key: "browser_profile", label: "browser profile", kinds: ["browser"] },
   { key: "tab_color", label: "tab colour", kinds: [] },
 ];
+
+/** Defaults where "none" in a folder ends what a folder above gives (go directly, no PSM, the shared browser profile). */
+const ENDS_WITH_NONE = ["wireguard", "psm", "browser_profile"];
 
 const filled = (v: unknown) => (Array.isArray(v) ? v.length > 0 : v !== undefined && v !== null && v !== "");
 
@@ -282,6 +289,15 @@ class AppState {
     this.activeId = tab.id;
   }
 
+  /** At the start: web sessions set to keep running open in the background (Teams, for its notifications). */
+  openKeptRunning() {
+    const active = this.activeId;
+    for (const s of this.sessions.filter((s) => s.kind === "browser" && s.data?.keep_running)) {
+      if (!this.tabs.some((t) => t.session?.id === s.id)) this.openSession(s);
+    }
+    this.activeId = active;
+  }
+
   openLocal(shell?: LocalShell, title?: string, cwd?: string) {
     const sh = shell ?? this.defaultShell();
     if (!sh) {
@@ -318,7 +334,9 @@ class AppState {
       // Imported by an older Cablebag, which kept the address apart.
       this.openSession({ ...s, host: s.data.target });
     } else if (s.kind === "browser") {
-      this.push({ id: uid(), title: s.name || s.host, type: "browser", proto: "browser", session: s, status: "connecting", color, gen: 0 });
+      // Without a colour of its own, the tab shows its browser profile's, so two tenants are told apart at a glance.
+      const profile = ((this.settings["browser.profiles"] ?? []) as { id: string; color: string }[]).find((p) => p.id === s.data?.browser_profile);
+      this.push({ id: uid(), title: s.name || s.host, type: "browser", proto: "browser", session: s, status: "connecting", color: color ?? (profile?.color || undefined), gen: 0 });
     } else if (s.kind === "file") {
       // A file or folder opens in its own Windows program; links in the web browser.
       const target = (s.host || s.data?.target || s.data?.path || "").trim();
@@ -570,10 +588,10 @@ class AppState {
     const from: Record<string, string> = {};
     for (const f of chain) {
       for (const { key } of FOLDER_DEFAULTS) {
-        if ((key === "wireguard" || key === "psm") && f.data?.[key] === "none") {
-          // A folder that goes directly ends the network (or PSM) a folder above gives.
-          delete values.wireguard;
-          delete from.wireguard;
+        if (ENDS_WITH_NONE.includes(key) && f.data?.[key] === "none") {
+          // A folder that goes directly ends the network (or PSM, or browser profile) a folder above gives.
+          delete values[key];
+          delete from[key];
         } else if (filled(f.data?.[key])) {
           values[key] = f.data![key];
           from[key] = f.name;

@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use tauri::{AppHandle, Emitter, Manager};
 
 /// What is synced: collection name, file in the repository.
-const FILES: [(&str, &str); 9] = [
+const FILES: [(&str, &str); 10] = [
     ("folders", "folders.json"),
     ("sessions", "sessions.json"),
     ("macros", "macros.json"),
@@ -27,6 +27,7 @@ const FILES: [(&str, &str); 9] = [
     ("workspaces", "workspaces.json"),
     ("wireguard", "wireguard.json"),
     ("sources", "sources.json"),
+    ("browserprofiles", "browser-profiles.json"),
 ];
 
 /// Settings that hold the synced lists.
@@ -39,6 +40,7 @@ fn setting_key(collection: &str) -> Option<&'static str> {
         "workspaces" => Some("workspaces"),
         "wireguard" => Some("wireguard.profiles"),
         "sources" => Some(crate::sources::SETTING),
+        "browserprofiles" => Some("browser.profiles"),
         _ => None,
     }
 }
@@ -83,6 +85,7 @@ fn item_kind(collection: &str) -> &'static str {
         "workspaces" => "workspace",
         "wireguard" => "WireGuard network",
         "sources" => "credential source",
+        "browserprofiles" => "browser profile",
         _ => "item",
     }
 }

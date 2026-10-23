@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { browserProfiles } from "../browserProfiles.svelte";
   import { ask } from "../ask.svelte";
   import { treeKeys } from "../keyNav";
   import { app, newSession } from "../state.svelte";
@@ -348,6 +349,14 @@
         {#if rk}<span class="reach {reach.results[rk]?.state ?? 'checking'}" title={reach.describe(rk)}></span>{/if}
       </span>
       <span class="name">{s.name || s.host}</span>
+      {#if s.kind === "browser"}
+        {@const ident = app.withFolderDefaults(s).data?.browser_profile}
+        {#if ident && ident !== "none"}
+          <span class="ident" title="Browser profile: {browserProfiles.name(ident)}">
+            <span class="idot" style:background={browserProfiles.color(ident) ?? "var(--faint)"} aria-hidden="true"></span>{browserProfiles.name(ident)}
+          </span>
+        {/if}
+      {/if}
     </div>
   {/each}
 {/snippet}
@@ -560,5 +569,25 @@
   }
   .empty p {
     margin: 0;
+  }
+  .ident {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 45%;
+    margin-left: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .idot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
   }
 </style>

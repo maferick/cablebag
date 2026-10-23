@@ -1,5 +1,6 @@
 mod agent;
 mod ai;
+mod bookmarks;
 mod browser;
 mod files;
 mod ftp;
@@ -25,6 +26,7 @@ mod tunnels;
 mod updater;
 mod vault;
 mod vnc;
+mod webnotify;
 mod wg;
 mod winrm;
 mod x11;
@@ -206,8 +208,35 @@ fn term_open_stream(
 /// Async on purpose: making a web view inside a synchronous command deadlocks on Windows.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-async fn browser_open(app: AppHandle, id: String, url: String, wireguard: Option<String>, x: f64, y: f64, w: f64, h: f64) -> CmdResult<()> {
-    browser::open(&app, &id, &url, wireguard.filter(|w| !w.is_empty() && w != "none"), x, y, w, h).await.map_err(err)
+async fn browser_open(app: AppHandle, id: String, url: String, wireguard: Option<String>, profile: Option<String>, x: f64, y: f64, w: f64, h: f64) -> CmdResult<()> {
+    let set = |v: Option<String>| v.filter(|v| !v.is_empty() && v != "none");
+    let profile = set(profile);
+    let private = profile.as_deref() == Some("private");
+    browser::open(&app, &id, &url, set(wireguard), profile.filter(|p| p != "private"), private, x, y, w, h).await.map_err(err)
+}
+
+/// The badge on Cablebag's taskbar button (the unread count of the web tabs): square RGBA pixels, or none.
+#[tauri::command]
+fn window_badge(app: AppHandle, rgba: Option<Vec<u8>>, size: u32) -> CmdResult<()> {
+    let window = app.get_window("main").ok_or("main window missing")?;
+    if size == 0 || size > 256 {
+        return Err("The badge is 1 to 256 pixels square.".into());
+    }
+    let icon = rgba.filter(|p| p.len() == (size * size * 4) as usize).map(|p| tauri::image::Image::new_owned(p, size, size));
+    window.set_overlay_icon(icon).map_err(err)
+}
+
+/// Shows a web tab's notification as a Windows notification (the window has decided it should show). Async, so
+/// showing it does not hold up the window.
+#[tauri::command]
+async fn browser_notify(app: AppHandle, id: String, key: u64, title: String, body: String, origin: String) -> CmdResult<()> {
+    webnotify::show(&app, &id, key, &title, &body, &origin).map_err(err)
+}
+
+/// Clears the cookies and logins of a browser profile (also when the profile itself is deleted).
+#[tauri::command]
+fn browser_profile_forget(id: String) {
+    browser::forget_profile(&id);
 }
 
 #[tauri::command]
@@ -354,9 +383,10 @@ fn file_modified(path: String) -> u64 {
         .unwrap_or(0)
 }
 
+/// Async: counting what the other programs hold reads their files (Firefox's database is copied first).
 #[tauri::command]
-fn import_sources() -> Vec<importers::Source> {
-    importers::sources()
+async fn import_sources() -> Vec<importers::Source> {
+    tauri::async_runtime::spawn_blocking(importers::sources).await.unwrap_or_default()
 }
 
 #[tauri::command]
@@ -1110,6 +1140,9 @@ pub fn run() {
             browser_visible,
             browser_command,
             browser_close,
+            browser_profile_forget,
+            window_badge,
+            browser_notify,
             sftp_home,
             sftp_list,
             sftp_mkdir,

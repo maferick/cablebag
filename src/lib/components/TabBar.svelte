@@ -170,7 +170,7 @@
             }}
           />
         {:else}
-          <span class="title">{t.title}</span>{#if app.unsaved.has(t.id)}<span class="unsaved" title="Not saved yet"></span>{/if}
+          <span class="title">{t.title}</span>{#if t.unread}<span class="badge" title="{t.unread} unread" aria-label="{t.unread} unread">{t.unread > 99 ? "99+" : t.unread}</span>{/if}{#if app.unsaved.has(t.id)}<span class="unsaved" title="Not saved yet"></span>{/if}
         {/if}
         <button
           class="close"
@@ -274,6 +274,18 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .badge {
+    flex-shrink: 0;
+    min-width: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: #c42b1c;
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 16px;
+    text-align: center;
   }
   .rename {
     width: 130px;

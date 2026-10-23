@@ -6,6 +6,7 @@
   import SyncSettings from "./SyncSettings.svelte";
   import AssistantSettings from "./AssistantSettings.svelte";
   import CredentialSources from "./CredentialSources.svelte";
+  import BrowserProfilesSettings from "./BrowserProfilesSettings.svelte";
   import { api, type KnownHost, type SecretInfo } from "../api";
   import { SCHEMES } from "../schemes";
   import { BUILTIN_SYNTAX, type SyntaxSet } from "../highlight";
@@ -363,8 +364,12 @@
       {:else if page === "assistant"}
         <AssistantSettings />
       {:else if page === "sync"}
-        <SettingsSection title="Sync through git" desc="Sessions, folders, macros, tunnels, Proxmox servers, credential sources and the assistant's memory, to a private repository; passwords never go there.">
+        <SettingsSection title="Sync through git" desc="Sessions, folders, macros, tunnels, Proxmox servers, credential sources, browser profiles and the assistant's memory, to a private repository; passwords and cookies never go there.">
           <div class="inner"><SyncSettings /></div>
+        </SettingsSection>
+      {:else if page === "browsers"}
+        <SettingsSection title="Profiles" desc="Each profile keeps its own cookies and logins, so web sessions can be signed in to different tenants or accounts side by side. Choose one per web session or per folder.">
+          <div class="inner"><BrowserProfilesSettings /></div>
         </SettingsSection>
       {:else if page === "proxmox"}
         <SettingsSection title="Proxmox servers" desc="Each server shows as a live folder of its machines in the session tree.">

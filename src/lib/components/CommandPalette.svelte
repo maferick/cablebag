@@ -156,7 +156,7 @@
       { group: "Actions", label: "Keyboard shortcuts", words: "keys hotkeys ctrl alt tiling", icon: Keyboard, run: () => app.openSettings("keyboard") },
       { group: "Actions", label: "About Cablebag", words: "version licence license update changelog what's new data folder", icon: Info, run: () => app.openSettings("about") },
       { group: "Actions", label: "Report a problem", words: "bug issue error crash help github feedback wrong broken", icon: Bug, run: () => app.openReport() },
-      { group: "Actions", label: "Import sessions", words: "mobaxterm putty winscp kitty ssh config rdp ini", icon: Download, run: () => (app.importOpen = true) },
+      { group: "Actions", label: "Import sessions", words: "mobaxterm putty winscp kitty ssh config rdp ini bookmarks chrome edge firefox favourites", icon: Download, run: () => (app.importOpen = true) },
     );
     for (const s of vault.sources.filter((x) => x.configured)) {
       const words = `vault credential source ${s.kind} ${s.kind === "vaultwarden" ? "bitwarden" : s.kind === "cyberark" ? "privilege cloud pvwa" : "secret server thycotic"}`;

@@ -42,6 +42,8 @@ class Workspaces {
     for (const s of specs) {
       if (s.kind === "session") {
         const now = s.session.id ? app.sessions.find((x) => x.id === s.session.id) : undefined;
+        // A web session that keeps running is open already (it opened by itself at the start).
+        if (now?.data?.keep_running && app.tabs.some((t) => t.session?.id === now.id)) continue;
         app.openSession(now ?? s.session);
       } else if (s.kind === "local") {
         app.openLocalSpec(s.title, s.local);

@@ -14,6 +14,8 @@
   import ProxmoxSettings from "./ProxmoxSettings.svelte";
   import MemoryList from "./MemoryList.svelte";
   import WireGuardPicker from "./WireGuardPicker.svelte";
+  import BrowserProfilePicker from "./BrowserProfilePicker.svelte";
+  import { browserProfiles } from "../browserProfiles.svelte";
   import { wireguard } from "../wireguard.svelte";
 
   let { session }: { session: Session } = $props();
@@ -79,7 +81,7 @@
       .map((d) => {
         const v = folderValues.values[d.key];
         const shown =
-          d.key === "jump_hosts" ? v.map((j: any) => j.host).join(", ") : d.key === "vault_item" ? "set" : d.key === "tab_color" || d.key === "x11" ? "" : d.key === "wireguard" ? wireguard.name(v) : d.key === "psm" ? (vault.source(v)?.name ?? "") : v;
+          d.key === "jump_hosts" ? v.map((j: any) => j.host).join(", ") : d.key === "vault_item" ? "set" : d.key === "tab_color" || d.key === "x11" ? "" : d.key === "wireguard" ? wireguard.name(v) : d.key === "psm" ? (vault.source(v)?.name ?? "") : d.key === "browser_profile" ? browserProfiles.name(v) : v;
         return `${d.label}${shown ? ` ${shown}` : ""} (${folderValues.from[d.key]})`;
       }),
   );
@@ -334,6 +336,13 @@
       {/if}
       {#if s.kind === "browser"}
         <label class="field"><span>Web address</span><input bind:value={s.host} placeholder="https://192.168.1.1 or proxmox.example.com:8006" /></label>
+        <div class="field"><span>Browser profile</span>
+          <BrowserProfilePicker bind:value={s.data.browser_profile} inherited={folderValues.values.browser_profile} from={`the folder ${folderValues.from.browser_profile ?? ""}`} />
+          <span class="muted small">Cookies and logins: give a second tenant or account its own profile to be signed in to both at once.</span>
+        </div>
+        <label class="check" title="For chat and mail such as Teams: its notifications and unread count keep coming while you work in other tabs.">
+          <input type="checkbox" bind:checked={s.data.keep_running} /> Open when Cablebag starts and keep it running
+        </label>
       {/if}
       {#if s.kind === "file"}
         <label class="field"><span>File, folder or link</span>

@@ -45,6 +45,7 @@
   import { macros } from "../macros.svelte";
   import { letter } from "../shortcuts";
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { showOnTaskbar } from "../unread";
 
   let ready = $state(false);
 
@@ -59,6 +60,11 @@
 
   $effect(() => {
     if (tiling) tiles.sync(tiled, app.activeId);
+  });
+
+  // The unread counts of the web tabs, together on Cablebag's taskbar button.
+  $effect(() => {
+    showOnTaskbar(app.tabs.reduce((n, t) => n + (t.unread ?? 0), 0));
   });
 
   // A conversation ends with its tab.
@@ -296,6 +302,7 @@
         update.start();
         assistant.load();
         workspaces.start();
+        app.openKeptRunning();
       });
     return () => unlisten.forEach((u) => u.then((f) => f()));
   });

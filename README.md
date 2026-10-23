@@ -125,7 +125,7 @@ tabs, at the same time.
 ## Sync
 
 Sessions, folders, folder settings, macros, tunnels, WireGuard networks, credential sources (without their
-secrets), workspaces and the assistant's memory sync through a private git repository of your own, encrypted.
+secrets), browser profiles (without their cookies), workspaces and the assistant's memory sync through a private git repository of your own, encrypted.
 Passwords and private keys stay out. When the same item changed on two PCs, Settings, Sync names the conflict
 and says whose version was kept.
 

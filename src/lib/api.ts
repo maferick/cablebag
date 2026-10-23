@@ -381,8 +381,9 @@ export const api = {
     invoke<void>("term_open_stream", { id, session, cols, rows, log: log ?? null, onData }),
   fileOpen: (target: string) => invoke<void>("file_open", { target }),
   serialPorts: () => invoke<{ name: string; description: string }[]>("serial_ports"),
-  browserOpen: (id: string, url: string, wireguard: string | undefined, r: { x: number; y: number; w: number; h: number }) =>
-    invoke<void>("browser_open", { id, url, wireguard: wireguard || null, ...r }),
+  browserOpen: (id: string, url: string, wireguard: string | undefined, profile: string | undefined, r: { x: number; y: number; w: number; h: number }) =>
+    invoke<void>("browser_open", { id, url, wireguard: wireguard || null, profile: profile || null, ...r }),
+  browserProfileForget: (id: string) => invoke<void>("browser_profile_forget", { id }),
   browserBounds: (id: string, r: { x: number; y: number; w: number; h: number }) => invoke<void>("browser_bounds", { id, ...r }),
   browserVisible: (id: string, show: boolean) => invoke<void>("browser_visible", { id, show }),
   browserCommand: (id: string, what: string, url?: string) => invoke<void>("browser_command", { id, what, url: url ?? null }),
