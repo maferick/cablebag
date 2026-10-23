@@ -11,8 +11,9 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/maferick/cablebag/ci.yml?branch=main&style=flat&label=CI)](https://github.com/maferick/cablebag/actions/workflows/ci.yml)
 
 Cablebag is a free remote access app for Windows 10 and 11. It puts SSH, Remote Desktop (RDP), VNC, Telnet,
-serial ports, SFTP and FTP, local shells and WSL, web pages and Proxmox consoles in tabs in one window, with
-remote files beside every SSH tab, a password vault, session sync, and an assistant that can work on your servers.
+serial ports, SFTP and FTP, PowerShell remoting (WinRM), local shells and WSL, web pages and Proxmox consoles in
+tabs in one window, with remote files beside every SSH tab, logins from your credential sources (Vaultwarden or
+Bitwarden, CyberArk, Delinea Secret Server), session sync, and an assistant that can work on your servers.
 It can run WireGuard inside the app, per session, so two customers' VPNs with the same address ranges can be
 open at the same time. It is made for system administrators, IT consultants and MSP staff who look after many
 customer networks, and for homelab users who want their servers, Proxmox machines and consoles in one place.
@@ -34,10 +35,11 @@ tabs, at the same time.
 ![The WireGuard networks overview: two networks with the same address range, one of them live with its handshake and traffic](assets/wireguard-networks.png)
 
 - **Nothing changes in Windows.** No WireGuard adapter, no routes, no admin rights. The WireGuard app can stay
-  installed; Cablebag warns when it sees the app has the same tunnel switched on.
-- **Works for every session type that talks to the network:** SSH, SFTP, RDP, VNC, Telnet, and web pages in a
-  tab. A web page gets an internal proxy that only that tab uses, so every address, including local ones, goes
-  through the tunnel, and each network keeps its own cookies.
+  installed; Cablebag warns when it sees the app has the same tunnel switched on. The ports Cablebag opens on
+  this PC for a network let in Cablebag's own tabs only; other programs are refused.
+- **Works for every session type that talks to the network:** SSH, SFTP, RDP, VNC, Telnet, PowerShell remoting
+  (over HTTPS), and web pages in a tab. A web page gets an internal proxy that only that tab uses, so every
+  address, including local ones, goes through the tunnel, and each network keeps its own cookies.
 - **Works for Proxmox servers:** the API, the machines list, start and stop, snapshots, the console, the node
   shell and the SSH and RDP sessions Cablebag opens for its VMs and containers all go through the network you
   chose for that server. The Proxmox web interface opens in a Cablebag tab through it too.
@@ -46,8 +48,8 @@ tabs, at the same time.
   the overview with the live state of every network: open connections, last handshake and data.
 - **Keys stay private.** Import the `.conf` you already use, or let Cablebag make a key pair of its own (its
   public key goes on the server as an extra peer, so you can keep the WireGuard app's tunnel as well). Private
-  keys live in Cablebag's encrypted vault or come from a Vaultwarden item. Networks travel with Sync; their keys
-  do not.
+  keys live in Cablebag's encrypted vault or come from a login in one of your credential sources. Networks travel
+  with Sync; their keys do not.
 
 ![A session's editor with the Network choice set to a WireGuard network, and the Import .conf, New and Edit buttons next to it](assets/wireguard-session.png)
 
@@ -58,6 +60,10 @@ tabs, at the same time.
   shown on your PC (X11, with the X server that comes with Cablebag) and automatic reconnect in the same terminal
   when the connection drops.
 - **Remote Desktop (RDP)**, sized to its pane, Ctrl+Alt+Del that works, and a clear message when a session ends.
+- **PowerShell remoting (WinRM)**: a remote PowerShell on a Windows server in a terminal tab, over HTTP or HTTPS,
+  with Negotiate, Kerberos, CredSSP or Basic. Windows' own PowerShell does the connecting, so it behaves exactly
+  as in any PowerShell window, and the password never shows on screen or on a command line. The assistant can
+  work in such a tab too.
 - **VNC**, **Telnet** and **serial ports**.
 - **SFTP and FTP** as file sessions.
 - **Local shells and WSL** in the same tabs as everything else (Ctrl+Shift+T).
@@ -67,7 +73,8 @@ tabs, at the same time.
 - **Search box (Ctrl+K).** Type a few letters to open any session, tab, Proxmox machine, tool, macro or setting;
   type `user@host` to connect right away; type `>` for the list of commands.
 - **Folders that do the work.** A folder can give its sessions a user name, a key file, a login from the vault,
-  jump hosts, a tab colour and a WireGuard network. Sessions use them where they have nothing of their own.
+  jump hosts, a CyberArk PSM, X11, a tab colour and a WireGuard network. Sessions use them where they have
+  nothing of their own.
 - **Run on many servers.** One command on every SSH session in a folder, a few at a time, answers side by side.
   Uptime, disk space, pending updates or failed services on 30 servers in one go.
 - **Workspaces and the tabs from last time.** Save the open tabs under a name (everything for one customer) and
@@ -103,10 +110,13 @@ tabs, at the same time.
 
 - **Logins from your credential sources**: as many Vaultwarden or Bitwarden vaults as you use (work and home
   side by side, unlocked with Windows Hello), CyberArk (Privilege Cloud or your own PVWA, with single sign-on in a
-  Cablebag window, reasons and tickets, check-out and check-in) and Delinea Secret Server. API keys and WireGuard
-  private keys can come from there as well.
-- **Through CyberArk PSM**: a session or a whole folder can connect over SSH through PSM for SSH, or over Remote
-  Desktop through the PSM server, so the target's password never reaches your PC.
+  Cablebag window, reasons and tickets, check-out and check-in) and Delinea Secret Server (with two-factor codes,
+  comments, tickets and check-out). API keys and WireGuard private keys can come from there as well. The login
+  picker shows the logins of every open source, grouped by source.
+- **Through CyberArk PSM**: a session or a whole folder can connect over SSH or SFTP through PSM for SSH, or over
+  Remote Desktop through the PSM server, so the target's password never reaches your PC.
+- CyberArk and Delinea Secret Server were built from their documentation; reports from people who use them are
+  welcome, through Report a problem in Cablebag.
 - **Passwords kept on this PC** are encrypted under your Windows account and never leave it. They are never
   included in Sync, and the assistant never sees them.
 - **SSH key generator** that puts the new key on the server in one step.
@@ -115,8 +125,9 @@ tabs, at the same time.
 ## Sync
 
 Sessions, folders, folder settings, macros, tunnels, WireGuard networks, credential sources (without their
-secrets), workspaces and the assistant's memory sync through a private git repository of your own, encrypted. Passwords and private keys stay out. When the
-same item changed on two PCs, Settings, Sync names the conflict and says whose version was kept.
+secrets), workspaces and the assistant's memory sync through a private git repository of your own, encrypted.
+Passwords and private keys stay out. When the same item changed on two PCs, Settings, Sync names the conflict
+and says whose version was kept.
 
 ## Assistant
 
@@ -125,7 +136,8 @@ vLLM, Ollama on your own hardware, or a cloud service. Nothing is configured unt
 
 - **Ask about what is on screen.** The last lines of the terminal, or a picture of a Remote Desktop or VNC
   screen, go with your question.
-- **It investigates by itself** in an SSH tab, or inside a Proxmox VM or container, with commands that only read.
+- **It investigates by itself** in an SSH or PowerShell remoting tab, or inside a Proxmox VM or container, with
+  commands that only read.
 - **Every change waits for you.** A card shows the command, why, how to undo it and what kind of change it is.
   Cablebag classifies the command, not the AI; dangerous ones (deleting folders, formatting disks, rebooting,
   destroying machines) always get a red card. You can let it ask before every change, or only before dangerous
@@ -149,9 +161,20 @@ and run it. It installs for your Windows account only, no administrator rights n
 date: updates come from this page and nowhere else, and are installed only when they carry the Cablebag signature.
 
 Needs Windows 10 or 11. Remote Desktop tabs need the
-[.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
+[.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0). The installer is about 47 MB because
+the X server for Linux windows (VcXsrv) comes with it.
 
-What changed in each version: [CHANGELOG.md](CHANGELOG.md).
+What changed in each version: [CHANGELOG.md](CHANGELOG.md). The user guide is the
+[wiki](https://github.com/maferick/cablebag/wiki).
+
+**Something wrong?** Settings, About Cablebag, **Report a problem** asks a few questions and opens GitHub's bug
+form in your web browser with the answers and the versions filled in, after Cablebag has hidden anything that
+looks like a password or key. You read it over and submit it there; Cablebag posts nothing itself. The same
+button is in the search box and on every red error message.
+
+**Keyboard and screen readers.** Cablebag can be used without a mouse: dialogs, menus, tabs and the session tree
+follow the keyboard, and the terminal has a screen reader setting. What works and what does not yet is in
+[ACCESSIBILITY.md](ACCESSIBILITY.md).
 
 ## FAQ
 
@@ -181,7 +204,8 @@ removed. Without a host it does nothing.
 
 Cablebag is free to use, but it is **not open source**: you may install and use it, but not share copies, change it
 or build on its code. The source is published so you can see what it does. See [LICENSE](LICENSE); the open-source
-components inside are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+components inside, and the programs shipped next to it (the VcXsrv X server, GPL-3.0, with its source), are listed
+in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 <details>
 <summary>Keyboard shortcuts</summary>
@@ -204,7 +228,8 @@ components inside are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
 | Ctrl+comma | Settings |
 
 All shortcuts, also for tiling, are in Settings, Keyboard shortcuts; in the search box, `>` lists the commands
-with their keys.
+with their keys. Dialogs close with Escape, menus open with the context menu key or Shift+F10, and the tabs and
+the session tree follow the arrow keys; see [ACCESSIBILITY.md](ACCESSIBILITY.md).
 
 </details>
 
@@ -212,11 +237,12 @@ with their keys.
 <summary>Building from source</summary>
 
 Building is for reading and checking the code; the licence does not allow changed or redistributed builds.
-Needs Rust, Node.js, the .NET 8 SDK and the Visual Studio C++ build tools. Running the Remote Desktop helper
-needs the .NET 8 Desktop Runtime.
+Needs Rust, Node.js, the .NET 8 SDK, the Visual Studio C++ build tools and 7-Zip (to unpack the X server).
+Running the Remote Desktop helper needs the .NET 8 Desktop Runtime.
 
 ```
 npm install
+npm run build:xserver  # once: fetches and unpacks the X server (VcXsrv)
 npm run tauri dev      # run from source
 npm run tauri build    # setup.exe in src-tauri/target/release/bundle/nsis
 ```
