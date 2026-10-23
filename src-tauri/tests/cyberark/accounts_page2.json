@@ -1,0 +1,16 @@
+{
+  "value": [
+    {
+      "platformId": "UnixSSH",
+      "safeName": "Linux-Servers",
+      "id": "13_1",
+      "name": "Operating System-UnixSSH-db01.example.com-oracle",
+      "address": "db01.example.com",
+      "userName": "oracle",
+      "secretType": "password",
+      "platformAccountProperties": {},
+      "createdTime": 1700000000
+    }
+  ],
+  "count": 3
+}

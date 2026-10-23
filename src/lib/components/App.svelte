@@ -285,6 +285,7 @@
       .load()
       .then(() => tunnels.init())
       .then(() => vault.refresh())
+      .then(() => vault.loadHello())
       .then(() => proxmox.load())
       .then(() => wireguard.load())
       .finally(() => {

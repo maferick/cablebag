@@ -90,6 +90,7 @@ async fn run_inner(app: &AppHandle, session: &Session, out: &TermOut, rx: &mut m
             vault_item: s(gw, "vault_item"),
             session_id: String::new(),
             name: String::new(),
+            ..Default::default()
         };
         let conn = Arc::new(ssh::connect_chain(app, &[hop], true, &StatusSink(out)).await?);
         let f = tunnel::local_forward(conn, 0, host.clone(), port).await?;
@@ -114,7 +115,7 @@ async fn run_inner(app: &AppHandle, session: &Session, out: &TermOut, rx: &mut m
         let state = app2.state::<AppState>();
         let item = s(&sess2.data, "vault_item");
         if !item.is_empty() {
-            if let Ok((_, pw)) = state.vw.login(&app2, &item).await {
+            if let Ok((_, pw)) = state.creds.login(&app2, &item).await {
                 if !pw.is_empty() {
                     return Ok(pw);
                 }
@@ -125,9 +126,9 @@ async fn run_inner(app: &AppHandle, session: &Session, out: &TermOut, rx: &mut m
             return Ok(pw);
         }
         if item.is_empty() {
-            match state.vw.pick_login(&app2, "vnc", &sess2.host, "", &sess2.name).await {
+            match state.creds.pick_login(&app2, "vnc", &sess2.host, "", &sess2.name).await {
                 Ok(Some((found, _, _, pw))) if !pw.is_empty() => {
-                    crate::bitwarden::link_session(&app2, &sess2.id, &found);
+                    crate::sources::link_session(&app2, &sess2.id, &found);
                     return Ok(pw);
                 }
                 Ok(_) => {}

@@ -5,6 +5,7 @@
   import ProxmoxSettings from "./ProxmoxSettings.svelte";
   import SyncSettings from "./SyncSettings.svelte";
   import AssistantSettings from "./AssistantSettings.svelte";
+  import CredentialSources from "./CredentialSources.svelte";
   import { api, type KnownHost, type SecretInfo } from "../api";
   import { SCHEMES } from "../schemes";
   import { BUILTIN_SYNTAX, type SyntaxSet } from "../highlight";
@@ -15,7 +16,7 @@
   import { ask } from "../ask.svelte";
   import { macros } from "../macros.svelte";
   import { SHORTCUTS } from "../shortcutList";
-  import { Trash2, Eye, FolderOpen, Lock, LockOpen, RefreshCw, Search, ExternalLink } from "@lucide/svelte";
+  import { Trash2, Eye, FolderOpen, Search, ExternalLink } from "@lucide/svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import Logo from "./Logo.svelte";
   import SettingsSection from "./SettingsSection.svelte";
@@ -61,7 +62,7 @@
     highlighting: "Words such as error and warning in colour, so they stand out in output.",
     logging: "Keep what terminals show in files.",
     ssh: "Keys from an SSH agent.",
-    vault: "Logins from your Vaultwarden or Bitwarden-compatible vault.",
+    vault: "Logins from Vaultwarden or Bitwarden, CyberArk and Delinea Secret Server, as many as you use.",
     proxmox: "Proxmox servers whose machines show in the session tree.",
     sync: "The same sessions on every PC, through a git repository.",
     assistant: "The AI assistant: its hosts, its memory and what it may do.",
@@ -78,7 +79,7 @@
     highlighting: "words colour syntax error warning regex",
     logging: "log file folder timestamps",
     ssh: "keys agent pageant openssh",
-    vault: "vaultwarden bitwarden master password windows hello unlock lock",
+    vault: "vault vaultwarden bitwarden cyberark privilege cloud pvwa psm psmp delinea secret server thycotic credential source master password windows hello unlock lock sign in check out",
     proxmox: "pve token server",
     sync: "git gitea github gitlab repository encrypt passphrase",
     assistant: "ai llm model openai litellm ollama memory protected folders rules always log",
@@ -151,14 +152,6 @@
 
   /** A page of the official project on GitHub. */
   const site = (path: string) => openUrl(`https://github.com/maferick/cablebag${path}`).catch((e) => app.notify(String(e), "error"));
-  let vwServer = $state("");
-  let vwEmail = $state("");
-
-  async function saveVault() {
-    await api.vaultConfigure(vwServer, vwEmail);
-    await vault.refresh();
-    app.notify("Vault settings saved");
-  }
 
   $effect(() => {
     if (page === "hosts") api.knownHosts().then((h) => (hosts = h));
@@ -168,11 +161,10 @@
       api.systemInfo().then((i) => (sys = i));
     }
     if (page === "proxmox") proxmox.load();
-    if (page === "vault")
-      vault.refresh().then(() => {
-        vwServer = vault.status.server || "";
-        vwEmail = vault.status.email;
-      });
+    if (page === "vault") {
+      vault.refresh();
+      vault.loadHello();
+    }
   });
 
   const set = (k: string) => (e: Event) => {
@@ -367,58 +359,11 @@
           </SettingsRow>
         </SettingsSection>
       {:else if page === "vault"}
-        <SettingsSection title="Vault server" desc="Sessions, Proxmox servers and AI hosts can take their login from it. The opened vault stays in memory only.">
-          <SettingsRow label="Server">
-            <input bind:value={vwServer} placeholder="https://vault.example.com" />
-          </SettingsRow>
-          <SettingsRow label="Email address of the account">
-            <input bind:value={vwEmail} />
-          </SettingsRow>
-          <SettingsRow>
-            <div class="btns end"><button class="btn" onclick={saveVault} disabled={!vwServer.trim() || !vwEmail.trim()}>Save</button></div>
-          </SettingsRow>
-        </SettingsSection>
-
-        <SettingsSection title="Opening the vault">
-          <SettingsRow
-            label="When Cablebag starts"
-            help={app.settings["vault.unlock"] === "password"
-              ? "Safest: nothing about the vault stays on this PC."
-              : app.settings["vault.unlock"] === "hello"
-                ? "This PC keeps the key, readable only by your Windows account; Windows Hello confirms it is you once per start."
-                : "This PC keeps the key, readable only by your Windows account, and uses it without asking: anyone using your Windows account can open the vault."}
-          >
-            <select
-              value={app.settings["vault.unlock"]}
-              onchange={async (e) => {
-                const v = (e.target as HTMLSelectElement).value;
-                await app.setSetting("vault.unlock", v);
-                if (v === "password") await api.vaultForget();
-                await vault.refresh();
-              }}
-            >
-              <option value="hello" disabled={!vault.status.hello}>Windows Hello (PIN, fingerprint or face){vault.status.hello ? "" : ", not set up here"}</option>
-              <option value="remember">Without asking</option>
-              <option value="password">The master password every time</option>
-            </select>
-          </SettingsRow>
-          {#if vault.status.configured}
-            <SettingsRow label={vault.status.unlocked ? "Open" : "Locked"} help={vault.status.unlocked ? `${vault.status.items} logins, synced ${new Date(vault.status.synced * 1000).toLocaleTimeString()}${vault.status.remembered ? "; this PC keeps the key" : ""}` : "Two-step login with an authenticator or email code is supported."}>
-              <div class="btns end">
-                {#if vault.status.unlocked}
-                  <button class="btn" disabled={vault.busy} onclick={() => vault.sync()}><RefreshCw size={14} /> Sync now</button>
-                  <button class="btn" onclick={() => vault.lock()}><Lock size={14} /> Lock</button>
-                {:else}
-                  <button class="btn primary" disabled={vault.busy} onclick={() => vault.unlock()}><LockOpen size={14} /> {vault.busy ? "Unlocking..." : "Unlock"}</button>
-                {/if}
-              </div>
-            </SettingsRow>
-          {/if}
-        </SettingsSection>
+        <CredentialSources />
       {:else if page === "assistant"}
         <AssistantSettings />
       {:else if page === "sync"}
-        <SettingsSection title="Sync through git" desc="Sessions, folders, macros, tunnels, Proxmox servers and the assistant's memory, to a private repository; passwords never go there.">
+        <SettingsSection title="Sync through git" desc="Sessions, folders, macros, tunnels, Proxmox servers, credential sources and the assistant's memory, to a private repository; passwords never go there.">
           <div class="inner"><SyncSettings /></div>
         </SettingsSection>
       {:else if page === "proxmox"}
@@ -663,9 +608,6 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
-  }
-  .btns.end {
-    justify-content: flex-end;
   }
   .with-btn {
     display: flex;

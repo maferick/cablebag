@@ -1,10 +1,11 @@
-//! Vaultwarden (Bitwarden-compatible) vault, read-only.
+//! Vaultwarden (Bitwarden-compatible) vault, read-only: the "vaultwarden" kind of credential source.
 //!
 //! Cablebag logs in the way the Bitwarden apps do: the master password is stretched locally
 //! (PBKDF2 or Argon2id), only a hash of it is sent, and the vault arrives encrypted. The user key
 //! that unlocks it is kept in memory only, until the vault is locked or Cablebag closes. Item
 //! passwords are decrypted one at a time, when a session needs them.
 
+use super::{Item, SourceConfig, SourceStatus};
 use crate::prompt::{button, field, PromptRequest};
 use crate::AppState;
 use aes::cipher::{block_padding::Pkcs7, BlockModeDecrypt, KeyIvInit};
@@ -13,7 +14,6 @@ use base64::engine::general_purpose::{STANDARD as B64, URL_SAFE_NO_PAD as B64URL
 use base64::Engine;
 use hmac::{Hmac, Mac};
 use parking_lot::Mutex;
-use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -154,25 +154,13 @@ fn password_hash(master: &[u8; 32], password: &str) -> String {
     B64.encode(out)
 }
 
-/// One login item, without its password.
-#[derive(Clone, Serialize)]
-pub struct VaultItem {
-    pub id: String,
-    pub name: String,
-    pub username: String,
-    pub uris: Vec<String>,
-    pub folder: String,
-    pub organization: String,
-    pub has_password: bool,
-}
-
 struct ItemSecret {
     password: Option<String>,
     key: SymKey,
 }
 
 struct Unlocked {
-    items: Vec<VaultItem>,
+    items: Vec<Item>,
     secrets: HashMap<String, ItemSecret>,
     synced: i64,
     user_key: SymKey,
@@ -185,20 +173,6 @@ pub struct Vaultwarden {
     unlocked: Mutex<Option<Unlocked>>,
     /// One master password question at a time: logins that need the vault at the same moment wait for it.
     asking: tokio::sync::Mutex<()>,
-}
-
-#[derive(Serialize)]
-pub struct VaultStatus {
-    pub configured: bool,
-    pub unlocked: bool,
-    /// This PC keeps the vault key, so a restart does not need the master password.
-    pub remembered: bool,
-    /// Windows Hello (PIN, fingerprint or face) can be used here.
-    pub hello: bool,
-    pub server: String,
-    pub email: String,
-    pub items: usize,
-    pub synced: i64,
 }
 
 fn setting(app: &AppHandle, key: &str) -> String {
@@ -216,119 +190,29 @@ fn set_setting(app: &AppHandle, key: &str, value: &str) {
     let _ = app.state::<AppState>().store.lock().set_setting(key, &Value::String(value.into()));
 }
 
-/// Small helpers to keep tokens encrypted at rest in Cablebag's own (DPAPI-protected) vault.
-fn save_token(app: &AppHandle, label: &str, value: &str) {
+/// Small helpers to keep tokens encrypted at rest in Cablebag's own (DPAPI-protected) vault, one set per
+/// source. The first vault (from before there were several sources) keeps its tokens where they were.
+fn token_host(cfg: &SourceConfig) -> &str {
+    if cfg.id == super::LEGACY { "" } else { &cfg.id }
+}
+
+fn save_token(app: &AppHandle, cfg: &SourceConfig, label: &str, value: &str) {
     let state = app.state::<AppState>();
     let store = state.store.lock();
     if let Ok((n, c)) = state.vault.encrypt(&store, value) {
-        let _ = store.put_secret("token", label, "vaultwarden", "", 0, "", &n, &c);
+        let _ = store.put_secret("token", label, "vaultwarden", token_host(cfg), 0, "", &n, &c);
     }
 }
 
-fn load_token(app: &AppHandle, label: &str) -> Option<String> {
+fn load_token(app: &AppHandle, cfg: &SourceConfig, label: &str) -> Option<String> {
     let state = app.state::<AppState>();
     let store = state.store.lock();
-    let (n, c) = store.find_secret("token", label, "vaultwarden", "", 0, "").ok().flatten()?;
+    let (n, c) = store.find_secret("token", label, "vaultwarden", token_host(cfg), 0, "").ok().flatten()?;
     state.vault.decrypt(&store, &n, &c).ok()
 }
 
-/// The host part of a vault URI: "ssh://root@10.0.0.5:22/x" gives "10.0.0.5".
-fn uri_host(uri: &str) -> String {
-    let u = uri.trim().to_lowercase();
-    let u = u.split_once("://").map(|(_, r)| r).unwrap_or(&u);
-    let u = u.split(['/', '?', '#']).next().unwrap_or("");
-    let u = u.rsplit_once('@').map(|(_, h)| h).unwrap_or(u);
-    if let Some(rest) = u.strip_prefix('[') {
-        return rest.split(']').next().unwrap_or("").to_string();
-    }
-    match u.rsplit_once(':') {
-        Some((h, p)) if !h.contains(':') && p.chars().all(|c| c.is_ascii_digit()) => h.to_string(),
-        _ => u.to_string(),
-    }
-}
-
-/// "DOMAIN\user" and "user@domain.tld" both compare as "user". "root@pam!token" (a Proxmox API token)
-/// stays whole, so it never passes for the user root.
-fn bare_user(u: &str) -> String {
-    let u = u.trim().to_lowercase();
-    let u = u.rsplit_once('\\').map(|(_, n)| n.to_string()).unwrap_or(u);
-    match u.split_once('@') {
-        Some((n, d)) if d.contains('.') && d.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-') => n.to_string(),
-        _ => u,
-    }
-}
-
-fn scheme(uri: &str) -> String {
-    uri.trim().to_lowercase().split_once("://").map(|(s, _)| s.to_string()).unwrap_or_default()
-}
-
-/// Vault logins that belong to a host, best first: the address in the item's URIs, or the item named
-/// after the host or the session. With a user name, logins for another user are left out.
-fn rank(items: &[VaultItem], protocol: &str, host: &str, user: &str, name: &str) -> Vec<VaultItem> {
-    rank_scored(items, protocol, host, user, name).into_iter().map(|(_, i)| i).collect()
-}
-
-/// rank, with each login's score: higher fits better.
-fn rank_scored(items: &[VaultItem], protocol: &str, host: &str, user: &str, name: &str) -> Vec<(i32, VaultItem)> {
-    let host = host.trim().to_lowercase();
-    let name = name.trim().to_lowercase();
-    let short = if host.parse::<std::net::IpAddr>().is_ok() { String::new() } else { host.split('.').next().unwrap_or("").to_string() };
-    let want = bare_user(user);
-    let mut scored: Vec<(i32, &VaultItem)> = items
-        .iter()
-        .filter(|i| i.has_password)
-        .filter_map(|i| {
-            let iname = i.name.trim().to_lowercase();
-            let at_host: Vec<&String> = i.uris.iter().filter(|u| !host.is_empty() && uri_host(u) == host).collect();
-            let mut score = if !at_host.is_empty() {
-                // A website at the same address (http://host) is most likely not the login for SSH or RDP.
-                if at_host.iter().all(|u| matches!(scheme(u).as_str(), "http" | "https")) { 3 } else { 6 }
-            } else if !host.is_empty() && (iname == host || iname.split([' ', '(', ')', ',', '/']).any(|w| w == host)) {
-                5
-            } else if !name.is_empty() && iname == name {
-                4
-            } else if short.len() >= 3 && (iname == short || iname.split([' ', '(', ')', ',', '/', '.']).any(|w| w == short) || i.uris.iter().any(|u| uri_host(u).split('.').next() == Some(short.as_str()))) {
-                3
-            } else {
-                return None;
-            };
-            // Items made for this kind of login: "ssh: pve-main (...)" or an ssh:// address.
-            if iname.starts_with(&format!("{protocol}:")) || iname.starts_with(&format!("{protocol} ")) || i.uris.iter().any(|u| scheme(u) == protocol) {
-                score += 2;
-            }
-            if !want.is_empty() {
-                let have = bare_user(&i.username);
-                if have == want {
-                    score += 2;
-                } else if !have.is_empty() {
-                    return None;
-                }
-            }
-            Some((score, i))
-        })
-        .collect();
-    scored.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.name.to_lowercase().cmp(&b.1.name.to_lowercase())));
-    scored.into_iter().map(|(s, i)| (s, i.clone())).collect()
-}
-
-/// Links a saved session to the vault login it logged in with, so the next connect does not search.
-pub fn link_session(app: &AppHandle, session_id: &str, item_id: &str) {
-    if session_id.is_empty() || item_id.is_empty() {
-        return;
-    }
-    let state = app.state::<AppState>();
-    {
-        let store = state.store.lock();
-        let Ok(Some(mut s)) = store.session(session_id) else { return };
-        if !s.data.is_object() {
-            s.data = json!({});
-        }
-        s.data["vault_item"] = Value::String(item_id.to_string());
-        if store.save_session(&s).is_err() {
-            return;
-        }
-    }
-    let _ = app.emit("library-changed", ());
+fn server_of(cfg: &SourceConfig) -> String {
+    cfg.url.trim().trim_end_matches('/').to_string()
 }
 
 /// How the vault opens after Cablebag starts: "password" (the master password every time), "hello"
@@ -341,13 +225,43 @@ fn unlock_mode(app: &AppHandle) -> String {
 }
 
 /// Removes the vault key and login this PC kept.
-pub fn forget(app: &AppHandle) {
+pub fn forget(app: &AppHandle, cfg: &SourceConfig) {
     let state = app.state::<AppState>();
     let store = state.store.lock();
     if let Ok(list) = store.list_secrets() {
-        for s in list.iter().filter(|s| s.kind == "token" && s.protocol == "vaultwarden" && (s.label == "user_key" || s.label == "refresh")) {
+        for s in list.iter().filter(|s| s.kind == "token" && s.protocol == "vaultwarden" && s.host == token_host(cfg) && (s.label == "user_key" || s.label == "refresh")) {
             let _ = store.delete_secret(&s.id);
         }
+    }
+}
+
+/// Whether Windows Hello (PIN, fingerprint or face) can be used on this PC.
+pub fn hello_available() -> bool {
+    hello::available()
+}
+
+/// How a source opens after Cablebag starts, for every source that can keep its sign-in: "password" (ask
+/// every time, keep nothing), "hello" (Windows Hello, then what this PC kept) or "remember" (without asking).
+pub fn keep_mode(app: &AppHandle) -> String {
+    unlock_mode(app)
+}
+
+/// Asks Windows Hello to confirm it is you before something this PC kept is used. Ok(true) when confirmed,
+/// Ok(false) when Hello is not set up here, an error when the person cancels.
+pub async fn hello_confirm(app: &AppHandle, message: &str) -> Result<bool> {
+    #[cfg(windows)]
+    let hwnd = app.get_webview_window("main").and_then(|w| w.hwnd().ok()).map(|h| h.0 as isize).unwrap_or(0);
+    // No Hello on other platforms: the stub verify gets no window and answers Unavailable.
+    #[cfg(not(windows))]
+    let hwnd = {
+        let _ = app;
+        0isize
+    };
+    let message = message.to_string();
+    match tokio::task::spawn_blocking(move || hello::verify(hwnd, &message)).await?? {
+        hello::Outcome::Verified => Ok(true),
+        hello::Outcome::Cancelled => bail!("Unlock cancelled."),
+        hello::Outcome::Unavailable => Ok(false),
     }
 }
 
@@ -426,22 +340,20 @@ async fn error_text(resp: reqwest::Response) -> String {
 }
 
 impl Vaultwarden {
-    pub fn status(&self, app: &AppHandle) -> VaultStatus {
+    pub fn status(&self, app: &AppHandle, cfg: &SourceConfig) -> SourceStatus {
         let u = self.unlocked.lock();
-        VaultStatus {
-            configured: !setting(app, "vault.server").is_empty() && !setting(app, "vault.email").is_empty(),
+        SourceStatus {
+            configured: !cfg.url.trim().is_empty() && !cfg.account.trim().is_empty(),
             unlocked: u.is_some(),
-            remembered: load_token(app, "user_key").is_some(),
-            hello: hello::available(),
-            server: setting(app, "vault.server"),
-            email: setting(app, "vault.email"),
+            remembered: load_token(app, cfg, "user_key").is_some(),
             items: u.as_ref().map(|x| x.items.len()).unwrap_or(0),
             synced: u.as_ref().map(|x| x.synced).unwrap_or(0),
+            ..Default::default()
         }
     }
 
     /// Downloads the vault again with the current login; no master password needed.
-    pub async fn sync(&self) -> Result<()> {
+    pub async fn sync(&self, _app: &AppHandle, _cfg: &SourceConfig) -> Result<()> {
         let (server, access, key) = {
             let u = self.unlocked.lock();
             let u = u.as_ref().ok_or_else(|| anyhow!("The vault is locked."))?;
@@ -457,70 +369,27 @@ impl Vaultwarden {
         Ok(())
     }
 
-    pub fn lock(&self) {
+    pub async fn lock(&self, _app: &AppHandle, _cfg: &SourceConfig) {
         *self.unlocked.lock() = None;
     }
 
-    pub fn items(&self) -> Vec<VaultItem> {
+    pub fn items(&self) -> Vec<Item> {
         self.unlocked.lock().as_ref().map(|u| u.items.clone()).unwrap_or_default()
     }
 
-    /// Finds the vault login for a host that has none linked. The only match is used; several are offered
-    /// in a list. Some((item id, item name, user, password)), or None when there is nothing (or the person
-    /// prefers to type). Errors only when the person cancels.
-    pub async fn pick_login(&self, app: &AppHandle, protocol: &str, host: &str, user: &str, name: &str) -> Result<Option<(String, String, String, String)>> {
-        if setting(app, "vault.server").is_empty() || setting(app, "vault.email").is_empty() || host.trim().is_empty() {
-            return Ok(None);
-        }
-        if self.unlocked.lock().is_none() && self.unlock_interactive(app).await.is_err() {
-            return Ok(None);
-        }
-        let scored = rank_scored(&self.items(), protocol, host, user, name);
-        let found: Vec<VaultItem> = scored.iter().map(|(_, i)| i.clone()).collect();
-        // One login, or one that fits clearly better than the rest (made for this kind of login, or for
-        // this user), is used without asking; logins that fit equally well are offered in a list.
-        let clear = scored.len() == 1 || (scored.len() > 1 && scored[0].0 > scored[1].0);
-        let chosen = match found.len() {
-            0 => return Ok(None),
-            _ if clear => found[0].clone(),
-            _ => {
-                let options: Vec<Value> = found
-                    .iter()
-                    .take(12)
-                    .map(|i| {
-                        let place = [i.organization.as_str(), i.folder.as_str()].iter().filter(|s| !s.is_empty()).cloned().collect::<Vec<_>>().join(" / ");
-                        let label = [i.name.as_str(), i.username.as_str(), place.as_str()].iter().filter(|s| !s.is_empty()).cloned().collect::<Vec<_>>().join(" · ");
-                        json!({ "id": i.id, "label": label })
-                    })
-                    .collect();
-                let state = app.state::<AppState>();
-                let ans = state
-                    .prompts
-                    .ask(
-                        app,
-                        PromptRequest {
-                            id: String::new(),
-                            title: format!("Log in to {host}"),
-                            message: format!("The vault has {} logins that fit {host}. Which one?", found.len()),
-                            details: vec![],
-                            fields: vec![field("item", "Login", "choice", Value::Array(options))],
-                            buttons: vec![button("use", "Use this login", "primary"), button("type", "Type a password", "normal"), button("cancel", "Cancel", "normal")],
-                            warning: false,
-                        },
-                    )
-                    .await;
-                match ans.button.as_str() {
-                    "use" => match found.iter().find(|i| i.id == ans.text("item")) {
-                        Some(i) => i.clone(),
-                        None => return Ok(None),
-                    },
-                    "type" => return Ok(None),
-                    _ => bail!("Login cancelled."),
-                }
-            }
-        };
-        let (u, pw) = self.login(app, &chosen.id).await?;
-        Ok(Some((chosen.id, chosen.name, u, pw)))
+    /// The whole vault is in memory, so searching is filtering.
+    pub async fn search(&self, _app: &AppHandle, _cfg: &SourceConfig, query: &str) -> Result<Vec<Item>> {
+        Ok(super::filter(self.items(), query))
+    }
+
+    /// Every login is a candidate; the ranking picks.
+    pub async fn find(&self, _app: &AppHandle, _cfg: &SourceConfig, _host: &str) -> Result<Vec<Item>> {
+        Ok(self.items())
+    }
+
+    /// Vaultwarden has nothing to check out.
+    pub async fn check_in(&self, _app: &AppHandle, _cfg: &SourceConfig, _item: &str) -> Result<()> {
+        Ok(())
     }
 
     pub fn is_unlocked(&self) -> bool {
@@ -539,15 +408,10 @@ impl Vaultwarden {
         Some(out)
     }
 
-    /// The logins pick_login would consider, without unlocking or reading secrets (empty when locked).
-    pub fn candidates(&self, protocol: &str, host: &str, user: &str, name: &str) -> Vec<VaultItem> {
-        rank(&self.items(), protocol, host, user, name)
-    }
-
     /// The login of one item. Unlocks the vault first (asking for the master password) when needed.
-    pub async fn login(&self, app: &AppHandle, item_id: &str) -> Result<(String, String)> {
+    pub async fn login(&self, app: &AppHandle, cfg: &SourceConfig, item_id: &str) -> Result<(String, String)> {
         if self.unlocked.lock().is_none() {
-            self.unlock_interactive(app).await?;
+            self.unlock_interactive(app, cfg).await?;
         }
         let u = self.unlocked.lock();
         let u = u.as_ref().ok_or_else(|| anyhow!("The vault is locked."))?;
@@ -568,28 +432,29 @@ impl Vaultwarden {
     }
 
     /// Asks for the master password (and a two-step code when needed) and unlocks.
-    pub async fn unlock_interactive(&self, app: &AppHandle) -> Result<()> {
+    pub async fn unlock_interactive(&self, app: &AppHandle, cfg: &SourceConfig) -> Result<()> {
         let _one = self.asking.lock().await;
         if self.unlocked.lock().is_some() {
             return Ok(());
         }
         // A key this PC kept from an earlier unlock opens the vault without the master password.
-        if self.restore(app).await? {
+        if self.restore(app, cfg).await? {
             let _ = app.emit("vault-changed", ());
             return Ok(());
         }
         let state = app.state::<AppState>();
-        let server = setting(app, "vault.server");
-        let email = setting(app, "vault.email");
+        let server = server_of(cfg);
+        let email = cfg.account.trim().to_string();
         if server.is_empty() || email.is_empty() {
-            bail!("Set up the vault first under Settings, Vault.");
+            bail!("Set up {} first under Settings, Credential sources.", cfg.name);
         }
         let mut message = format!("Master password for {email} on {}", server.trim_start_matches("https://"));
+        let title = format!("Unlock {}", cfg.name);
         for _ in 0..3 {
-            let Some((pw, _)) = state.prompts.ask_secret(app, "Unlock the vault", &message, "Master password", false).await else {
+            let Some((pw, _)) = state.prompts.ask_secret(app, &title, &message, "Master password", false).await else {
                 bail!("Vault unlock cancelled.");
             };
-            match self.unlock(app, &pw).await {
+            match self.unlock(app, cfg, &pw).await {
                 Ok(()) => {
                     // The window shows the vault state too; tell it the vault opened here.
                     let _ = app.emit("vault-changed", ());
@@ -604,9 +469,9 @@ impl Vaultwarden {
         bail!("The vault stayed locked.")
     }
 
-    pub async fn unlock(&self, app: &AppHandle, password: &str) -> Result<()> {
-        let server = setting(app, "vault.server").trim_end_matches('/').to_string();
-        let email = setting(app, "vault.email").trim().to_lowercase();
+    pub async fn unlock(&self, app: &AppHandle, cfg: &SourceConfig, password: &str) -> Result<()> {
+        let server = server_of(cfg);
+        let email = cfg.account.trim().to_lowercase();
         let http = client()?;
 
         let kdf: Value = http
@@ -636,7 +501,7 @@ impl Vaultwarden {
             ("deviceIdentifier", device),
             ("deviceName", "Cablebag".into()),
         ];
-        if let Some(remember) = load_token(app, "remember") {
+        if let Some(remember) = load_token(app, cfg, "remember") {
             form.push(("twoFactorProvider", "5".into()));
             form.push(("twoFactorToken", remember));
         }
@@ -692,7 +557,7 @@ impl Vaultwarden {
             Err(TokenError::Other(e)) => return Err(e),
         };
         if let Some(r) = get_str(&token, "twoFactorToken") {
-            save_token(app, "remember", &r);
+            save_token(app, cfg, "remember", &r);
         }
 
         let access = get_str(&token, "access_token").ok_or_else(|| anyhow!("The vault server sent no access token."))?;
@@ -716,8 +581,8 @@ impl Vaultwarden {
         *self.unlocked.lock() = Some(unlocked);
         if unlock_mode(app) != "password" {
             if let Some(refresh) = get_str(&token, "refresh_token") {
-                save_token(app, "user_key", &hex::encode(user_key.to_64()));
-                save_token(app, "refresh", &refresh);
+                save_token(app, cfg, "user_key", &hex::encode(user_key.to_64()));
+                save_token(app, cfg, "refresh", &refresh);
             }
         }
         Ok(())
@@ -726,32 +591,24 @@ impl Vaultwarden {
     /// Opens the vault with the key kept on this PC: Windows Hello first when that is the choice, then
     /// a fresh login with the kept refresh token. False when there is nothing kept or it no longer works,
     /// so the master password is needed.
-    async fn restore(&self, app: &AppHandle) -> Result<bool> {
+    async fn restore(&self, app: &AppHandle, cfg: &SourceConfig) -> Result<bool> {
         let mode = unlock_mode(app);
         if mode == "password" {
-            forget(app);
+            forget(app, cfg);
             return Ok(false);
         }
-        let (Some(key_hex), Some(refresh)) = (load_token(app, "user_key"), load_token(app, "refresh")) else {
+        let (Some(key_hex), Some(refresh)) = (load_token(app, cfg, "user_key"), load_token(app, cfg, "refresh")) else {
             return Ok(false);
         };
         if mode == "hello" {
-            #[cfg(windows)]
-            let hwnd = app.get_webview_window("main").and_then(|w| w.hwnd().ok()).map(|h| h.0 as isize).unwrap_or(0);
-            // No Hello on other platforms: the stub verify gets no window and answers Unavailable.
-            #[cfg(not(windows))]
-            let hwnd = 0isize;
-            let email = setting(app, "vault.email");
-            let outcome = tokio::task::spawn_blocking(move || hello::verify(hwnd, &format!("Unlock the Cablebag vault ({email})"))).await??;
-            match outcome {
-                hello::Outcome::Verified => {}
-                hello::Outcome::Cancelled => bail!("Vault unlock cancelled."),
-                // No PIN or fingerprint set up (any more): fall back to the master password.
-                hello::Outcome::Unavailable => return Ok(false),
+            let what = format!("{} ({})", cfg.name, cfg.account.trim());
+            // No PIN or fingerprint set up (any more): fall back to the master password.
+            if !hello_confirm(app, &format!("Unlock {what} in Cablebag")).await? {
+                return Ok(false);
             }
         }
         let user_key = SymKey::from_64(&hex::decode(key_hex)?)?;
-        let server = setting(app, "vault.server").trim_end_matches('/').to_string();
+        let server = server_of(cfg);
         let http = client()?;
         let resp = http
             .post(format!("{server}/identity/connect/token"))
@@ -761,13 +618,13 @@ impl Vaultwarden {
             .with_context(|| format!("Could not reach {server}"))?;
         if !resp.status().is_success() {
             // Signed out on the server, or the login expired: start over with the master password.
-            forget(app);
+            forget(app, cfg);
             return Ok(false);
         }
         let token: Value = resp.json().await?;
         let access = get_str(&token, "access_token").ok_or_else(|| anyhow!("The vault server sent no access token."))?;
         if let Some(r) = get_str(&token, "refresh_token") {
-            save_token(app, "refresh", &r);
+            save_token(app, cfg, "refresh", &r);
         }
         let sync: Value = http
             .get(format!("{server}/api/sync?excludeDomains=true"))
@@ -778,7 +635,7 @@ impl Vaultwarden {
             .json()
             .await?;
         let unlocked = decode_vault(&sync, &user_key, &access, &server).map_err(|_| {
-            forget(app);
+            forget(app, cfg);
             anyhow!("The key this PC kept no longer opens the vault; unlock it with the master password.")
         })?;
         *self.unlocked.lock() = Some(unlocked);
@@ -880,8 +737,9 @@ fn decode_vault(sync: &Value, user_key: &SymKey, access: &str, server: &str) -> 
             .map(|a| a.iter().filter_map(|u| get_str(u, "uri")).map(|u| decrypt_text(&u, &key).unwrap_or_default()).filter(|u| !u.is_empty()).collect())
             .unwrap_or_default();
         let password = get_str(&login, "password");
-        items.push(VaultItem {
+        items.push(Item {
             id: id.clone(),
+            source: String::new(),
             name: dec(get_str(&c, "name")),
             username: dec(get_str(&login, "username")),
             uris,
@@ -936,75 +794,17 @@ mod tests {
     fn pbkdf2_master_key_and_login_hash_match_reference() {
         let kdf = json!({ "kdf": 0, "kdfIterations": 5000 });
         let mk = master_key("p4ssw0rd", "user@example.com", &kdf).unwrap();
-        assert_eq!(hex::encode(mk), include_str!("../tests/bw_pbkdf2_master.hex").trim());
-        assert_eq!(password_hash(&mk, "p4ssw0rd"), include_str!("../tests/bw_pbkdf2_hash.txt").trim());
+        assert_eq!(hex::encode(mk), include_str!("../../tests/bw_pbkdf2_master.hex").trim());
+        assert_eq!(password_hash(&mk, "p4ssw0rd"), include_str!("../../tests/bw_pbkdf2_hash.txt").trim());
         let st = stretch(&mk).unwrap();
-        assert_eq!(hex::encode(st.enc), include_str!("../tests/bw_stretch_enc.hex").trim());
-        assert_eq!(hex::encode(st.mac.unwrap()), include_str!("../tests/bw_stretch_mac.hex").trim());
+        assert_eq!(hex::encode(st.enc), include_str!("../../tests/bw_stretch_enc.hex").trim());
+        assert_eq!(hex::encode(st.mac.unwrap()), include_str!("../../tests/bw_stretch_mac.hex").trim());
     }
 
     #[test]
     fn argon2_master_key_matches_reference() {
         let kdf = json!({ "Kdf": 1, "KdfIterations": 3, "KdfMemory": 16, "KdfParallelism": 2 });
         let mk = master_key("p4ssw0rd", "user@example.com", &kdf).unwrap();
-        assert_eq!(hex::encode(mk), include_str!("../tests/bw_argon2_master.hex").trim());
-    }
-}
-
-#[cfg(test)]
-mod match_tests {
-    use super::*;
-
-    fn item(id: &str, name: &str, user: &str, uris: &[&str]) -> VaultItem {
-        VaultItem { id: id.into(), name: name.into(), username: user.into(), uris: uris.iter().map(|s| s.to_string()).collect(), folder: String::new(), organization: String::new(), has_password: true }
-    }
-
-    #[test]
-    fn hosts_from_uris() {
-        assert_eq!(uri_host("ssh://root@10.0.0.5:22/x"), "10.0.0.5");
-        assert_eq!(uri_host("https://Proxmox2.example.net"), "proxmox2.example.net");
-        assert_eq!(uri_host("10.20.30.53:8006"), "10.20.30.53");
-        assert_eq!(uri_host("rdp://[fe80::1]:3389"), "fe80::1");
-    }
-
-    #[test]
-    fn users() {
-        assert_eq!(bare_user("CORP\\admin.jan"), "admin.jan");
-        assert_eq!(bare_user("admin.jan@corp.example"), "admin.jan");
-        assert_eq!(bare_user("root@pam!dashboard-readonly"), "root@pam!dashboard-readonly");
-    }
-
-    #[test]
-    fn ranking() {
-        let items = vec![
-            item("a", "pve root", "root", &["https://10.20.30.53:8006"]),
-            item("b", "dc01", "CORP\\admin.jan", &[]),
-            item("c", "something else", "root", &["https://example.com"]),
-            item("d", "docker01", "jan", &["ssh://10.20.30.54"]),
-            item("e", "docker01 old", "root", &["ssh://10.20.30.54"]),
-        ];
-        let ids = |v: Vec<VaultItem>| v.into_iter().map(|i| i.id).collect::<Vec<_>>();
-        assert_eq!(ids(rank(&items, "ssh", "10.20.30.53", "root", "")), vec!["a"]);
-        assert_eq!(ids(rank(&items, "rdp", "dc01.corp.example", "admin.jan", "")), vec!["b"]);
-        assert_eq!(ids(rank(&items, "ssh", "10.20.30.54", "jan", "")), vec!["d"]);
-        assert_eq!(ids(rank(&items, "ssh", "10.20.30.54", "", "")), vec!["d", "e"]);
-        assert_eq!(ids(rank(&items, "ssh", "10.9.9.9", "", "docker01")), vec!["d"]);
-        assert!(rank(&items, "ssh", "10.9.9.9", "root", "").is_empty());
-        // The pve case from the real vault: the SSH login wins; the API token and the website do not count.
-        let pve = vec![
-            item("web", "http://10.20.30.200", "jan", &["http://10.20.30.200"]),
-            item("tok", "proxmox-dashboard", "root@pam!dashboard-readonly", &["https://10.20.30.200:8006"]),
-            item("ssh", "ssh: pve-main (10.20.30.200)", "root", &["10.20.30.200"]),
-        ];
-        assert_eq!(ids(rank(&pve, "ssh", "10.20.30.200", "root", "")), vec!["ssh"]);
-        assert_eq!(ids(rank(&pve, "ssh", "10.20.30.200", "", ""))[0], "ssh");
-        // The test case that asked needlessly: a Telnet and an FTP login for the same host and user.
-        let same = vec![
-            item("t", "telnet: test (10.0.0.9)", "ttest", &["telnet://10.0.0.9:2323"]),
-            item("f", "ftp: test (10.0.0.9)", "ttest", &["ftp://10.0.0.9:2121"]),
-        ];
-        let s = rank_scored(&same, "telnet", "10.0.0.9", "ttest", "");
-        assert_eq!(s[0].1.id, "t");
-        assert!(s[0].0 > s[1].0, "the Telnet login fits clearly better, so no list");
+        assert_eq!(hex::encode(mk), include_str!("../../tests/bw_argon2_master.hex").trim());
     }
 }

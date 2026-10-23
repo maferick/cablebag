@@ -95,7 +95,7 @@ export const SETTINGS_PAGES = [
   { id: "highlighting", label: "Highlighting" },
   { id: "logging", label: "Logging" },
   { id: "ssh", label: "SSH" },
-  { id: "vault", label: "Vault (Vaultwarden)" },
+  { id: "vault", label: "Credential sources" },
   { id: "proxmox", label: "Proxmox" },
   { id: "sync", label: "Sync (Git)" },
   { id: "assistant", label: "Assistant" },
@@ -115,6 +115,7 @@ export const FOLDER_DEFAULTS: { key: string; label: string; kinds: string[] }[] 
   { key: "jump_hosts", label: "jump hosts", kinds: ["ssh", "sftp"] },
   { key: "wireguard", label: "WireGuard network", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet", "winrm", "browser"] },
   { key: "x11", label: "Linux windows on this PC", kinds: ["ssh"] },
+  { key: "psm", label: "CyberArk PSM", kinds: ["ssh", "sftp", "rdp"] },
   { key: "tab_color", label: "tab colour", kinds: [] },
 ];
 
@@ -569,8 +570,8 @@ class AppState {
     const from: Record<string, string> = {};
     for (const f of chain) {
       for (const { key } of FOLDER_DEFAULTS) {
-        if (key === "wireguard" && f.data?.wireguard === "none") {
-          // A folder that goes directly ends the network a folder above gives.
+        if ((key === "wireguard" || key === "psm") && f.data?.[key] === "none") {
+          // A folder that goes directly ends the network (or PSM) a folder above gives.
           delete values.wireguard;
           delete from.wireguard;
         } else if (filled(f.data?.[key])) {

@@ -1,0 +1,41 @@
+{
+  "Platforms": [
+    {
+      "ID": 10,
+      "PlatformID": "WinServerLocal",
+      "Name": "Windows Server Local Accounts",
+      "Active": true,
+      "SystemType": "Windows",
+      "AllowedSafes": ".*",
+      "PrivilegedAccessWorkflows": {
+        "RequireDualControlPasswordAccessApproval": { "IsActive": false, "IsAnException": false },
+        "EnforceCheckinCheckoutExclusiveAccess": { "IsActive": true, "IsAnException": false },
+        "EnforceOnetimePasswordAccess": { "IsActive": false, "IsAnException": false },
+        "RequireUsersToSpecifyReasonForAccess": { "IsActive": true, "IsAnException": false }
+      },
+      "CredentialsManagementPolicy": {
+        "Verification": { "PerformAutomatic": false, "RequirePasswordEveryXDays": 7, "AutoOnAdd": false, "IsRequirePasswordEveryXDaysAnException": false, "AllowManual": true },
+        "Change": { "PerformAutomatic": false, "RequirePasswordEveryXDays": 90, "AutoOnAdd": false, "IsRequirePasswordEveryXDaysAnException": false, "AllowManual": true },
+        "Reconcile": { "AutomaticReconcileWhenUnsynced": false, "AllowManual": true },
+        "SecretUpdateConfiguration": { "ChangePasswordInResetMode": false }
+      },
+      "PrivilegedSessionManagement": { "PSMServerId": "" }
+    },
+    {
+      "ID": 11,
+      "PlatformID": "UnixSSH",
+      "Name": "Unix via SSH",
+      "Active": true,
+      "SystemType": "*NIX",
+      "AllowedSafes": ".*",
+      "PrivilegedAccessWorkflows": {
+        "RequireDualControlPasswordAccessApproval": { "IsActive": false, "IsAnException": false },
+        "EnforceCheckinCheckoutExclusiveAccess": { "IsActive": false, "IsAnException": false },
+        "EnforceOnetimePasswordAccess": { "IsActive": true, "IsAnException": true },
+        "RequireUsersToSpecifyReasonForAccess": { "IsActive": false, "IsAnException": false }
+      },
+      "PrivilegedSessionManagement": { "PSMServerId": "PSMServer_1" }
+    }
+  ],
+  "Total": 2
+}

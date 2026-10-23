@@ -20,7 +20,17 @@
   const running = $derived(Object.values(tunnels.status).filter((s) => s.state === "running").length);
   const transfers = $derived(Object.values(app.transfers).filter((t) => !t.finished));
 
-  const vaultWord = $derived(!vault.status.configured ? "not set up" : vault.status.unlocked ? "unlocked" : "locked");
+  const vaultWord = $derived(
+    !vault.status.configured
+      ? "not set up"
+      : vault.status.count === 1
+        ? vault.status.unlocked
+          ? "unlocked"
+          : "locked"
+        : vault.status.allUnlocked
+          ? "all open"
+          : `${vault.status.open} of ${vault.status.count} open`,
+  );
 
   function ago(at: number): string {
     const min = Math.floor((now / 1000 - at) / 60);
@@ -36,13 +46,19 @@
 
   function vaultMenu(e: MouseEvent) {
     if (!vault.status.configured) return app.openSettings("vault");
-    menu.showAt(e.currentTarget as HTMLElement, [
-      vault.status.unlocked
-        ? { label: "Lock the vault", icon: Lock, action: () => vault.lock() }
-        : { label: "Unlock the vault", icon: LockOpen, action: () => vault.unlock() },
-      { label: "Sync the vault", icon: RefreshCw, disabled: !vault.status.unlocked, action: () => vault.sync() },
-      { label: "Vault settings", icon: Settings, action: () => app.openSettings("vault") },
-    ]);
+    const several = vault.status.count > 1;
+    const items = vault.sources
+      .filter((s) => s.configured)
+      .flatMap((s) => {
+        const what = several ? ` ${s.name}` : s.kind === "vaultwarden" ? " the vault" : ` ${s.name}`;
+        return [
+          s.unlocked
+            ? { label: `${s.kind === "vaultwarden" ? "Lock" : "Sign out of"}${what}`, icon: Lock, action: () => vault.lock(s.id) }
+            : { label: `${s.kind === "vaultwarden" ? "Unlock" : "Sign in to"}${what}`, icon: LockOpen, action: () => vault.unlock(s.id) },
+          ...(s.unlocked ? [{ label: `Sync${what}`, icon: RefreshCw, action: () => vault.sync(s.id) }] : []),
+        ];
+      });
+    menu.showAt(e.currentTarget as HTMLElement, [...items, { label: "Credential sources", icon: Settings, action: () => app.openSettings("vault") }]);
   }
 
   function syncMenu(e: MouseEvent) {
@@ -69,7 +85,7 @@
   <button class="item" title="Port forwarding over SSH" onclick={() => app.toggleTool("tunnels", "Tunnels")}>
     <Waypoints size={13} />Tunnels: {running ? `${running} running` : "none"}
   </button>
-  <button class="item" class:warn={vault.status.configured && !vault.status.unlocked} title="Passwords from Vaultwarden" onclick={vaultMenu}>
+  <button class="item" class:warn={vault.status.configured && !vault.status.unlocked} title="Logins from your credential sources" onclick={vaultMenu}>
     {#if vault.status.unlocked}<LockOpen size={13} />{:else}<Lock size={13} />{/if}Vault: {vaultWord}
   </button>
   <button class="item" class:bad={!!sync.last?.error} title={sync.last?.error ? `Sync failed: ${sync.last.error}` : "Sessions synced through git"} onclick={syncMenu}>

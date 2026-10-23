@@ -68,7 +68,7 @@ async fn password(app: &AppHandle, session: &Session, user: &mut String) -> Resu
     let state = app.state::<AppState>();
     let item = s(&session.data, "vault_item");
     if !item.is_empty() {
-        let (u, pw) = state.vw.login(app, &item).await?;
+        let (u, pw) = state.creds.login(app, &item).await?;
         if user.is_empty() {
             *user = u;
         }
@@ -82,8 +82,8 @@ async fn password(app: &AppHandle, session: &Session, user: &mut String) -> Resu
     if let Some(pw) = saved {
         return Ok(pw);
     }
-    if let Some((found, _, _, pw)) = state.vw.pick_login(app, "ftp", &session.host, user, &session.name).await? {
-        crate::bitwarden::link_session(app, &session.id, &found);
+    if let Some((found, _, _, pw)) = state.creds.pick_login(app, "ftp", &session.host, user, &session.name).await? {
+        crate::sources::link_session(app, &session.id, &found);
         return Ok(pw);
     }
     let (pw, save) = state

@@ -277,7 +277,7 @@ pub async fn connect(app: &AppHandle, id: &str) -> Result<Api> {
     let state = app.state::<AppState>();
 
     let (mut token_id, secret) = if !src.vault_item.is_empty() {
-        let (user, pw) = state.vw.login(app, &src.vault_item).await?;
+        let (user, pw) = state.creds.login(app, &src.vault_item).await?;
         (user, pw)
     } else {
         let saved = { state.vault.password(&state.store.lock(), "proxmox", &src.url, 0, &src.token_id).ok().flatten() };
@@ -885,7 +885,7 @@ async fn node_ssh(app: &AppHandle, id: &str, api: &Api, node: &str) -> Result<(A
     };
     let mut hops = match &saved {
         Some(sess) => crate::ssh::hops_for(sess),
-        None => vec![crate::ssh::Hop { via_wg: String::new(), agent_forward: false, host: addr.clone(), port: 22, user: "root".into(), key_path: String::new(), vault_item: String::new(), session_id: String::new(), name: node.to_string() }],
+        None => vec![crate::ssh::Hop { via_wg: String::new(), agent_forward: false, host: addr.clone(), port: 22, user: "root".into(), key_path: String::new(), vault_item: String::new(), session_id: String::new(), name: node.to_string(), ..Default::default() }],
     };
     // Behind WireGuard the node is reached the same way, unless its own session says otherwise.
     if let (Some((_, w)), Some(first)) = (&api.wg, hops.first_mut()) {

@@ -1,0 +1,8 @@
+{
+  "access_token": "platform-access",
+  "refresh_token": "platform-refresh",
+  "token_type": "Bearer",
+  "expires_in": 3602,
+  "session_expires_in": 43200,
+  "scope": "xpmheadless"
+}

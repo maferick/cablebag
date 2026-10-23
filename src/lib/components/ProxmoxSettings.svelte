@@ -141,7 +141,7 @@
     <div class="field">
       <span>API token</span>
       <div class="choice">
-        <label class="check"><input type="radio" bind:group={secretFrom} value="vault" /> From a Vaultwarden item (user name = token ID, password = secret)</label>
+        <label class="check"><input type="radio" bind:group={secretFrom} value="vault" /> From a credential source (user name = token ID, password = secret)</label>
         <label class="check"><input type="radio" bind:group={secretFrom} value="here" /> Type it here, kept encrypted on this PC</label>
       </div>
     </div>

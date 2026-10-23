@@ -428,7 +428,7 @@ async fn sudo_password(app: &AppHandle, session: &Session) -> Result<(String, bo
     let state = app.state::<AppState>();
     let item = session.data.get("vault_item").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
     if !item.is_empty() {
-        if let Ok((_, pw)) = state.vw.login(app, &item).await {
+        if let Ok((_, pw)) = state.creds.login(app, &item).await {
             if !pw.is_empty() {
                 return Ok((pw, false));
             }
@@ -440,7 +440,7 @@ async fn sudo_password(app: &AppHandle, session: &Session) -> Result<(String, bo
     }
     // Logged in with a key: the vault may still hold the password for this server.
     if item.is_empty() {
-        if let Ok(Some((_, _, _, pw))) = state.vw.pick_login(app, "ssh", &session.host, &session.username, &session.name).await {
+        if let Ok(Some((_, _, _, pw))) = state.creds.pick_login(app, "ssh", &session.host, &session.username, &session.name).await {
             if !pw.is_empty() {
                 return Ok((pw, false));
             }

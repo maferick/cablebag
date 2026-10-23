@@ -1,0 +1,57 @@
+{
+  "filter": { "searchText": "", "includeRestricted": true },
+  "skip": 0,
+  "take": 2,
+  "total": 3,
+  "pageCount": 2,
+  "currentPage": 1,
+  "batchCount": 2,
+  "prevSkip": 0,
+  "nextSkip": 2,
+  "hasPrev": false,
+  "hasNext": true,
+  "records": [
+    {
+      "id": 12,
+      "name": "db01 root",
+      "secretTemplateId": 6007,
+      "secretTemplateName": "Unix Account (SSH)",
+      "folderId": 4,
+      "folderPath": "\\Servers\\Linux",
+      "siteId": 1,
+      "active": true,
+      "checkedOut": false,
+      "checkOutEnabled": true,
+      "isRestricted": true,
+      "requiresComment": false,
+      "requiresApproval": false,
+      "lastHeartBeatStatus": "Success",
+      "extendedFields": [
+        { "name": "Machine", "value": "db01.example.test" },
+        { "name": "Username", "value": "root" }
+      ]
+    },
+    {
+      "id": 15,
+      "name": "Backup service account",
+      "secretTemplateId": 6001,
+      "secretTemplateName": "Active Directory Account",
+      "folderId": 5,
+      "folderPath": "\\Service accounts",
+      "siteId": 1,
+      "active": true,
+      "checkedOut": false,
+      "checkOutEnabled": false,
+      "isRestricted": true,
+      "requiresComment": true,
+      "requiresApproval": false,
+      "extendedFields": [
+        { "name": "Domain", "value": "EXAMPLE" },
+        { "name": "Username", "value": "svc-backup" }
+      ]
+    }
+  ],
+  "sortBy": [ { "name": "name", "direction": "Asc", "priority": 0 } ],
+  "success": true,
+  "severity": "None"
+}

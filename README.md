@@ -101,8 +101,12 @@ tabs, at the same time.
 
 ## Vault and passwords
 
-- **Logins from Vaultwarden**, unlocked with Windows Hello. API keys and WireGuard private keys can come from
-  there as well.
+- **Logins from your credential sources**: as many Vaultwarden or Bitwarden vaults as you use (work and home
+  side by side, unlocked with Windows Hello), CyberArk (Privilege Cloud or your own PVWA, with single sign-on in a
+  Cablebag window, reasons and tickets, check-out and check-in) and Delinea Secret Server. API keys and WireGuard
+  private keys can come from there as well.
+- **Through CyberArk PSM**: a session or a whole folder can connect over SSH through PSM for SSH, or over Remote
+  Desktop through the PSM server, so the target's password never reaches your PC.
 - **Passwords kept on this PC** are encrypted under your Windows account and never leave it. They are never
   included in Sync, and the assistant never sees them.
 - **SSH key generator** that puts the new key on the server in one step.
@@ -110,8 +114,8 @@ tabs, at the same time.
 
 ## Sync
 
-Sessions, folders, folder settings, macros, tunnels, WireGuard networks, workspaces and the assistant's memory
-sync through a private git repository of your own, encrypted. Passwords and private keys stay out. When the
+Sessions, folders, folder settings, macros, tunnels, WireGuard networks, credential sources (without their
+secrets), workspaces and the assistant's memory sync through a private git repository of your own, encrypted. Passwords and private keys stay out. When the
 same item changed on two PCs, Settings, Sync names the conflict and says whose version was kept.
 
 ## Assistant
@@ -165,8 +169,8 @@ not both at once; or make a key pair of Cablebag's own and add it to the server 
 **Can I import from MobaXterm, PuTTY or WinSCP?** Yes: MobaXterm, PuTTY, KiTTY, WinSCP, the OpenSSH config and
 `.rdp` files. Cablebag is not a fork of any of them.
 
-**Where are my passwords kept?** Either in Vaultwarden, unlocked with Windows Hello, or on this PC, encrypted
-under your Windows account. They never go into Sync and are hidden from the assistant.
+**Where are my passwords kept?** Either in your credential sources (Vaultwarden, CyberArk, Secret Server), or on
+this PC, encrypted under your Windows account. They never go into Sync and are hidden from the assistant.
 
 **Does it work on Linux or macOS?** No, Windows 10 and 11 only.
 
