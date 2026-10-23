@@ -1,0 +1,70 @@
+# Once a week: is there a newer VcXsrv than the one Cablebag bundles (scripts/xserver.json)? Dependabot does not
+# know about it, so this opens an issue with the new version, its download and checksums, ready to put in.
+name: VcXsrv update check
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Compare with the newest VcXsrv release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          current=$(jq -r .version scripts/xserver.json)
+          release=$(gh api repos/marchaesen/vcxsrv/releases/latest)
+          latest=$(jq -r .tag_name <<<"$release")
+          newest=$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -n 1)
+          if [ "$latest" = "$current" ] || [ "$newest" = "$current" ]; then
+            echo "Cablebag bundles VcXsrv $current, the newest release."
+            exit 0
+          fi
+
+          title="VcXsrv $latest is out (Cablebag bundles $current)"
+          # An error here stops the check instead of being taken for "there is one already".
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --search "\"VcXsrv $latest is out\" in:title" --json number --jq length)
+          if [ "$existing" != "0" ]; then
+            echo "There is already an issue for VcXsrv $latest."
+            exit 0
+          fi
+
+          # The same kind of installer as now (64-bit, not the debug or no-admin build), and the licence text.
+          asset=$(jq -r '.assets[] | select(.name | test("^vcxsrv-64\\.[0-9.]+\\.installer\\.exe$")) | .browser_download_url' <<<"$release" | head -n 1)
+          if [ -z "$asset" ]; then
+            echo "No 64-bit installer found in release $latest."
+            installer_line="The release has no file named like vcxsrv-64.<version>.installer.exe; look at it by hand."
+            sums=""
+          else
+            curl -fsSL "$asset" -o installer.exe
+            curl -fsSL "https://raw.githubusercontent.com/marchaesen/vcxsrv/$latest/COPYING" -o COPYING
+            installer_line="Installer: $asset"
+            sums=$(printf -- '- installerSha256: `%s`\n- licenceTextSha256: `%s`' "$(sha256sum installer.exe | cut -d' ' -f1)" "$(sha256sum COPYING | cut -d' ' -f1)")
+          fi
+
+          body=$(cat <<EOF
+          VcXsrv [$latest](https://github.com/marchaesen/vcxsrv/releases/tag/$latest) has been released; Cablebag bundles $current.
+
+          $installer_line
+
+          Checksums of the files as downloaded by this check (verify them before relying on them; upstream publishes none):
+          $sums
+
+          To update, in \`scripts/xserver.json\`: set \`version\` to \`$latest\`, change the version in the \`installer\`, \`licenceText\`, \`source\` and \`sourceArchive\` addresses, and put in the two checksums. Then run \`npm run build:xserver\`, try an X11 session, and check that \`THIRD-PARTY-NOTICES.md\` names the new version (\`node scripts/notices.mjs\`). If the licence changed, look at it before shipping.
+
+          This issue was opened by the weekly check in \`.github/workflows/vcxsrv-update.yml\`.
+          EOF
+          )
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body" --label dependencies
+          echo "Opened an issue for VcXsrv $latest."
