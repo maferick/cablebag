@@ -761,6 +761,42 @@ async fn sudo_without_password(conn: &crate::ssh::SshConn) -> bool {
     }
 }
 
+/// True when the SSH login is root already (`id -u` says 0): then a command needs no sudo, and no password.
+async fn login_is_root(conn: &crate::ssh::SshConn) -> bool {
+    match exec_line(conn, "id -u", Duration::from_secs(10)).await {
+        Ok(r) => r.exit == Some(0) && r.output.trim() == "0",
+        Err(_) => false,
+    }
+}
+
+/// For a root login: a sudo that only runs the command, on servers without sudo (Debian containers often have
+/// none), so `sudo apt-get update` in an approved command still works. Running as another user cannot be done
+/// this way, so -u and -g say so instead of running the command as root.
+const SUDO_FOR_ROOT: &str = r#"command -v sudo >/dev/null 2>&1 || sudo() { while [ $# -gt 0 ]; do case "$1" in --) shift; break;; -u|-g|--user=*|--group=*) echo "sudo is not installed here, so the command cannot run as another user" >&2; return 1;; -C|-p|-h|-U|-r|-t|-T|-D) shift 2;; -*) shift;; *) break;; esac; done; "$@"; }; "#;
+
+/// How a command gets root, if it needs it.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Root {
+    No,
+    /// The login is root already.
+    Already,
+    SudoNoPassword,
+    SudoPassword,
+}
+
+/// The command line for the channel.
+fn command_line(command: &str, how: Root) -> String {
+    let quote = |c: &str| format!("'{}'", c.replace('\'', r"'\''"));
+    match how {
+        Root::No => format!("sh -c {}", quote(command)),
+        Root::Already => format!("sh -c {}", quote(&format!("{SUDO_FOR_ROOT}{command}"))),
+        Root::SudoNoPassword => format!("sudo -n -- sh -c {}", quote(command)),
+        // -S reads the password from the channel, -p '' keeps its question out of the output, -k asks every
+        // time so the password always goes the same way.
+        Root::SudoPassword => format!("sudo -S -k -p '' -- sh -c {}", quote(command)),
+    }
+}
+
 /// The output (at most MAX_OUTPUT) and exit code of a command on a channel, until it ends or the time is up.
 async fn collect(channel: &mut russh::Channel<russh::client::Msg>, timeout: Duration) -> ExecResult {
     let mut res = ExecResult::default();
@@ -823,22 +859,22 @@ pub async fn exec(app: &AppHandle, tab_id: &str, session: &Session, command: &st
     let mut channel = tokio::time::timeout(Duration::from_secs(15), conn.handle.channel_open_session())
         .await
         .map_err(|_| anyhow!("The server did not open a channel for the command in time."))??;
-    let quoted = format!("'{}'", command.replace('\'', r"'\''"));
-    let passwordless = root && sudo_without_password(&conn).await;
-    let line = if passwordless {
-        format!("sudo -n -- sh -c {quoted}")
-    } else if root {
-        // -S reads the password from the channel, -p '' keeps its question out of the output, -k asks every
-        // time so the password always goes the same way.
-        format!("sudo -S -k -p '' -- sh -c {quoted}")
+    // Logged in as root: no sudo and no password. Otherwise sudo, with a password only when it wants one.
+    let how = if !root {
+        Root::No
+    } else if login_is_root(&conn).await {
+        Root::Already
+    } else if sudo_without_password(&conn).await {
+        Root::SudoNoPassword
     } else {
-        format!("sh -c {quoted}")
+        Root::SudoPassword
     };
+    let line = command_line(command, how);
     tokio::time::timeout(Duration::from_secs(15), channel.exec(true, line.as_bytes()))
         .await
         .map_err(|_| anyhow!("The server did not start the command in time."))??;
     let mut keep: Option<String> = None;
-    if root && !passwordless {
+    if how == Root::SudoPassword {
         let (pw, save) = sudo_password(app, session).await?;
         channel.data(format!("{pw}\n").as_bytes()).await?;
         if save {
@@ -846,7 +882,7 @@ pub async fn exec(app: &AppHandle, tab_id: &str, session: &Session, command: &st
         }
     }
     let res = collect(&mut channel, timeout).await;
-    if root && res.exit == Some(1) && res.output.contains("incorrect password") {
+    if how == Root::SudoPassword && res.exit == Some(1) && res.output.contains("incorrect password") {
         bail!("sudo did not accept the password.");
     }
     // sudo took the typed password: remember it, as asked.
@@ -863,6 +899,34 @@ mod tests {
 
     fn e(cmd: &str) -> Effect {
         classify(cmd).effect
+    }
+
+    #[test]
+    fn root_logins_run_without_sudo() {
+        let line = command_line("sudo -n apt-get update", Root::Already);
+        assert!(line.starts_with("sh -c 'command -v sudo"), "{line}");
+        assert!(!line.starts_with("sudo"), "{line}");
+        assert!(command_line("id", Root::SudoPassword).starts_with("sudo -S -k -p '' -- sh -c "));
+        assert_eq!(command_line("echo 'a b'", Root::No), r#"sh -c 'echo '\''a b'\'''"#);
+    }
+
+    /// The stand-in for sudo on a root login without sudo: runs the command, refuses another user.
+    #[cfg(unix)]
+    #[test]
+    fn sudo_stand_in() {
+        let run = |cmd: &str| {
+            std::process::Command::new("/bin/sh")
+                .arg("-c")
+                .arg(format!("{SUDO_FOR_ROOT}{cmd}"))
+                .env("PATH", "/nonexistent")
+                .output()
+                .unwrap()
+        };
+        let ok = run("sudo -n -- echo hello; sudo -E -p x echo again");
+        assert_eq!(String::from_utf8_lossy(&ok.stdout), "hello\nagain\n");
+        let other = run("sudo -u postgres echo no");
+        assert!(!other.status.success());
+        assert!(String::from_utf8_lossy(&other.stdout).is_empty());
     }
 
     #[test]

@@ -6,6 +6,12 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.18.1 · not released yet
+
+- **The assistant no longer asks for a sudo password when you are logged in as root.** A command it needs root
+  for now runs directly on a root login, also on servers without sudo (Debian containers often have none), where
+  it used to ask for a password that does not exist.
+
 ## 0.18.0 · 23 October 2026
 
 **Your servers and your web sessions apart, and pinned sites**
