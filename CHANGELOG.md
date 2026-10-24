@@ -6,6 +6,14 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.19.1 · not released yet
+
+- **A calmer Containers tab.** On the left a short list: each container on one line with a dot, and how long it
+  runs, or what is wrong ("23 restarts", "unhealthy", "stopped"). Projects with more than one container group
+  their containers under the project's name. Click a container (or walk the list with the arrow keys) for its
+  details on the right: image, web ports to open, its project and compose file, and buttons that say what they
+  do (Logs, Shell, Restart, Stop). **Needs a look** and **Stopped** show only those.
+
 ## 0.19.0 · 24 October 2026
 
 **Containers, like Portainer but inside Cablebag**
