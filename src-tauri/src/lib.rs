@@ -347,6 +347,21 @@ async fn docker_compose(app: AppHandle, tab: String, compose: String, sudo: bool
 }
 
 #[tauri::command]
+async fn docker_logs(app: AppHandle, tab: String, sudo: bool, id: String, lines: u32) -> CmdResult<String> {
+    docker::logs(&app, &tab, sudo, &id, lines).await.map_err(err)
+}
+
+#[tauri::command]
+async fn docker_create_stack(app: AppHandle, tab: String, compose: String, sudo: bool, name: String, file: String, env: String) -> CmdResult<docker::NewStack> {
+    docker::create_stack(&app, &tab, &compose, sudo, &name, &file, &env).await.map_err(err)
+}
+
+#[tauri::command]
+async fn docker_container_compose(app: AppHandle, tab: String, sudo: bool, id: String) -> CmdResult<String> {
+    docker::container_compose(&app, &tab, sudo, &id).await.map_err(err)
+}
+
+#[tauri::command]
 async fn docker_portainer_file(app: AppHandle, tab: String, sudo: bool, portainer: String, data: String, path: String) -> CmdResult<String> {
     docker::portainer_file(&app, &tab, sudo, &portainer, &data, &path).await.map_err(err)
 }
@@ -1201,6 +1216,9 @@ pub fn run() {
             docker_container,
             docker_compose,
             docker_portainer_file,
+            docker_logs,
+            docker_create_stack,
+            docker_container_compose,
             sftp_mkdir,
             sftp_new_file,
             sftp_rename,

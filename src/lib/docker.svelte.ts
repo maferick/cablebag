@@ -52,3 +52,49 @@ class Containers {
 }
 
 export const containers = new Containers();
+
+/** A compose file to start new stacks from, with {{blanks}} asked when used. Travels with Sync. */
+export interface StackTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  compose: string;
+  env?: string;
+}
+
+/** Same rule as the Rust side (docker::secret_name): a part of the name says password, token, key or secret. */
+const SECRET_PARTS = new Set(["PASSWORD", "PASS", "PASSWD", "PWD", "SECRET", "TOKEN", "KEY", "APIKEY", "PRIVATE", "CREDENTIALS"]);
+export function secretName(name: string): boolean {
+  return name.toUpperCase().split(/[^A-Z0-9]+/).some((p) => SECRET_PARTS.has(p));
+}
+
+/**
+ * The text with the values of secret-looking settings replaced by a {{blank}} of their name, so a template never
+ * keeps a password: "KEY: value", "KEY=value" and "- KEY=value" lines of a compose or .env file. Values that are
+ * already a blank or a ${variable} stay.
+ */
+export function blankSecrets(text: string): string {
+  return text.replace(/^([ \t]*(?:-[ \t]*)?["']?)([A-Za-z_][A-Za-z0-9_.-]*)(["']?[ \t]*[:=][ \t]*)(["']?)([^\n"']*?)(["']?)([ \t]*)$/gm, (line, lead, key, sep, q1, value, q2, tail) => {
+    if (!secretName(key) || !value.trim() || /^\{\{.*\}\}$|^\$\{.*\}$/.test(value.trim())) return line;
+    // An unquoted YAML value gets quotes: a filled-in password may hold ": " or " #".
+    if (!q1 && sep.includes(":")) return `${lead}${key}${sep}"{{${key}}}"${tail}`;
+    return `${lead}${key}${sep}${q1}{{${key}}}${q2}${tail}`;
+  });
+}
+
+class Templates {
+  get list(): StackTemplate[] {
+    return (app.settings["docker.templates"] as StackTemplate[]) ?? [];
+  }
+
+  async save(t: StackTemplate) {
+    const rest = this.list.filter((x) => x.id !== t.id);
+    await app.setSetting("docker.templates", [...rest, t].sort((a, b) => a.name.localeCompare(b.name)));
+  }
+
+  async remove(id: string) {
+    await app.setSetting("docker.templates", this.list.filter((x) => x.id !== id));
+  }
+}
+
+export const templates = new Templates();

@@ -8,12 +8,14 @@
   import { app, newSession, type Tab } from "../state.svelte";
   import { ask } from "../ask.svelte";
   import { menu } from "../menu.svelte";
-  import { containers } from "../docker.svelte";
+  import { containers, templates, blankSecrets } from "../docker.svelte";
+  import { assistant } from "../assistant.svelte";
+  import NewStackDialog from "./NewStackDialog.svelte";
   import { writeText } from "../clipboard";
   import Modal from "./Modal.svelte";
   import {
     Container, RefreshCw, RotateCw, ScrollText, TerminalSquare, Play, Square, Pause, FileCode, ExternalLink, Download,
-    Copy, Search, X,
+    Copy, Search, X, Plus, Layers, Trash2, Sparkles,
   } from "@lucide/svelte";
   import "./tools/tool.css";
 
@@ -30,6 +32,7 @@
   let output = $state<{ title: string; text: string; ok: boolean } | null>(null);
   let viewing = $state<{ path: string; onServer: string; text: string } | null>(null);
   let listEl = $state<HTMLDivElement>();
+  let newStack = $state(false);
 
   // svelte-ignore state_referenced_locally
   const server = tab.session!;
@@ -106,6 +109,18 @@
     return out.sort((a, b) => (a.project || a.items[0].name).localeCompare(b.project || b.items[0].name));
   });
   const flat = $derived(groups.flatMap((g) => g.items));
+
+  /** Stacks in ~/stacks that have no containers (removed or never started): they can be started from here. */
+  const dirOf = (f: string) => f.slice(0, f.lastIndexOf("/"));
+  const idle = $derived.by(() => {
+    if (show === "look") return [];
+    const q = filter.trim().toLowerCase();
+    return (listing?.stacks ?? [])
+      .filter((f) => !all.some((c) => c.config_files.includes(f) || c.working_dir === dirOf(f)))
+      .map((f) => ({ file: f, dir: dirOf(f), name: dirOf(f).split("/").pop()!.toLowerCase() }))
+      .filter((s) => !q || s.name.includes(q));
+  });
+  const idlePicked = $derived(idle.find((s) => picked === `stack:${s.file}`));
   const current = $derived(all.find((c) => c.id === picked));
   const project = $derived(current?.project ? all.filter((c) => c.project === current.project) : []);
 
@@ -181,9 +196,10 @@
     restart: { label: "Restart all", done: "restarted" },
     stop: { label: "Stop all", ask: "Stop every container of {p}?", done: "stopped" },
     start: { label: "Start all", done: "started" },
+    down: { label: "Remove stack", ask: "Remove the containers of {p}? Its volumes and its compose file stay.", done: "removed" },
   };
 
-  async function composeAction(c: DockerContainer, action: string) {
+  async function composeAction(c: Pick<DockerContainer, "project" | "working_dir" | "config_files">, action: string) {
     const a = COMPOSE[action];
     if (a.ask && !(await ask.confirm(a.label, a.ask.replace("{p}", c.project), { okLabel: a.label, danger: action === "stop" }))) return;
     busy[`p:${c.project}`] = action;
@@ -217,6 +233,59 @@
     } catch (e) {
       app.notify(String(e), "error");
     }
+  }
+
+  /** A template from a running project (its compose file and .env) or from a container started without Compose. */
+  async function saveTemplate(c: DockerContainer) {
+    try {
+      let compose = "";
+      let env = "";
+      if (c.project && c.config_files.length) {
+        const f = c.config_files[0];
+        if (c.portainer) {
+          const p = listing?.portainer;
+          if (!p) throw new Error("Cannot find the Portainer container to read this stack from.");
+          compose = await api.dockerPortainerFile(tab.id, sudo, p.container, p.data, f);
+        } else {
+          compose = (await api.readText(tab.id, f)).text;
+          env = await api.readText(tab.id, `${c.working_dir}/.env`).then((r) => r.text, () => "");
+        }
+      } else {
+        compose = await api.dockerContainerCompose(tab.id, sudo, c.id);
+      }
+      const n = await ask.text("Save as template", "Name of the template", c.project || c.name, "Save");
+      if (!n?.trim()) return;
+      // Passwords in the file become blanks: a template (and Sync) never keeps them.
+      await templates.save({ id: crypto.randomUUID(), name: n.trim(), description: `From ${c.project || c.name} on ${server.name || server.host}`, compose: blankSecrets(compose), env: blankSecrets(env) || undefined });
+      app.notify(`Saved template "${n.trim()}"; New stack offers it.`);
+    } catch (e) {
+      app.notify(String(e), "error");
+    }
+  }
+
+  /** What to ask the assistant about a container that is not as it should be. */
+  function question(c: DockerContainer): string {
+    if (c.health === "unhealthy") return "Why is it unhealthy?";
+    if (c.state === "restarting" || c.restarts >= 3) return "Why does it keep restarting?";
+    if (c.state === "exited" || c.state === "dead") return "Why did it stop?";
+    return "";
+  }
+
+  /** The assistant starts with the facts: the container's state, where it comes from, and its last log lines. */
+  async function askAssistant(c: DockerContainer) {
+    if (!assistant.hosts.length) {
+      app.notify("Add an AI host under Settings, Assistant first.", "error");
+      return;
+    }
+    const logs = await api.dockerLogs(tab.id, sudo, c.id, 100).catch((e) => `(could not read the logs: ${e})`);
+    const from = c.project ? `compose project ${c.project}, service ${c.service}, file ${c.config_files[0] ?? "unknown"}${c.portainer ? " (made in Portainer)" : ""}` : "not started with Compose";
+    const fence = "```";
+    const text =
+      `Container ${c.name} on this server: image ${c.image}, ${from}. ${stateText(c)}${c.restarts ? `, restarted ${c.restarts} times` : ""}.\n\n` +
+      `Its last log lines:\n${fence}\n${logs.trim()}\n${fence}\n\n${question(c) || "Is everything all right with it?"}`;
+    assistant.open = true;
+    await tick();
+    assistant.ask(tab.id, text);
   }
 
   function openPortainer() {
@@ -264,8 +333,8 @@
       {/if}
     </div>
     <span class="grow"></span>
-    {#if listing?.portainer?.url_port}
-      <button class="btn" onclick={openPortainer} title="Portainer's web interface on this server, in a web tab"><ExternalLink size={14} /> Portainer</button>
+    {#if listing && (listing.access === "direct" || listing.access === "sudo") && listing.compose !== "none"}
+      <button class="btn" onclick={() => (newStack = true)}><Plus size={14} /> New stack</button>
     {/if}
     <button class="btn" disabled={tab.status !== "connected" || loading} onclick={() => load()}><RefreshCw size={14} class={loading ? "spin" : ""} /> Refresh</button>
   </header>
@@ -308,7 +377,7 @@
           </div>
         </div>
         <div class="list" bind:this={listEl} role="listbox" tabindex="-1" aria-label="Containers" onkeydown={listKey}>
-          {#if !groups.length}
+          {#if !groups.length && !idle.length}
             <p class="muted empty">{filter || show !== "all" ? "Nothing here." : "No containers on this server."}</p>
           {/if}
           {#each groups as g (g.key)}
@@ -335,11 +404,41 @@
               </div>
             {/each}
           {/each}
+          {#if idle.length}
+            <div class="glabel">Not running</div>
+            {#each idle as s (s.file)}
+              <div
+                class="row"
+                class:sel={picked === `stack:${s.file}`}
+                role="option"
+                aria-selected={picked === `stack:${s.file}`}
+                tabindex="-1"
+                onclick={() => (picked = `stack:${s.file}`)}
+                onkeydown={(e) => e.key === "Enter" && (picked = `stack:${s.file}`)}
+              >
+                <span class="smark" aria-hidden="true"></span>
+                <span class="nm">{s.name}</span>
+                <span class="st">no containers</span>
+              </div>
+            {/each}
+          {/if}
         </div>
       </div>
 
       <aside class="right">
-        {#if current}
+        {#if idlePicked}
+          {@const s = idlePicked}
+          <h3>{s.name}</h3>
+          <p class="state">Not running: the stack has no containers now.</p>
+          <div class="proj">
+            <button class="link file" onclick={() => app.openEditor(tab.id, s.file)} title={s.file}><FileCode size={13} /> Edit {s.file.split("/").pop()}</button>
+            <p class="muted small mono path">{s.file}</p>
+            {#if busy[`p:${s.name}`]}<p class="muted small">{COMPOSE[busy[`p:${s.name}`]].label}...</p>{/if}
+            <div class="acts">
+              <button class="btn" disabled={!!busy[`p:${s.name}`] || listing.compose === "none"} onclick={() => composeAction({ project: s.name, working_dir: s.dir, config_files: [s.file] }, "up")}><Play size={14} /> Apply the compose file</button>
+            </div>
+          </div>
+        {:else if current}
           {@const on = current.state === "running"}
           {@const web = current.ports.filter((p) => p.public)}
           <h3>{current.name}</h3>
@@ -356,6 +455,9 @@
               <button class="btn" disabled={!!busy[current.id]} onclick={() => containerAction(current, current.state === "paused" ? "unpause" : "start")}><Play size={14} /> Start</button>
             {/if}
             {#if on}<button class="btn" disabled={!!busy[current.id]} onclick={() => containerAction(current, "pause")}><Pause size={14} /> Pause</button>{/if}
+          </div>
+          <div class="acts">
+            <button class="btn" class:ask={!!question(current)} onclick={() => askAssistant(current)}><Sparkles size={14} /> {question(current) || "Ask the assistant"}</button>
           </div>
 
           <dl>
@@ -375,6 +477,12 @@
             {/if}
           </dl>
 
+          {#if !current.project}
+            <div class="proj">
+              <p class="muted small">Not started with Compose.</p>
+              <button class="btn" onclick={() => saveTemplate(current)}><Layers size={14} /> Save as template</button>
+            </div>
+          {/if}
           {#if current.project}
             <div class="proj">
               <h4>
@@ -390,7 +498,10 @@
               {/each}
               {#if current.portainer}
                 <p class="muted small">Made in Portainer: change and redeploy it there.</p>
-                {#if listing.portainer?.url_port}<button class="btn" onclick={openPortainer}><ExternalLink size={14} /> Open Portainer</button>{/if}
+                <div class="acts">
+                  {#if listing.portainer?.url_port}<button class="btn" onclick={openPortainer}><ExternalLink size={14} /> Open in Portainer</button>{/if}
+                  <button class="btn" onclick={() => saveTemplate(current)}><Layers size={14} /> Save as template</button>
+                </div>
               {:else if current.working_dir && listing.compose !== "none"}
                 {#if busy[`p:${current.project}`]}<p class="muted small">{COMPOSE[busy[`p:${current.project}`]].label}...</p>{/if}
                 <div class="acts">
@@ -400,6 +511,8 @@
                     <button class="btn" disabled={!!busy[`p:${current.project}`]} onclick={() => composeAction(current, "restart")}><RotateCw size={14} /> Restart all</button>
                     <button class="btn" disabled={!!busy[`p:${current.project}`]} onclick={() => composeAction(current, "stop")}><Square size={14} /> Stop all</button>
                   {/if}
+                  <button class="btn" onclick={() => saveTemplate(current)}><Layers size={14} /> Save as template</button>
+                  <button class="btn danger-text" disabled={!!busy[`p:${current.project}`]} onclick={() => composeAction(current, "down")}><Trash2 size={14} /> Remove stack</button>
                 </div>
               {/if}
             </div>
@@ -411,6 +524,22 @@
     </div>
   {/if}
 </div>
+
+{#if newStack && listing}
+  <NewStackDialog
+    tab={tab.id}
+    compose={listing.compose}
+    {sudo}
+    onclose={() => (newStack = false)}
+    oncreated={async (name, text, ok) => {
+      newStack = false;
+      output = { title: `Stack ${name}`, text, ok };
+      await load(true);
+      const c = listing?.containers.find((x) => x.project === name);
+      if (c) picked = c.id;
+    }}
+  />
+{/if}
 
 {#if output}
   <Modal title={output.title} width={720} warning={!output.ok} onclose={() => (output = null)}>
@@ -675,6 +804,12 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
+  }
+  .ask {
+    border-color: var(--warn);
+  }
+  .danger-text {
+    color: var(--danger-text);
   }
   .proj {
     padding-top: 14px;

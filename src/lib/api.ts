@@ -269,6 +269,8 @@ export interface DockerListing {
   compose: string;
   containers: DockerContainer[];
   portainer: { container: string; data: string; url_port: number | null; https: boolean } | null;
+  /** Compose files in ~/stacks on the server, also of stacks without containers now. */
+  stacks: string[];
 }
 
 export interface ExecResult {
@@ -427,6 +429,14 @@ export const api = {
     invoke<ExecResult>("docker_compose", { tab, compose, sudo, project, dir, files, action }),
   dockerPortainerFile: (tab: string, sudo: boolean, portainer: string, data: string, path: string) =>
     invoke<string>("docker_portainer_file", { tab, sudo, portainer, data, path }),
+  dockerLogs: (tab: string, sudo: boolean, id: string, lines: number) => invoke<string>("docker_logs", { tab, sudo, id, lines }),
+  /** Writes ~/stacks/<name>/compose.yml (and .env) on the server and starts it. */
+  dockerCreateStack: (tab: string, compose: string, sudo: boolean, name: string, file: string, env: string) =>
+    invoke<{ dir: string; output: string; exit: number | null }>("docker_create_stack", { tab, compose, sudo, name, file, env }),
+  /** A compose file for a container started without Compose, with secret values as {{blanks}}. */
+  dockerContainerCompose: (tab: string, sudo: boolean, id: string) => invoke<string>("docker_container_compose", { tab, sudo, id }),
+  /** A text file over the SFTP connection of a tab. */
+  readText: (tab: string, path: string) => invoke<{ text: string; version: string }>("sftp_read_text", { tab, path }),
   openStream: (id: string, session: Session, cols: number, rows: number, log: LogSpec | undefined, onData: Channel<ArrayBuffer>) =>
     invoke<void>("term_open_stream", { id, session, cols, rows, log: log ?? null, onData }),
   fileOpen: (target: string) => invoke<void>("file_open", { target }),

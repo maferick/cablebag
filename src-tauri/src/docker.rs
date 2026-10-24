@@ -62,6 +62,8 @@ pub struct Listing {
     pub compose: String,
     pub containers: Vec<Container>,
     pub portainer: Option<Portainer>,
+    /// The compose files in ~/stacks on the server, also of stacks that have no containers now.
+    pub stacks: Vec<String>,
 }
 
 /// One line per container, as JSON. Single quotes are not allowed in it: the script sends it inside '...'.
@@ -78,6 +80,7 @@ else echo "access none"; exit 0; fi
 if $D compose version >/dev/null 2>&1; then echo "compose plugin"
 elif command -v docker-compose >/dev/null 2>&1; then echo "compose standalone"
 else echo "compose none"; fi
+for f in "$HOME"/stacks/*/compose.yml "$HOME"/stacks/*/compose.yaml "$HOME"/stacks/*/docker-compose.yml "$HOME"/stacks/*/docker-compose.yaml; do [ -f "$f" ] && echo "stack $f"; done
 ids=$($D ps -aq --no-trunc)
 [ -z "$ids" ] || $D inspect --format '{FORMAT}' $ids"#
     )
@@ -108,10 +111,13 @@ pub async fn list(app: &AppHandle, tab: &str) -> Result<Listing> {
 fn parse_listing(output: &str) -> Result<Listing> {
     let mut access = String::new();
     let mut compose = "none".to_string();
+    let mut stacks = Vec::new();
     let mut raw = Vec::new();
     for line in output.lines().map(str::trim) {
         if let Some(a) = line.strip_prefix("access ") {
             access = a.to_string();
+        } else if let Some(f) = line.strip_prefix("stack ") {
+            stacks.push(f.to_string());
         } else if let Some(c) = line.strip_prefix("compose ") {
             compose = c.to_string();
         } else if line.starts_with('{') {
@@ -126,7 +132,7 @@ fn parse_listing(output: &str) -> Result<Listing> {
     let portainer = raw.iter().find_map(portainer_of);
     let mut containers: Vec<Container> = raw.iter().map(|v| container(v, portainer.as_ref())).collect();
     containers.sort_by(|a, b| (a.project.is_empty(), &a.project, &a.name).cmp(&(b.project.is_empty(), &b.project, &b.name)));
-    Ok(Listing { access, compose, containers, portainer })
+    Ok(Listing { access, compose, containers, portainer, stacks })
 }
 
 /// The Portainer container (the image says so, and it has a /data mount).
@@ -239,6 +245,8 @@ fn compose_line(compose: &str, sudo: bool, project: &str, dir: &str, files: &[St
         "restart" => "restart",
         "stop" => "stop",
         "start" => "start",
+        // Removes the containers and the project's network; volumes stay.
+        "down" => "down",
         _ => bail!("Unknown Compose action {action}."),
     };
     if project.is_empty() || !project.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
@@ -247,11 +255,7 @@ fn compose_line(compose: &str, sudo: bool, project: &str, dir: &str, files: &[St
     if dir.is_empty() {
         bail!("Docker does not know the folder of this project.");
     }
-    let program = match (compose, sudo) {
-        ("standalone", false) => "docker-compose".to_string(),
-        ("standalone", true) => "sudo -n docker-compose".to_string(),
-        _ => format!("{} compose", docker(sudo)),
-    };
+    let program = compose_program(compose, sudo);
     let files: String = files.iter().map(|f| format!(" -f {}", sh_quote(f))).collect();
     Ok(format!("cd {} && {program} -p {project}{files} {args} 2>&1", sh_quote(dir)))
 }
@@ -259,6 +263,182 @@ fn compose_line(compose: &str, sudo: bool, project: &str, dir: &str, files: &[St
 pub async fn compose_action(app: &AppHandle, tab: &str, compose: &str, sudo: bool, project: &str, dir: &str, files: &[String], action: &str) -> Result<ExecResult> {
     let line = compose_line(compose, sudo, project, dir, files, action)?;
     run(app, tab, &line, Duration::from_secs(600)).await
+}
+
+/// The last lines a container wrote, for the assistant.
+pub async fn logs(app: &AppHandle, tab: &str, sudo: bool, id: &str, lines: u32) -> Result<String> {
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_hexdigit()) {
+        bail!("That is not a container id.");
+    }
+    let r = run(app, tab, &format!("{} logs --tail {} {id} 2>&1", docker(sudo), lines.clamp(10, 1000)), Duration::from_secs(30)).await?;
+    Ok(r.output)
+}
+
+#[derive(Debug, Serialize)]
+pub struct NewStack {
+    /// The stack's folder on the server.
+    pub dir: String,
+    pub output: String,
+    pub exit: Option<u32>,
+}
+
+/// A stack of Cablebag's own: the compose file (and .env when given) in ~/stacks/<name> on the server, only
+/// readable by the login (they may hold passwords), then docker compose up -d. An existing stack is not overwritten.
+pub async fn create_stack(app: &AppHandle, tab: &str, compose: &str, sudo: bool, name: &str, file: &str, env: &str) -> Result<NewStack> {
+    use base64::Engine;
+    let ok = name.len() <= 63 && name.starts_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit()) && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_');
+    if !ok {
+        bail!("A stack name has small letters, digits, - and _ only, and starts with a letter or digit.");
+    }
+    if file.trim().is_empty() {
+        bail!("The compose file is empty.");
+    }
+    let b64 = |s: &str| base64::engine::general_purpose::STANDARD.encode(s.as_bytes());
+    let env_part = if env.trim().is_empty() { String::new() } else { format!(" && printf %s '{}' | base64 -d > \"$d/.env\"", b64(env)) };
+    let program = compose_program(compose, sudo);
+    let script = format!(
+        r#"d="$HOME/stacks/{name}"
+if [ -e "$d/compose.yml" ] || [ -e "$d/docker-compose.yml" ]; then echo "exists $d"; exit 3; fi
+umask 077 && mkdir -p "$d" && printf %s '{}' | base64 -d > "$d/compose.yml"{env_part} || exit 4
+echo "dir $d"
+cd "$d" && {program} -p {name} -f compose.yml up -d 2>&1"#,
+        b64(file)
+    );
+    let r = run(app, tab, &script, Duration::from_secs(900)).await?;
+    let first = r.output.lines().next().unwrap_or("");
+    if let Some(d) = first.strip_prefix("exists ") {
+        bail!("There is already a stack in {d}. Pick another name, or edit that one.");
+    }
+    let Some(dir) = first.strip_prefix("dir ") else {
+        bail!("Could not write the stack's files: {}", r.output.trim());
+    };
+    Ok(NewStack { dir: dir.to_string(), output: r.output.lines().skip(1).collect::<Vec<_>>().join("\n"), exit: r.exit })
+}
+
+fn compose_program(compose: &str, sudo: bool) -> String {
+    match (compose, sudo) {
+        ("standalone", false) => "docker-compose".to_string(),
+        ("standalone", true) => "sudo -n docker-compose".to_string(),
+        _ => format!("{} compose", docker(sudo)),
+    }
+}
+
+/// A compose file that starts the same container again, made from docker inspect: for a container that was
+/// started without Compose. Values of settings that look secret become {{blanks}}.
+pub async fn container_compose(app: &AppHandle, tab: &str, sudo: bool, id: &str) -> Result<String> {
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_hexdigit()) {
+        bail!("That is not a container id.");
+    }
+    let r = run(app, tab, &format!("{} inspect {id}", docker(sudo)), Duration::from_secs(30)).await?;
+    let all: Value = serde_json::from_str(&r.output).map_err(|_| anyhow!("Docker did not describe the container: {}", r.output.trim()))?;
+    let c = all.get(0).ok_or_else(|| anyhow!("Docker does not know this container."))?;
+    // What the image sets itself is left out, so the file holds only what the container added.
+    let image = c["Config"]["Image"].as_str().unwrap_or("");
+    let img = match run(app, tab, &format!("{} image inspect --format '{{{{json .Config}}}}' {}", docker(sudo), sh_quote(image)), Duration::from_secs(30)).await {
+        Ok(r) if r.exit == Some(0) => serde_json::from_str(r.output.trim()).unwrap_or(Value::Null),
+        _ => Value::Null,
+    };
+    Ok(compose_from(c, &img))
+}
+
+/// Whether an environment variable's name says it holds a secret (MYSQL_ROOT_PASSWORD, API_KEY, ...).
+pub fn secret_name(name: &str) -> bool {
+    name.to_ascii_uppercase()
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .any(|p| matches!(p, "PASSWORD" | "PASS" | "PASSWD" | "PWD" | "SECRET" | "TOKEN" | "KEY" | "APIKEY" | "PRIVATE" | "CREDENTIALS"))
+}
+
+fn q(s: &str) -> String {
+    serde_json::to_string(s).unwrap_or_default()
+}
+
+fn compose_from(c: &Value, img: &Value) -> String {
+    let name = c["Name"].as_str().unwrap_or("app").trim_start_matches('/');
+    let service: String = name.chars().map(|ch| if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' { ch.to_ascii_lowercase() } else { '-' }).collect();
+    let cfg = &c["Config"];
+    let host = &c["HostConfig"];
+    let mut y = format!("services:\n  {service}:\n    image: {}\n    container_name: {}\n", q(cfg["Image"].as_str().unwrap_or("")), q(name));
+    match host["RestartPolicy"]["Name"].as_str() {
+        Some(p) if !p.is_empty() && p != "no" => y += &format!("    restart: {p}\n"),
+        _ => {}
+    }
+    if host["NetworkMode"] == "host" {
+        y += "    network_mode: host\n";
+    }
+    let strings = |v: &Value| v.as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect::<Vec<_>>()).unwrap_or_default();
+    if cfg["Cmd"] != img["Cmd"] && cfg["Cmd"].is_array() {
+        y += &format!("    command: {}\n", cfg["Cmd"]);
+    }
+    if cfg["Entrypoint"] != img["Entrypoint"] && cfg["Entrypoint"].is_array() {
+        y += &format!("    entrypoint: {}\n", cfg["Entrypoint"]);
+    }
+    let mut ports = Vec::new();
+    if let Some(map) = host["PortBindings"].as_object() {
+        for (key, binds) in map {
+            let (num, proto) = key.split_once('/').unwrap_or((key, "tcp"));
+            for b in binds.as_array().into_iter().flatten() {
+                let hp = b["HostPort"].as_str().unwrap_or("");
+                let ip = b["HostIp"].as_str().unwrap_or("");
+                let mut p = if ip.is_empty() || ip == "0.0.0.0" || ip == "::" { format!("{hp}:{num}") } else { format!("{ip}:{hp}:{num}") };
+                if proto != "tcp" {
+                    p += &format!("/{proto}");
+                }
+                if !hp.is_empty() && !ports.contains(&p) {
+                    ports.push(p);
+                }
+            }
+        }
+    }
+    ports.sort();
+    if !ports.is_empty() {
+        y += "    ports:\n";
+        for p in &ports {
+            y += &format!("      - {}\n", q(p));
+        }
+    }
+    let image_env = strings(&img["Env"]);
+    let env: Vec<String> = strings(&cfg["Env"]).into_iter().filter(|e| !image_env.contains(e)).collect();
+    if !env.is_empty() {
+        y += "    environment:\n";
+        for e in &env {
+            let (k, v) = e.split_once('=').unwrap_or((e, ""));
+            let v = if secret_name(k) && !v.is_empty() { format!("{{{{{k}}}}}") } else { v.to_string() };
+            y += &format!("      {k}: {}\n", q(&v));
+        }
+    }
+    let mut named = Vec::new();
+    let mut vols = Vec::new();
+    for m in c["Mounts"].as_array().into_iter().flatten() {
+        let dst = m["Destination"].as_str().unwrap_or("");
+        let ro = if m["RW"] == false { ":ro" } else { "" };
+        match m["Type"].as_str() {
+            Some("bind") => vols.push(format!("{}:{dst}{ro}", m["Source"].as_str().unwrap_or(""))),
+            Some("volume") => {
+                let n = m["Name"].as_str().unwrap_or("");
+                // A volume Docker named itself (a long hex string) belongs to this container only: leave it out.
+                if n.len() == 64 && n.chars().all(|c| c.is_ascii_hexdigit()) {
+                    continue;
+                }
+                vols.push(format!("{n}:{dst}{ro}"));
+                named.push(n.to_string());
+            }
+            _ => {}
+        }
+    }
+    if !vols.is_empty() {
+        y += "    volumes:\n";
+        for v in &vols {
+            y += &format!("      - {}\n", q(v));
+        }
+    }
+    if !named.is_empty() {
+        // The same data as now: the volumes exist already.
+        y += "volumes:\n";
+        for n in &named {
+            y += &format!("  {n}:\n    external: true\n");
+        }
+    }
+    y
 }
 
 #[cfg(test)]
@@ -285,6 +465,9 @@ mod tests {
         let loose = &l.containers[1];
         assert_eq!((loose.project.as_str(), loose.state.as_str(), loose.health.as_str(), loose.restarts, loose.ports.len()), ("", "exited", "", 3, 0));
         assert_eq!(l.portainer, None);
+        assert!(l.stacks.is_empty());
+        let l = parse_listing("access direct\ncompose plugin\nstack /home/me/stacks/web/compose.yml\n").unwrap();
+        assert_eq!(l.stacks, vec!["/home/me/stacks/web/compose.yml"]);
     }
 
     #[test]
@@ -323,7 +506,46 @@ mod tests {
         );
         assert_eq!(compose_line("standalone", true, "web", "/srv/web", &[], "pull").unwrap(), "cd '/srv/web' && sudo -n docker-compose -p web pull 2>&1");
         assert!(compose_line("plugin", false, "web; rm -rf /", "/srv", &[], "up").is_err());
-        assert!(compose_line("plugin", false, "web", "/srv", &[], "down").is_err());
+        // down keeps the volumes (no -v); anything else is refused.
+        assert_eq!(compose_line("plugin", false, "web", "/srv", &[], "down").unwrap(), "cd '/srv' && docker compose -p web down 2>&1");
+        assert!(compose_line("plugin", false, "web", "/srv", &[], "rm").is_err());
+    }
+
+    #[test]
+    fn compose_from_a_container() {
+        let c = serde_json::json!({
+            "Name": "/My DB",
+            "Config": {"Image": "postgres:16", "Env": ["PATH=/usr/bin", "POSTGRES_PASSWORD=hunter2", "POSTGRES_DB=app", "KEYCLOAK_ADMIN=admin"], "Cmd": ["postgres"], "Entrypoint": ["docker-entrypoint.sh"]},
+            "HostConfig": {"RestartPolicy": {"Name": "unless-stopped"}, "NetworkMode": "bridge",
+                "PortBindings": {"5432/tcp": [{"HostIp": "", "HostPort": "5433"}, {"HostIp": "::", "HostPort": "5433"}], "53/udp": [{"HostIp": "127.0.0.1", "HostPort": "53"}]}},
+            "Mounts": [
+                {"Type": "volume", "Name": "pgdata", "Destination": "/var/lib/postgresql/data", "RW": true},
+                {"Type": "bind", "Source": "/srv/init", "Destination": "/docker-entrypoint-initdb.d", "RW": false},
+                {"Type": "volume", "Name": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "Destination": "/tmp/x", "RW": true}
+            ]
+        });
+        let img = serde_json::json!({"Env": ["PATH=/usr/bin"], "Cmd": ["postgres"], "Entrypoint": ["docker-entrypoint.sh"]});
+        let y = compose_from(&c, &img);
+        assert_eq!(
+            y,
+            concat!(
+                "services:\n  my-db:\n    image: \"postgres:16\"\n    container_name: \"My DB\"\n    restart: unless-stopped\n",
+                "    ports:\n      - \"127.0.0.1:53:53/udp\"\n      - \"5433:5432\"\n",
+                "    environment:\n      POSTGRES_PASSWORD: \"{{POSTGRES_PASSWORD}}\"\n      POSTGRES_DB: \"app\"\n      KEYCLOAK_ADMIN: \"admin\"\n",
+                "    volumes:\n      - \"pgdata:/var/lib/postgresql/data\"\n      - \"/srv/init:/docker-entrypoint-initdb.d:ro\"\n",
+                "volumes:\n  pgdata:\n    external: true\n"
+            )
+        );
+    }
+
+    #[test]
+    fn secret_names() {
+        for s in ["MYSQL_ROOT_PASSWORD", "API_KEY", "GITEA_RUNNER_REGISTRATION_TOKEN", "db_pass", "JWT_SECRET"] {
+            assert!(secret_name(s), "{s}");
+        }
+        for s in ["KEYCLOAK_ADMIN", "PASSAGE", "TZ", "MONKEY", "PUID"] {
+            assert!(!secret_name(s), "{s}");
+        }
     }
 
     #[test]

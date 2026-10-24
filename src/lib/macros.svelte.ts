@@ -45,6 +45,18 @@ export function blanks(m: Macro): string[] {
   return names;
 }
 
+/** The blanks in texts (container templates use the same {{name}} as macros), in the order they first appear. */
+export function blankNamesIn(...texts: string[]): string[] {
+  const names: string[] = [];
+  for (const t of texts) for (const [, name] of t.matchAll(BLANK)) if (!names.includes(name.trim())) names.push(name.trim());
+  return names;
+}
+
+/** The text with its blanks filled in; a blank without a value stays as it is. */
+export function fillBlanks(text: string, values: Record<string, string>): string {
+  return text.replace(BLANK, (whole, name: string) => values[name.trim()] ?? whole);
+}
+
 export function fill(text: string, values: Record<string, string>, tab: string): string {
   return text.replace(BLANK, (whole, name: string) => {
     const n = name.trim();

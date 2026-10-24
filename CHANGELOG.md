@@ -13,6 +13,18 @@ installs it and starts Cablebag again. Every version is also on the
   their containers under the project's name. Click a container (or walk the list with the arrow keys) for its
   details on the right: image, web ports to open, its project and compose file, and buttons that say what they
   do (Logs, Shell, Restart, Stop). **Needs a look** and **Stopped** show only those.
+- **Stacks of your own.** **New stack** writes a compose file (and an optional `.env`) to `~/stacks/<name>` on the
+  server, readable only by your login, and starts it. A stack is never overwritten. **Remove stack** takes its
+  containers away and keeps its volumes and files; stacks in `~/stacks` without containers show under **Not
+  running**, where **Apply the compose file** starts them again.
+- **Templates.** Start a new stack from a template: its `{{blanks}}` (as in macros) are asked when you use it,
+  and fields named like a password hide what you type. **Save as template** works on any project, also one made
+  in Portainer, and on a container started without Compose (Cablebag writes the compose file for it). Values of
+  settings that look secret (passwords, tokens, keys) become blanks, so a template never holds them. Templates
+  travel with Sync.
+- **Ask the assistant** about a container: it gets the state, where the container comes from and its last 100
+  log lines, and the button asks the right question when something is wrong ("Why does it keep restarting?").
+- The Portainer button at the top is gone; stacks made in Portainer keep **Open in Portainer**.
 
 ## 0.19.0 · 24 October 2026
 
