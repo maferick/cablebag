@@ -87,6 +87,41 @@ pub async fn home(app: &AppHandle, tab: &str) -> Result<String> {
     Ok(sftp(app, tab).await?.canonicalize(".").await?)
 }
 
+/// Finds the folder the tab's terminal is in, without typing anything into it. Run on a channel of its own, it
+/// walks up from itself to the SSH server's process for this login, takes that process's child with a terminal
+/// (the shell of the tab) and reads the folder of the program in the foreground there, or of the shell itself
+/// when that program belongs to someone else (sudo -i). Linux only (/proc); `read` is built in, so the scan of
+/// /proc starts no programs. No single quotes: it is sent inside sh -c '...'.
+const TERMINAL_FOLDER: &str = r#"p=$$
+while [ "$p" -gt 1 ]; do
+  read -r c 2>/dev/null < /proc/$p/comm || exit 3
+  case $c in sshd*|dropbear*) break;; esac
+  read -r s 2>/dev/null < /proc/$p/stat || exit 3
+  s=${s##*")"}; set -- $s; p=$2
+done
+[ "$p" -gt 1 ] || exit 3
+for d in /proc/[0-9]*; do
+  read -r s 2>/dev/null < $d/stat || continue
+  s=${s##*")"}; set -- $s
+  [ "$2" = "$p" ] && [ "$5" != 0 ] || continue
+  readlink /proc/$6/cwd 2>/dev/null || readlink $d/cwd 2>/dev/null
+  exit 0
+done
+exit 4"#;
+
+/// The folder of the tab's terminal, or None when the server cannot tell (no /proc, or no shell found).
+pub async fn terminal_folder(app: &AppHandle, tab: &str) -> Result<Option<String>> {
+    use tauri::Manager;
+    let conn = app.state::<crate::AppState>().ssh.lock().get(tab).cloned().ok_or_else(|| anyhow!("This SSH tab is not connected."))?;
+    let r = crate::agent::exec_line(&conn, &format!("sh -c '{TERMINAL_FOLDER}'"), std::time::Duration::from_secs(5)).await?;
+    Ok(folder_from(&r.output, r.exit))
+}
+
+fn folder_from(output: &str, exit: Option<u32>) -> Option<String> {
+    let line = output.lines().next()?.trim_end_matches('\r');
+    (exit == Some(0) && line.starts_with('/')).then(|| line.to_string())
+}
+
 pub async fn list(app: &AppHandle, tab: &str, path: &str) -> Result<Listing> {
     let s = sftp(app, tab).await?;
     let path = s.canonicalize(if path.is_empty() { "." } else { path }).await?;
@@ -401,5 +436,16 @@ mod tests {
         assert_eq!(local_name("/srv/LPT¹"), "_LPT¹");
         assert_eq!(local_name("/srv/console.log"), "console.log");
         assert_eq!(local_name("/srv/.bashrc"), ".bashrc");
+    }
+
+    #[test]
+    fn terminal_folder_answers() {
+        use super::{folder_from, TERMINAL_FOLDER};
+        assert_eq!(folder_from("/home/me/projects\n", Some(0)).as_deref(), Some("/home/me/projects"));
+        assert_eq!(folder_from("/srv/with space\r\n", Some(0)).as_deref(), Some("/srv/with space"));
+        assert_eq!(folder_from("", Some(3)), None);
+        assert_eq!(folder_from("sh: 1: cannot open /proc/1/comm\n", Some(0)), None);
+        assert_eq!(folder_from("/tmp\n", Some(4)), None);
+        assert!(!TERMINAL_FOLDER.contains('\''), "the script goes inside sh -c '...'");
     }
 }

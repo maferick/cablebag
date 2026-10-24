@@ -5,6 +5,7 @@
   import { kindInfo } from "../kinds";
   import { TOOLS, toolInfo } from "../tools";
   import { macros } from "../macros.svelte";
+  import { terminals } from "../terms";
   import { workspaces } from "../workspaces.svelte";
   import { vault } from "../vault.svelte";
   import { proxmox, isWindows } from "../proxmox.svelte";
@@ -122,6 +123,8 @@
       a.push({ group: "Actions", label: "Stop recording and save the macro", icon: CircleStop, run: () => macros.stopRecording() });
     } else if (t?.type === "terminal") {
       a.push({ group: "Actions", label: "Record a macro in this terminal", icon: Circle, run: () => macros.startRecording(t.id) });
+      const picked = terminals.get(t.id)?.getSelection();
+      if (picked?.trim()) a.push({ group: "Actions", label: "Save the selected text as a macro", words: "snippet command", icon: Plus, run: () => macros.newFromText(picked) });
     }
     a.push(
       { group: "Actions", label: "Show Home", keys: "Ctrl+Shift+H", words: "start recent", icon: House, run: () => app.showHome() },
@@ -201,7 +204,7 @@
       ...actions(),
       ...TOOLS.map((x) => ({ group: "Tools", label: x.name, detail: x.description, icon: x.icon, run: () => app.openTool(x.id, x.name) })),
       ...app.shells.map((s) => ({ group: "Local terminals", label: s.name, icon: TerminalSquare, run: () => app.openLocal(s) })),
-      ...macros.list.map((m) => ({ group: "Macros", label: m.name, detail: m.folder, keys: m.hotkey, icon: Play, run: () => macros.run(m) })),
+      ...macros.forTab(app.activeId).map((m) => ({ group: "Macros", label: m.name, detail: m.folder ? app.folders.find((f) => f.id === m.folder)?.name : undefined, keys: m.hotkey, icon: Play, run: () => macros.run(m) })),
       ...SETTINGS_PAGES.map((p) => ({ group: "Settings", label: `Settings: ${p.label}`, icon: Settings, keys: p.id === "general" ? "Ctrl+," : undefined, run: () => app.openSettings(p.id) })),
     ];
   }

@@ -500,9 +500,27 @@ fn rdp_file(path: &Path) -> Result<Item> {
         host,
         port,
         user: vals.get("username").cloned().unwrap_or_default(),
-        data: json!({}),
+        data: rdp_gateway(&vals).map(|g| json!({ "gateway": g })).unwrap_or_else(|| json!({})),
         comment: String::new(),
     })
+}
+
+/// The Remote Desktop Gateway of an .rdp file, as Cablebag's session keeps it. gatewayusagemethod 1 is always,
+/// 2 only when the computer cannot be reached directly, 0 and 4 not at all; a file that names a gateway without
+/// saying how means always. promptcredentialonce:i:0 asks for the gateway's login apart from the computer's.
+fn rdp_gateway(vals: &BTreeMap<String, String>) -> Option<serde_json::Value> {
+    let host = vals.get("gatewayhostname").filter(|h| !h.trim().is_empty())?.trim();
+    let usage = match vals.get("gatewayusagemethod").map(String::as_str) {
+        Some("0" | "4") => return None,
+        Some("2") => "detect",
+        _ => "always",
+    };
+    let auth = match (vals.get("gatewaycredentialssource").map(String::as_str), vals.get("promptcredentialonce").map(String::as_str)) {
+        (Some("1"), _) => "smartcard",
+        (_, Some("0")) => "ask",
+        _ => "same",
+    };
+    Some(json!({ "host": host, "usage": usage, "auth": auth }))
 }
 
 // ---- MobaXterm: MobaXterm.ini (installed or portable copy) and .mxtsessions exports ----
@@ -717,6 +735,11 @@ mod tests {
         std::fs::write(&rdp, text).unwrap();
         let it = rdp_file(&rdp).unwrap();
         assert_eq!((it.name.as_str(), it.host.as_str(), it.port, it.user.as_str()), ("Terminal server", "ts01.example.com", 3390, "CORP\\jan"));
+        assert_eq!(it.data, json!({}));
+
+        let gw = dir.join("Behind a gateway.rdp");
+        std::fs::write(&gw, "full address:s:app01.corp.example\r\ngatewayhostname:s:rdg.example.com\r\ngatewayusagemethod:i:2\r\npromptcredentialonce:i:0\r\n").unwrap();
+        assert_eq!(rdp_file(&gw).unwrap().data, json!({ "gateway": { "host": "rdg.example.com", "usage": "detect", "auth": "ask" } }));
 
         let ini = dir.join("sessions.ini");
         std::fs::write(&ini, "[Bookmarks_1]\r\nSubRep=Lab\\Linux\r\nImgNum=41\r\nweb01= #109#0%10.0.0.5%22%admin%%-1%-1%%%%%0%0%0%%%-1%0%0%0%%1080%%0%0%1#Consolas%10%0%0%-1%15%236,236,236%30,30,30%180,180,192%0%-1%0%%xterm%-1%-1%_Std_Colors_0_%80%24%0%1%-1%<none>%%0%0%-1#0# #-1\r\n").unwrap();
@@ -725,5 +748,19 @@ mod tests {
         assert_eq!(items[0].folder, vec!["Lab".to_string(), "Linux".to_string()]);
         assert_eq!((items[0].kind.as_str(), items[0].host.as_str(), items[0].user.as_str()), ("ssh", "10.0.0.5", "admin"));
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn rdp_gateways() {
+        let vals = |pairs: &[(&str, &str)]| pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect::<BTreeMap<_, _>>();
+        assert_eq!(rdp_gateway(&vals(&[])), None);
+        assert_eq!(rdp_gateway(&vals(&[("gatewayhostname", " ")])), None);
+        assert_eq!(rdp_gateway(&vals(&[("gatewayhostname", "rdg"), ("gatewayusagemethod", "0")])), None);
+        assert_eq!(rdp_gateway(&vals(&[("gatewayhostname", "rdg"), ("gatewayusagemethod", "4")])), None);
+        assert_eq!(rdp_gateway(&vals(&[("gatewayhostname", "rdg")])), Some(json!({ "host": "rdg", "usage": "always", "auth": "same" })));
+        assert_eq!(
+            rdp_gateway(&vals(&[("gatewayhostname", "rdg"), ("gatewayusagemethod", "1"), ("gatewaycredentialssource", "1"), ("promptcredentialonce", "0")])),
+            Some(json!({ "host": "rdg", "usage": "always", "auth": "smartcard" }))
+        );
     }
 }

@@ -6,6 +6,22 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.18.2 · 24 October 2026
+
+- **Remote files follow the terminal.** Beside an SSH tab the files go to the folder you `cd` to in the terminal,
+  and stay where you browsed to until the terminal moves again. The link button in the files toolbar switches it
+  off and on. Nothing is typed into your terminal for it: Cablebag asks the server on a channel of its own (Linux
+  servers). Right-click a folder in the files for **Go to this folder in the terminal**.
+- **Macros with blanks.** Write `{{service}}` in a macro and Cablebag asks for it when the macro runs, once, also
+  when it runs in all connected terminals at once; it offers what you filled in last time. `{{host}}`, `{{user}}`
+  and `{{session}}` are filled in by themselves. Docker's `{{.Names}}` and the like stay as they are.
+- **Macros for one folder.** A macro can show only for the sessions in a folder (one customer's commands), in the
+  search box and in the terminal's menu.
+- **Save a command as a macro**: select it in the terminal, right-click (Shift+right-click when right-click
+  pastes) and choose **Save the selected text as a macro**. The same menu has Copy, Paste and **Run a macro**.
+- **Remote Desktop Gateway for a whole folder.** Set it once in the folder's settings; a session can still have
+  its own or choose **Never**. Gateways in `.rdp` files are now imported too.
+
 ## 0.18.1 · 24 October 2026
 
 - **The assistant no longer asks for a sudo password when you are logged in as root.** A command it needs root

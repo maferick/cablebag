@@ -358,7 +358,7 @@
           <SettingsRow label="Copy as soon as text is selected">
             <input type="checkbox" class="switch" checked={app.settings["term.copyOnSelect"]} onchange={set("term.copyOnSelect")} />
           </SettingsRow>
-          <SettingsRow label="Paste with the right mouse button">
+          <SettingsRow label="Paste with the right mouse button" help="Shift+right-click opens the menu with Copy, Paste and the macros. When this is off, a plain right-click opens it.">
             <input type="checkbox" class="switch" checked={app.settings["term.rightClickPaste"]} onchange={set("term.rightClickPaste")} />
           </SettingsRow>
           <SettingsRow label="Ask before pasting several lines" help="So a pasted block does not run line by line by accident.">

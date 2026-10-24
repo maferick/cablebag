@@ -43,6 +43,7 @@
   import ProxmoxSettings from "./ProxmoxSettings.svelte";
   import ContextMenu from "./ContextMenu.svelte";
   import AskDialog from "./AskDialog.svelte";
+  import MacroEditor from "./MacroEditor.svelte";
   import { ask } from "../ask.svelte";
   import { macros } from "../macros.svelte";
   import { letter } from "../shortcuts";
@@ -593,6 +594,9 @@
 {#each app.prompts as p (p.id)}
   <PromptDialog req={p} />
 {/each}
+{#if macros.editing}
+  {#key macros.editing.id}<MacroEditor macro={macros.editing} onclose={() => (macros.editing = null)} />{/key}
+{/if}
 <ContextMenu />
 {#if ask.current}
   <AskDialog />

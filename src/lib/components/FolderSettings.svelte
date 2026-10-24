@@ -34,6 +34,8 @@
       if (k.key === "jump_hosts") {
         const list = (v ?? []).filter((j: any) => j.host?.trim());
         if (list.length) data.jump_hosts = list;
+      } else if (k.key === "gateway") {
+        if (v?.host?.trim()) data.gateway = { usage: "always", auth: "same", ...v, host: v.host.trim() };
       } else if (v !== undefined && v !== "" && v !== null) data[k.key] = v;
     }
     await api.saveFolder({ ...$state.snapshot(folder), data } as Folder);
@@ -42,7 +44,8 @@
     app.notify(`Settings of ${folder.name} saved`);
   }
 
-  const from = (key: string) => (above.from[key] ? `From ${above.from[key]}: ${key === "jump_hosts" ? above.values[key].map((j: any) => j.host).join(", ") : key === "wireguard" ? wireguard.name(above.values[key]) : key === "browser_profile" ? browserProfiles.name(above.values[key]) : above.values[key]}` : "");
+  const from = (key: string) => (above.from[key] ? `From ${above.from[key]}: ${key === "jump_hosts" ? above.values[key].map((j: any) => j.host).join(", ") : key === "wireguard" ? wireguard.name(above.values[key]) : key === "browser_profile" ? browserProfiles.name(above.values[key]) : key === "gateway" ? above.values[key].host : above.values[key]}` : "");
+  const gw = (key: string, value: string) => (d.gateway = { ...(d.gateway ?? {}), [key]: value });
 </script>
 
 <Modal title={`Folder ${folder.name}`} width={620} onclose={() => (app.folderEditing = null)}>
@@ -70,6 +73,18 @@
     </div>
     <div class="field"><span>Browser profile (web)</span>
       <BrowserProfilePicker bind:value={d.browser_profile} inherited={above.values.browser_profile} from={above.from.browser_profile ?? ""} />
+    </div>
+    <div class="field"><span>Remote Desktop Gateway (RDP)</span>
+      <div class="jrow">
+        <input value={d.gateway?.host ?? ""} oninput={(e) => gw("host", (e.target as HTMLInputElement).value)} placeholder="None" aria-label="Gateway server" />
+        <select class="usage" value={d.gateway?.usage ?? "always"} onchange={(e) => gw("usage", (e.target as HTMLSelectElement).value)} aria-label="Use it">
+          <option value="always">Always</option><option value="detect">Only when needed</option>
+        </select>
+        <select class="login" value={d.gateway?.auth ?? "same"} onchange={(e) => gw("auth", (e.target as HTMLSelectElement).value)} aria-label="Log in to the gateway">
+          <option value="same">Same login as the server</option><option value="ask">Ask when connecting</option><option value="smartcard">Smart card</option>
+        </select>
+      </div>
+      {#if !d.gateway?.host?.trim() && from("gateway")}<span class="muted small inherited">{from("gateway")}</span>{/if}
     </div>
     <div class="field">
       <span>Jump hosts (SSH)</span>
@@ -141,6 +156,15 @@
   }
   .jrow .tiny {
     flex: 0 0 70px;
+  }
+  .jrow .usage {
+    flex: 0 0 140px;
+  }
+  .small.inherited {
+    margin: -4px 0 0;
+  }
+  .jrow .login {
+    flex: 0 0 180px;
   }
   .small {
     font-size: 12px;

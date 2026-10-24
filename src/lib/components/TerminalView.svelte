@@ -17,7 +17,9 @@
   import { terminals, emitOutput } from "../terms";
   import { Highlighter, BUILTIN_SYNTAX, compile, type SyntaxSet } from "../highlight";
   import { macros } from "../macros.svelte";
-  import { Search, X, ChevronUp, ChevronDown } from "@lucide/svelte";
+  import { termFolders } from "../termFolders.svelte";
+  import { menu } from "../menu.svelte";
+  import { Search, X, ChevronUp, ChevronDown, Copy, ClipboardPaste, Plus, Play } from "@lucide/svelte";
 
   let { tab, visible }: { tab: Tab; visible: boolean } = $props();
 
@@ -64,6 +66,24 @@
     term?.focus();
   }
 
+  /** Right-click without paste (or with Shift when right-click pastes): copy, paste and the macros. */
+  function terminalMenu(e: MouseEvent) {
+    const picked = term?.getSelection() ?? "";
+    const own = macros.forTab(tab.id);
+    menu.show(e, [
+      { label: "Copy", icon: Copy, hint: "Ctrl+Shift+C", disabled: !picked, action: () => writeText(picked) },
+      { label: "Paste", icon: ClipboardPaste, hint: "Ctrl+Shift+V", action: () => paste() },
+      "sep",
+      { label: "Save the selected text as a macro", icon: Plus, disabled: !picked.trim(), action: () => macros.newFromText(picked) },
+      {
+        label: "Run a macro...",
+        icon: Play,
+        disabled: !own.length,
+        action: () => menu.again(own.map((m) => ({ label: m.name, icon: Play, hint: m.hotkey, action: () => macros.run(m, [tab.id]) }))),
+      },
+    ]);
+  }
+
   onMount(() => {
     const scheme = schemeById(app.settings["term.scheme"]);
     term = new Terminal({
@@ -94,8 +114,14 @@
     }
     fit.fit();
 
+    if (tab.proto === "ssh")
+      term.parser.registerOscHandler(7, (data) => {
+        termFolders.reported(tab.id, data);
+        return true;
+      });
     term.onData((d) => {
       macros.record(tab.id, d);
+      termFolders.typed(tab.id, d);
       if (app.multiExec) {
         for (const t of app.tabs) if (t.type === "terminal" && t.status === "connected") api.input(t.id, d).catch(() => {});
       } else {
@@ -136,6 +162,8 @@
       if (app.settings["term.rightClickPaste"] && !e.ctrlKey && !e.shiftKey) {
         e.preventDefault();
         paste();
+      } else {
+        terminalMenu(e);
       }
     });
 

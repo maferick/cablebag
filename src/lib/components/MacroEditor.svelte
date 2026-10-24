@@ -1,13 +1,21 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import Modal from "./Modal.svelte";
-  import { macros, type Macro, type MacroStep } from "../macros.svelte";
+  import { macros, blanks, type Macro, type MacroStep } from "../macros.svelte";
+  import { app } from "../state.svelte";
   import { Plus, Trash2, ArrowUp, ArrowDown } from "@lucide/svelte";
 
   let { macro, onclose }: { macro: Macro; onclose: () => void } = $props();
   const initial = untrack(() => macro);
   let m = $state<Macro>(JSON.parse(JSON.stringify(initial)));
   let capturing = $state(false);
+  const asked = $derived(blanks(m));
+  // Folders by their path, for "Show for".
+  const folders = $derived(
+    app.folders
+      .map((f) => ({ id: f.id, path: app.folderPath(f.id) }))
+      .sort((a, b) => a.path.localeCompare(b.path)),
+  );
 
   // Text steps are edited with real line breaks; the terminal receives Enter as a carriage return.
   const shown = (t: string) => t.replace(/\r/g, "\n");
@@ -64,6 +72,12 @@
     </label>
     {#if m.hotkey}<button class="btn clear" onclick={() => (m.hotkey = "")}>No hotkey</button>{/if}
   </div>
+  <label class="field for"><span>Show for</span>
+    <select value={m.folder ?? ""} onchange={(e) => (m.folder = (e.target as HTMLSelectElement).value || undefined)}>
+      <option value="">Every session</option>
+      {#each folders as f (f.id)}<option value={f.id}>The sessions in {f.path}</option>{/each}
+    </select>
+  </label>
 
   <div class="steps">
     {#each m.steps as s, i}
@@ -96,7 +110,12 @@
     <button class="btn" onclick={() => scaleSleeps(0.5)}>Halve all pauses</button>
     <button class="btn" onclick={() => scaleSleeps(2)}>Double all pauses</button>
   </div>
-  <p class="muted small">A line break in a text step presses Enter. "Wait for text" waits until the terminal shows it, for example a prompt.</p>
+  <p class="muted small">
+    A line break in a text step presses Enter. "Wait for text" waits until the terminal shows it, for example a
+    prompt. Write <code>{"{{name}}"}</code> for a blank that Cablebag asks for when the macro runs;
+    <code>{"{{host}}"}</code>, <code>{"{{user}}"}</code> and <code>{"{{session}}"}</code> it fills in itself.
+    {#if asked.length}<br />This macro asks for: {asked.join(", ")}.{/if}
+  </p>
   {#snippet footer()}
     <button class="btn" onclick={onclose}>Cancel</button>
     <button class="btn primary" onclick={save}>Save macro</button>
@@ -115,6 +134,13 @@
   }
   .hk {
     min-width: 200px;
+  }
+  .for {
+    margin: -4px 0 14px;
+  }
+  code {
+    font-family: var(--font-mono);
+    font-size: 11px;
   }
   .steps {
     display: flex;

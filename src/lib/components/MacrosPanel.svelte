@@ -1,12 +1,9 @@
 <script lang="ts">
   import { ask } from "../ask.svelte";
   import { app } from "../state.svelte";
-  import { macros, describe, type Macro } from "../macros.svelte";
+  import { macros, describe, blanks, type Macro } from "../macros.svelte";
   import { menu } from "../menu.svelte";
-  import MacroEditor from "./MacroEditor.svelte";
-  import { Play, Circle, Plus, Pencil, Copy, Trash2, Keyboard } from "@lucide/svelte";
-
-  let editing = $state<Macro | null>(null);
+  import { Play, Circle, Plus, Pencil, Copy, Trash2, Keyboard, Radio } from "@lucide/svelte";
 
   function record() {
     const t = app.active;
@@ -18,7 +15,7 @@
   }
 
   function newMacro() {
-    editing = { id: crypto.randomUUID(), name: `Macro ${macros.list.length + 1}`, steps: [{ type: "text", text: "" }] };
+    macros.editing = { id: crypto.randomUUID(), name: `Macro ${macros.list.length + 1}`, steps: [{ type: "text", text: "" }] };
   }
 
   async function remove(m: Macro) {
@@ -31,14 +28,18 @@
   }
 
   function rowMenu(e: MouseEvent, m: Macro) {
+    const all = macros.terminals;
     menu.show(e, [
       { label: "Run in the active terminal", icon: Play, action: () => macros.run(m) },
-      { label: "Edit", icon: Pencil, action: () => (editing = JSON.parse(JSON.stringify(m))) },
+      { label: `Run in all ${all.length} connected terminals`, icon: Radio, disabled: all.length < 2, action: () => macros.run(m, all) },
+      { label: "Edit", icon: Pencil, action: () => (macros.editing = JSON.parse(JSON.stringify(m))) },
       { label: "Duplicate", icon: Copy, action: () => duplicate(m) },
       "sep",
       { label: "Delete", icon: Trash2, danger: true, action: () => remove(m) },
     ]);
   }
+
+  const folderName = (id: string) => app.folders.find((f) => f.id === id)?.name ?? "";
 </script>
 
 <div class="macros">
@@ -48,8 +49,8 @@
   </div>
   {#if !macros.list.length}
     <p class="muted empty">
-      No macros yet. Record one: press Record, type in a terminal, then press Stop. Run a macro with a click, or give
-      it a hotkey.
+      No macros yet. Record one: press Record, type in a terminal, then press Stop. Or select a command in a terminal,
+      right-click and save it as a macro. Run a macro with a click, from the search box, or give it a hotkey.
     </p>
   {/if}
   <div class="list">
@@ -58,24 +59,19 @@
         class="row"
         role="button"
         tabindex="0"
-        title={m.steps.map(describe).join("\n")}
+        title={m.steps.map(describe).join("\n") + (blanks(m).length ? `\nAsks for: ${blanks(m).join(", ")}` : "")}
         onclick={() => macros.run(m)}
         onkeydown={(e) => e.key === "Enter" && macros.run(m)}
         oncontextmenu={(e) => rowMenu(e, m)}
       >
         <Play size={13} />
         <span class="name">{m.name}</span>
+        {#if m.folder && folderName(m.folder)}<span class="tag" title="Shows only for the sessions in this folder">{folderName(m.folder)}</span>{/if}
         {#if m.hotkey}<span class="key"><Keyboard size={11} /> {m.hotkey}</span>{/if}
       </div>
     {/each}
   </div>
 </div>
-
-{#if editing}
-  {#key editing.id}
-    <MacroEditor macro={editing} onclose={() => (editing = null)} />
-  {/key}
-{/if}
 
 <style>
   .macros {
@@ -114,8 +110,13 @@
   .name {
     flex: 1;
     color: var(--text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .key {
+  .key,
+  .tag {
     display: inline-flex;
     align-items: center;
     gap: 3px;
@@ -123,5 +124,11 @@
     padding: 1px 6px;
     border-radius: 3px;
     background: var(--panel-2);
+    white-space: nowrap;
+  }
+  .tag {
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 </style>

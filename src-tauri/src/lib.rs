@@ -329,6 +329,11 @@ async fn sftp_home(app: AppHandle, tab: String) -> CmdResult<String> {
 }
 
 #[tauri::command]
+async fn ssh_terminal_folder(app: AppHandle, tab: String) -> CmdResult<Option<String>> {
+    files::terminal_folder(&app, &tab).await.map_err(err)
+}
+
+#[tauri::command]
 async fn sftp_list(app: AppHandle, tab: String, path: String) -> CmdResult<files::Listing> {
     (if is_ftp(&app, &tab) { ftp::list(&app, &tab, &path).await } else { files::list(&app, &tab, &path).await }).map_err(err)
 }
@@ -1168,6 +1173,7 @@ pub fn run() {
             browser_fill,
             sftp_home,
             sftp_list,
+            ssh_terminal_folder,
             sftp_mkdir,
             sftp_new_file,
             sftp_rename,

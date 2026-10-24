@@ -347,6 +347,8 @@ export const api = {
   close: (id: string) => invoke<void>("term_close", { id }),
   sftpHome: (tab: string) => invoke<string>("sftp_home", { tab }),
   sftpList: (tab: string, path: string) => invoke<Listing>("sftp_list", { tab, path }),
+  /** The folder the SSH tab's terminal is in, or null when the server cannot tell. */
+  terminalFolder: (tab: string) => invoke<string | null>("ssh_terminal_folder", { tab }),
   sftpMkdir: (tab: string, path: string) => invoke<void>("sftp_mkdir", { tab, path }),
   sftpNewFile: (tab: string, path: string) => invoke<void>("sftp_new_file", { tab, path }),
   sftpRename: (tab: string, from: string, to: string) => invoke<void>("sftp_rename", { tab, from, to }),

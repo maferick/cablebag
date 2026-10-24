@@ -123,6 +123,7 @@ export const FOLDER_DEFAULTS: { key: string; label: string; kinds: string[] }[] 
   { key: "wireguard", label: "WireGuard network", kinds: ["ssh", "sftp", "rdp", "vnc", "telnet", "winrm", "browser"] },
   { key: "x11", label: "Linux windows on this PC", kinds: ["ssh"] },
   { key: "psm", label: "CyberArk PSM", kinds: ["ssh", "sftp", "rdp"] },
+  { key: "gateway", label: "Remote Desktop Gateway", kinds: ["rdp"] },
   { key: "browser_profile", label: "browser profile", kinds: ["browser"] },
   { key: "tab_color", label: "tab colour", kinds: [] },
 ];
@@ -130,7 +131,13 @@ export const FOLDER_DEFAULTS: { key: string; label: string; kinds: string[] }[] 
 /** Defaults where "none" in a folder ends what a folder above gives (go directly, no PSM, the shared browser profile). */
 const ENDS_WITH_NONE = ["wireguard", "psm", "browser_profile"];
 
-const filled = (v: unknown) => (Array.isArray(v) ? v.length > 0 : v !== undefined && v !== null && v !== "");
+/** A Remote Desktop Gateway counts when it names a server, or says "never" to end the one a folder gives. */
+const filled = (v: unknown) =>
+  Array.isArray(v)
+    ? v.length > 0
+    : v && typeof v === "object" && ("host" in v || "usage" in v)
+      ? !!(v as any).host?.trim() || (v as any).usage === "never"
+      : v !== undefined && v !== null && v !== "";
 
 export function newSession(kind = "ssh"): Session {
   return {
@@ -609,7 +616,7 @@ class AppState {
   /** The session as it connects: its own values, and its folders' defaults where it has none. */
   withFolderDefaults(s: Session): Session {
     const { values } = this.folderDefaults(s.folder_id);
-    if (!Object.keys(values).length) return s;
+    if (!Object.keys(values).length && s.data?.gateway?.usage !== "never") return s;
     const out: Session = { ...s, data: { ...(s.data ?? {}) } };
     for (const d of FOLDER_DEFAULTS) {
       if (!(d.key in values) || (d.kinds.length && !d.kinds.includes(s.kind))) continue;
@@ -619,6 +626,7 @@ class AppState {
         out.data[d.key] = values[d.key];
       }
     }
+    if (out.data.gateway?.usage === "never") delete out.data.gateway;
     return out;
   }
 

@@ -77,11 +77,17 @@
   const folderValues = $derived(app.folderDefaults(s.folder_id));
   const inherited = $derived(
     FOLDER_DEFAULTS.filter((d) => d.key in folderValues.values && (!d.kinds.length || d.kinds.includes(s.kind)) && folderValues.values[d.key] !== false)
-      .filter((d) => (d.key === "username" ? !s.username : !(Array.isArray(s.data[d.key]) ? s.data[d.key].length : s.data[d.key])))
+      .filter((d) =>
+        d.key === "username"
+          ? !s.username
+          : d.key === "gateway"
+            ? !s.data.gateway?.host?.trim() && s.data.gateway?.usage !== "never"
+            : !(Array.isArray(s.data[d.key]) ? s.data[d.key].length : s.data[d.key]),
+      )
       .map((d) => {
         const v = folderValues.values[d.key];
         const shown =
-          d.key === "jump_hosts" ? v.map((j: any) => j.host).join(", ") : d.key === "vault_item" ? "set" : d.key === "tab_color" || d.key === "x11" ? "" : d.key === "wireguard" ? wireguard.name(v) : d.key === "psm" ? (vault.source(v)?.name ?? "") : d.key === "browser_profile" ? browserProfiles.name(v) : v;
+          d.key === "jump_hosts" ? v.map((j: any) => j.host).join(", ") : d.key === "vault_item" ? "set" : d.key === "tab_color" || d.key === "x11" ? "" : d.key === "wireguard" ? wireguard.name(v) : d.key === "psm" ? (vault.source(v)?.name ?? "") : d.key === "browser_profile" ? browserProfiles.name(v) : d.key === "gateway" ? v.host : v;
         return `${d.label}${shown ? ` ${shown}` : ""}, from the folder ${folderValues.from[d.key]}`;
       }),
   );
@@ -486,10 +492,11 @@
       {#if s.kind === "rdp"}
       <strong class="sub">Remote Desktop Gateway</strong>
       <div class="row3">
-        <label class="field grow"><span>Gateway server</span><input value={s.data.gateway?.host ?? ""} oninput={(e) => (s.data.gateway = { ...(s.data.gateway ?? {}), host: (e.target as HTMLInputElement).value })} placeholder="None" /></label>
+        <label class="field grow"><span>Gateway server</span><input value={s.data.gateway?.host ?? ""} disabled={s.data.gateway?.usage === "never"} oninput={(e) => (s.data.gateway = { ...(s.data.gateway ?? {}), host: (e.target as HTMLInputElement).value })} placeholder={folderValues.values.gateway && s.data.gateway?.usage !== "never" ? `From ${folderValues.from.gateway}: ${folderValues.values.gateway.host}` : "None"} /></label>
         <label class="field"><span>Use it</span>
           <select value={s.data.gateway?.usage ?? "always"} onchange={(e) => (s.data.gateway = { ...(s.data.gateway ?? {}), usage: (e.target as HTMLSelectElement).value })}>
             <option value="always">Always</option><option value="detect">Only when needed</option>
+            {#if folderValues.values.gateway || s.data.gateway?.usage === "never"}<option value="never">Never (not the folder's either)</option>{/if}
           </select>
         </label>
         <label class="field"><span>Log in to the gateway</span>

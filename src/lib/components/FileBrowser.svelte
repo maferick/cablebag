@@ -11,8 +11,10 @@
   import { writeText } from "../clipboard";
   import {
     ArrowUp, RefreshCw, House, FolderPlus, FilePlus, Upload, Download, Trash2, Eye, EyeOff, Folder, File,
-    FileSymlink, Pencil, Copy, TerminalSquare, Lock, ExternalLink,
+    FileSymlink, Pencil, Copy, TerminalSquare, Lock, ExternalLink, Link, Unlink,
   } from "@lucide/svelte";
+  import { terminals } from "../terms";
+  import { termFolders, shellQuote } from "../termFolders.svelte";
 
   let { tab }: { tab: Tab } = $props();
 
@@ -29,6 +31,27 @@
   let unlistenDrop: (() => void) | undefined;
 
   const visible = $derived(entries.filter((e) => showHidden || !e.name.startsWith(".")));
+
+  // Beside an SSH terminal the files can follow the terminal's folder: they go along when the terminal goes
+  // somewhere else, and stay where you browsed to until it does.
+  // svelte-ignore state_referenced_locally
+  const besideTerminal = tab.type === "terminal" && tab.proto === "ssh";
+  let followed = "";
+  $effect(() => {
+    const dir = termFolders.dirs[tab.id];
+    if (!besideTerminal || !termFolders.follow || !dir || dir === followed) return;
+    followed = dir;
+    load(dir);
+  });
+
+  function toggleFollow() {
+    const on = !termFolders.follow;
+    termFolders.setFollow(on);
+    if (on) {
+      followed = "";
+      termFolders.check(tab.id);
+    }
+  }
 
   async function load(p: string) {
     loading = true;
@@ -132,6 +155,7 @@
   let timer: ReturnType<typeof setInterval>;
   onMount(() => {
     load(memory[tab.id] ?? "");
+    if (besideTerminal && termFolders.follow) termFolders.check(tab.id);
     timer = setInterval(async () => {
       for (const w of watches.filter((x) => x.tab === tab.id)) {
         const m = await api.fileModified(w.local);
@@ -175,7 +199,12 @@
   }
 
   function pastePath(e: Entry) {
-    api.input(tab.id, e.path.includes(" ") ? `'${e.path}'` : e.path);
+    api.input(tab.id, shellQuote(e.path));
+  }
+
+  function cdHere(dir: string) {
+    api.input(tab.id, `cd ${shellQuote(dir)}\r`);
+    terminals.get(tab.id)?.focus();
   }
 
   function rowClick(ev: MouseEvent, e: Entry) {
@@ -189,7 +218,10 @@
     if (!selected.has(e.path)) selected = new Set([e.path]);
     menu.show(ev, [
       ...(e.is_dir
-        ? [{ label: "Open folder", icon: ExternalLink, action: () => activate(e) }]
+        ? [
+            { label: "Open folder", icon: ExternalLink, action: () => activate(e) },
+            ...(besideTerminal ? [{ label: "Go to this folder in the terminal", icon: TerminalSquare, action: () => cdHere(e.path) }] : []),
+          ]
         : [
             { label: "Edit in Cablebag", icon: Pencil, action: () => editFile(e) },
             { label: "Open with a program on this PC", icon: ExternalLink, action: () => openFile(e) },
@@ -228,6 +260,22 @@
     <button class="icon-btn" title="Parent folder" aria-label="Parent folder" onclick={parent}><ArrowUp size={15} /></button>
     <button class="icon-btn" title="Home folder" aria-label="Home folder" onclick={() => load("")}><House size={15} /></button>
     <button class="icon-btn" title="Refresh" aria-label="Refresh" onclick={() => load(path)}><RefreshCw size={15} class={loading ? "spin" : ""} /></button>
+    {#if besideTerminal}
+      <button
+        class="icon-btn"
+        class:active={termFolders.follow && !termFolders.unknown[tab.id]}
+        aria-pressed={termFolders.follow}
+        title={termFolders.unknown[tab.id]
+          ? "This server does not tell which folder its terminal is in (Linux servers do), so the files cannot follow it"
+          : termFolders.follow
+            ? "Following the terminal's folder: click to stop"
+            : "Follow the terminal's folder"}
+        aria-label="Follow the terminal's folder"
+        onclick={toggleFollow}
+      >
+        {#if termFolders.follow}<Link size={15} />{:else}<Unlink size={15} />{/if}
+      </button>
+    {/if}
     <span class="gap"></span>
     <button class="icon-btn" title="Upload files" aria-label="Upload files" onclick={upload}><Upload size={15} /></button>
     <button class="icon-btn" title="Download selected" aria-label="Download selected" onclick={() => download()} disabled={!selected.size}><Download size={15} /></button>

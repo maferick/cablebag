@@ -76,8 +76,8 @@ tabs, at the same time.
 - **Search box (Ctrl+K).** Type a few letters to open any session, tab, Proxmox machine, tool, macro or setting;
   type `user@host` to connect right away; type `>` for the list of commands.
 - **Folders that do the work.** A folder can give its sessions a user name, a key file, a login from the vault,
-  jump hosts, a CyberArk PSM, X11, a tab colour and a WireGuard network. Sessions use them where they have
-  nothing of their own.
+  jump hosts, a CyberArk PSM, X11, a Remote Desktop Gateway, a tab colour and a WireGuard network. Sessions use
+  them where they have nothing of their own.
 - **Run on many servers.** One command on every SSH session in a folder, a few at a time, answers side by side.
   Uptime, disk space, pending updates or failed services on 30 servers in one go.
 - **Workspaces and the tabs from last time.** Save the open tabs under a name (everything for one customer) and
@@ -110,7 +110,8 @@ tabs, at the same time.
 ## Files
 
 - **Remote files beside every SSH tab** (Ctrl+Shift+E): browse the server and drag files in from Explorer.
-  Each session can choose whether the files open when it connects.
+  Each session can choose whether the files open when it connects. The files follow the folder you `cd` to in the
+  terminal (Linux servers), and right-click a folder to go there in the terminal.
 - **Edit in Cablebag.** Double-click a text file and it opens in Cablebag's editor over SFTP, with line numbers
   and Ctrl+S. Before anything is written you see the exact change, removed lines in red and new ones in green.
   The server keeps the old version as `name.bak`, and Cablebag refuses to overwrite a file that changed on the
@@ -179,7 +180,8 @@ vLLM, Ollama on your own hardware, or a cloud service. Nothing is configured unt
 
 - SSH tunnels drawn step by step, from where they listen to where they arrive.
 - A network and port scanner, Wake on LAN, and Run on many servers.
-- Macros with keyboard shortcuts.
+- Macros with keyboard shortcuts and blanks (`{{service}}`) that Cablebag asks for when they run, in one terminal or
+  all of them; a macro can belong to one folder. Select a command in the terminal and right-click to save it as one.
 
 ## Install
 
