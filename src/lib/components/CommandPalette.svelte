@@ -6,12 +6,13 @@
   import { TOOLS, toolInfo } from "../tools";
   import { macros } from "../macros.svelte";
   import { terminals } from "../terms";
+  import { containers } from "../docker.svelte";
   import { workspaces } from "../workspaces.svelte";
   import { vault } from "../vault.svelte";
   import { proxmox, isWindows } from "../proxmox.svelte";
   import type { Session } from "../api";
   import {
-    Search, Plus, TerminalSquare, X, Copy, RotateCw, Square, Columns2, Rows2, Grid2x2, Radio, Circle, CircleStop,
+    Search, Plus, TerminalSquare, X, Copy, RotateCw, Square, Columns2, Rows2, Grid2x2, Radio, Circle, CircleStop, Container,
     PanelLeft, Sun, Moon, Download, LockOpen, Lock, RefreshCw, Settings, Play, AArrowUp, AArrowDown, ArrowRight, House, Info, Keyboard, LayoutGrid, History, Bug,
     Server, Monitor, Boxes, FolderTree, ZoomIn, ZoomOut,
   } from "@lucide/svelte";
@@ -123,6 +124,10 @@
       a.push({ group: "Actions", label: "Stop recording and save the macro", icon: CircleStop, run: () => macros.stopRecording() });
     } else if (t?.type === "terminal") {
       a.push({ group: "Actions", label: "Record a macro in this terminal", icon: Circle, run: () => macros.startRecording(t.id) });
+      if (t.proto === "ssh" && t.session) {
+        const server = t.session;
+        a.push({ group: "Actions", label: "Containers on this server", detail: t.title, words: "docker compose portainer", icon: Container, run: () => app.openContainers(server) });
+      }
       const picked = terminals.get(t.id)?.getSelection();
       if (picked?.trim()) a.push({ group: "Actions", label: "Save the selected text as a macro", words: "snippet command", icon: Plus, run: () => macros.newFromText(picked) });
     }
@@ -204,6 +209,7 @@
       ...actions(),
       ...TOOLS.map((x) => ({ group: "Tools", label: x.name, detail: x.description, icon: x.icon, run: () => app.openTool(x.id, x.name) })),
       ...app.shells.map((s) => ({ group: "Local terminals", label: s.name, icon: TerminalSquare, run: () => app.openLocal(s) })),
+      ...containers.sessions.map((s) => ({ group: "Containers", label: `Containers on ${s.name}`, detail: s.host, words: "docker compose portainer", icon: Container, run: () => app.openContainers(s) })),
       ...macros.forTab(app.activeId).map((m) => ({ group: "Macros", label: m.name, detail: m.folder ? app.folders.find((f) => f.id === m.folder)?.name : undefined, keys: m.hotkey, icon: Play, run: () => macros.run(m) })),
       ...SETTINGS_PAGES.map((p) => ({ group: "Settings", label: `Settings: ${p.label}`, icon: Settings, keys: p.id === "general" ? "Ctrl+," : undefined, run: () => app.openSettings(p.id) })),
     ];

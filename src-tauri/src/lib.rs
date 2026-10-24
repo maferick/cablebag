@@ -1,6 +1,7 @@
 mod agent;
 mod ai;
 mod bookmarks;
+mod docker;
 mod browser;
 mod files;
 mod ftp;
@@ -326,6 +327,28 @@ fn is_ftp(app: &AppHandle, tab: &str) -> bool {
 #[tauri::command]
 async fn sftp_home(app: AppHandle, tab: String) -> CmdResult<String> {
     (if is_ftp(&app, &tab) { ftp::home(&app, &tab).await } else { files::home(&app, &tab).await }).map_err(err)
+}
+
+/// The containers on the server of a Containers tab (whose connection files_open made).
+#[tauri::command]
+async fn docker_list(app: AppHandle, tab: String) -> CmdResult<docker::Listing> {
+    docker::list(&app, &tab).await.map_err(err)
+}
+
+#[tauri::command]
+async fn docker_container(app: AppHandle, tab: String, sudo: bool, id: String, action: String) -> CmdResult<agent::ExecResult> {
+    docker::container_action(&app, &tab, sudo, &id, &action).await.map_err(err)
+}
+
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+async fn docker_compose(app: AppHandle, tab: String, compose: String, sudo: bool, project: String, dir: String, files: Vec<String>, action: String) -> CmdResult<agent::ExecResult> {
+    docker::compose_action(&app, &tab, &compose, sudo, &project, &dir, &files, &action).await.map_err(err)
+}
+
+#[tauri::command]
+async fn docker_portainer_file(app: AppHandle, tab: String, sudo: bool, portainer: String, data: String, path: String) -> CmdResult<String> {
+    docker::portainer_file(&app, &tab, sudo, &portainer, &data, &path).await.map_err(err)
 }
 
 #[tauri::command]
@@ -1174,6 +1197,10 @@ pub fn run() {
             sftp_home,
             sftp_list,
             ssh_terminal_folder,
+            docker_list,
+            docker_container,
+            docker_compose,
+            docker_portainer_file,
             sftp_mkdir,
             sftp_new_file,
             sftp_rename,

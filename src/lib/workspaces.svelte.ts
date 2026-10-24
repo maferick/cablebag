@@ -8,6 +8,7 @@ import { openIn, pins, profileKey, profileOfTab } from "./pins.svelte";
 export type TabSpec =
   | { kind: "session"; title: string; session: Session }
   | { kind: "local"; title: string; local: LocalSpec }
+  | { kind: "containers"; title: string; session: Session }
   | { kind: "tool"; title: string; tool: string };
 
 export interface Workspace {
@@ -28,6 +29,7 @@ class Workspaces {
 
   /** How a tab can be opened again; Home and tabs without a lasting form give null. */
   specOf(t: Tab): TabSpec | null {
+    if (t.type === "docker" && t.session) return { kind: "containers", title: t.title, session: $state.snapshot(t.session) as Session };
     if (t.session) return { kind: "session", title: t.title, session: $state.snapshot(t.session) as Session };
     if (t.local) return { kind: "local", title: t.title, local: $state.snapshot(t.local) as LocalSpec };
     if (t.type === "tool" && t.tool && t.tool !== "editor") return { kind: "tool", title: t.title, tool: t.tool };
@@ -56,6 +58,8 @@ class Workspaces {
         app.openSession(now ?? s.session);
       } else if (s.kind === "local") {
         app.openLocalSpec(s.title, s.local);
+      } else if (s.kind === "containers") {
+        app.openContainers((s.session.id && app.sessions.find((x) => x.id === s.session.id)) || s.session);
       } else {
         app.openTool(s.tool, s.title);
       }

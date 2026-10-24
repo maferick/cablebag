@@ -24,6 +24,7 @@
   import PendingView from "./PendingView.svelte";
   import RdpView from "./RdpView.svelte";
   import ToolView from "./tools/ToolView.svelte";
+  import DockerView from "./DockerView.svelte";
   import FilesView from "./FilesView.svelte";
   import BrowserView from "./BrowserView.svelte";
   import VncView from "./VncView.svelte";
@@ -257,7 +258,7 @@
         if (e.payload.state === "connected") t.lost = undefined;
         else if (e.payload.state === "closed" && t.proto === "ssh" && e.payload.message) t.lost = e.payload.message;
         // Remote files on connecting: the session's own choice, otherwise the one in Settings.
-        if (e.payload.state === "connected" && t.proto === "ssh" && !(t.id in app.filesFor)) {
+        if (e.payload.state === "connected" && t.type === "terminal" && t.proto === "ssh" && !(t.id in app.filesFor)) {
           const own = t.session?.data?.files;
           app.filesFor[t.id] = own === "show" ? true : own === "hide" ? false : app.settings["ssh.autoFiles"] !== false;
         }
@@ -513,6 +514,10 @@
                 {:else if t.type === "files"}
                   {#key t.gen}
                     <FilesView tab={t} visible={shown} />
+                  {/key}
+                {:else if t.type === "docker"}
+                  {#key t.gen}
+                    <DockerView tab={t} visible={shown} />
                   {/key}
                 {:else if t.type === "tool"}
                   <ToolView tab={t} visible={shown} />

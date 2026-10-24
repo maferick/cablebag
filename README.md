@@ -11,9 +11,10 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/maferick/cablebag/ci.yml?branch=main&style=flat&label=CI)](https://github.com/maferick/cablebag/actions/workflows/ci.yml)
 
 Cablebag is a free remote access app for Windows 10 and 11. It puts SSH, Remote Desktop (RDP), VNC, Telnet,
-serial ports, SFTP and FTP, PowerShell remoting (WinRM), local shells and WSL, web pages and Proxmox consoles in
-tabs in one window, with remote files beside every SSH tab, logins from your credential sources (Vaultwarden or
-Bitwarden, CyberArk, Delinea Secret Server, Proton Pass), session sync, and an assistant that can work on your servers.
+serial ports, SFTP and FTP, PowerShell remoting (WinRM), local shells and WSL, web pages, Proxmox consoles and
+Docker containers in tabs in one window, with remote files beside every SSH tab, logins from your credential sources
+(Vaultwarden or Bitwarden, CyberArk, Delinea Secret Server, Proton Pass), session sync, and an assistant that can work
+on your servers.
 It can run WireGuard inside the app, per session, so two customers' VPNs with the same address ranges can be
 open at the same time. It is made for system administrators, IT consultants and MSP staff who look after many
 customer networks, and for homelab users who want their servers, Proxmox machines and consoles in one place.
@@ -118,6 +119,17 @@ tabs, at the same time.
   server since you opened it.
 - **Edit with a Windows program.** Larger or binary files open with the program of your choice and are uploaded
   again when you save. Right-click offers both.
+
+## Containers
+
+- **Like Portainer, inside Cablebag.** Right-click an SSH session for **Containers**: every container on that
+  server, grouped by compose project, with state, health and published ports (click one to open it in a web tab).
+- **Where is that compose file?** Each project shows its compose file; open it in Cablebag's editor, then apply it
+  (`docker compose up -d`), pull new images, or restart, stop and start the whole project.
+- **Stacks made in Portainer** are marked, and their compose file is shown read-only with where it lives, so you
+  change it in Portainer.
+- Per container: logs that keep following, a shell inside, restart, start, stop and pause.
+- Docker is asked over SSH; no Docker port is opened.
 
 ## Proxmox
 

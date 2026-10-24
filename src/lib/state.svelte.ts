@@ -16,7 +16,7 @@ export interface LocalSpec {
 export interface Tab {
   id: string;
   title: string;
-  type: "home" | "terminal" | "rdp" | "vnc" | "files" | "browser" | "tool" | "pending";
+  type: "home" | "terminal" | "rdp" | "vnc" | "files" | "browser" | "tool" | "docker" | "pending";
   proto: "ssh" | "sftp" | "ftp" | "telnet" | "serial" | "winrm" | "local" | "rdp" | "vnc" | "browser" | "none";
   session?: Session;
   local?: LocalSpec;
@@ -405,6 +405,18 @@ class AppState {
     }
   }
 
+  /** The containers on an SSH server, in a tab with its own connection; switches to it when it is already open. */
+  openContainers(s: Session) {
+    s = this.withFolderDefaults(s);
+    const open = this.tabs.find((t) => t.type === "docker" && (s.id ? t.session?.id === s.id : t.session?.host === s.host && t.session?.username === s.username));
+    if (open) {
+      this.activeId = open.id;
+      return;
+    }
+    const name = s.name || s.host;
+    this.push({ id: uid(), title: `Containers on ${name}`, type: "docker", proto: "ssh", session: s, status: "connecting", color: s.data?.tab_color || undefined, gen: 0 });
+  }
+
   /** Opens a tool in its own tab, or switches to it when it is already open. */
   openTool(id: string, title: string) {
     const open = this.tabs.find((t) => t.type === "tool" && t.tool === id);
@@ -507,7 +519,7 @@ class AppState {
     const i = this.tabs.findIndex((t) => t.id === id);
     if (i < 0 || this.tabs[i].type === "home") return;
     const tab = this.tabs[i];
-    if (tab.type === "terminal" || tab.type === "files") api.close(id).catch(() => {});
+    if (tab.type === "terminal" || tab.type === "files" || tab.type === "docker") api.close(id).catch(() => {});
     if (tab.type === "rdp") api.rdpClose(id).catch(() => {});
     if (tab.type === "browser") api.browserClose(id).catch(() => {});
     this.tabs.splice(i, 1);

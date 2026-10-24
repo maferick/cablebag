@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browserProfiles } from "../browserProfiles.svelte";
   import { ask } from "../ask.svelte";
+  import { containers } from "../docker.svelte";
   import { treeKeys } from "../keyNav";
   import { app, newSession } from "../state.svelte";
   import { menu } from "../menu.svelte";
@@ -14,7 +15,7 @@
   import type { ProxmoxGuest, ProxmoxSource } from "../api";
   import { api, type Folder, type Session } from "../api";
   import {
-    ChevronRight, Folder as FolderIcon, FolderOpen, Search, Plus, FolderPlus, Settings2, ListChecks, Camera, ListOrdered, Play, Pencil, Copy, Trash2, X, Activity,
+    ChevronRight, Folder as FolderIcon, FolderOpen, Container, Search, Plus, FolderPlus, Settings2, ListChecks, Camera, ListOrdered, Play, Pencil, Copy, Trash2, X, Activity,
     ServerCog, Server, Monitor, MonitorPlay, Boxes, Terminal, Globe, Save, Power, RotateCw, Square, RefreshCw, Settings,
   Shield, ShieldCheck, Pin, Upload, } from "@lucide/svelte";
 
@@ -296,6 +297,7 @@
     selected = s.id;
     menu.show(e, [
       ...(isWeb(s) ? webItems(s) : [{ label: "Open", icon: Play, action: () => app.openSession(s) }]),
+      ...(s.kind === "ssh" ? [{ label: "Containers", icon: Container, hint: containers.known.includes(s.id) ? "Docker" : undefined, action: () => app.openContainers(s) }] : []),
       { label: "Edit session", icon: Pencil, action: () => app.editSession(s) },
       {
         label: "Duplicate",

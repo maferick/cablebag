@@ -12,7 +12,7 @@
   import CommandPalette from "./CommandPalette.svelte";
   import {
     Plus, X, Copy, RotateCw, Pencil, Palette, TerminalSquare, Save, ClipboardCopy, ChevronDown, PanelLeft, Settings, LayoutGrid,
-    Square, LayoutDashboard, Grid2x2, Columns2, Rows2, Equal, Radio, Circle, Server, Download,
+    Square, LayoutDashboard, Grid2x2, Columns2, Rows2, Equal, Radio, Circle, Server, Download, Container,
   } from "@lucide/svelte";
   import { save as saveDialog } from "@tauri-apps/plugin-dialog";
   import { api } from "../api";
@@ -52,6 +52,7 @@
       { label: "Reconnect", icon: RotateCw, action: () => app.restart(t.id), disabled: t.type === "pending" || t.type === "tool" },
       { label: "Save terminal output", icon: Save, action: () => saveOutput(t), disabled: !term },
       { label: "Copy all terminal output", icon: ClipboardCopy, action: () => writeText(bufferText(t.id)), disabled: !term },
+      ...(term && t.proto === "ssh" && t.session ? [{ label: "Containers on this server", icon: Container, action: () => app.openContainers(t.session!) }] : []),
       "sep",
       {
         label: app.multiExec ? "Stop sending to all terminals" : "Send typing to all terminals",
@@ -118,6 +119,7 @@
 
   function iconOf(t: Tab) {
     if (t.type === "tool") return t.tool === "settings" ? Settings : toolInfo(t.tool!).icon;
+    if (t.type === "docker") return Container;
     if (t.session) return kindInfo(t.session.kind).icon;
     return TerminalSquare;
   }

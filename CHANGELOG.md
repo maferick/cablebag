@@ -6,7 +6,24 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.18.3 · not released yet
+## 0.19.0 · 24 October 2026
+
+**Containers, like Portainer but inside Cablebag**
+
+- Right-click an SSH session (or an SSH tab) and choose **Containers**: a tab with every container on that server,
+  grouped by compose project, with its state, health, restarts and published ports. Click a port to open it in a
+  web tab. It follows the server every 10 seconds while you look at it.
+- **Where is that compose file?** Each project shows its compose file. A file on the server opens in Cablebag's
+  editor (with the changes shown before saving); then **Apply the compose file** (`docker compose up -d`), **Pull
+  new images**, **Restart all**, **Stop all** or **Start all** from the project's menu.
+- **Stacks made in Portainer** are marked as such. Their compose file lives inside Portainer's data; Cablebag
+  shows it (and where it is on the server) read-only, with a button to Portainer to change it there.
+- Per container: **Logs** that keep following, a **Shell inside** (bash or sh), and Restart, Start, Stop and Pause.
+- Docker is asked over the SSH connection; no Docker port is opened. A login that may not use Docker goes
+  through sudo when that needs no password; otherwise the tab says how to add the user to the docker group.
+- Servers that have Docker show up in the search box (Ctrl+K) as **Containers on ...**.
+
+**Also**
 
 - **A Proxmox server can be removed where you edit it.** Right-click it in the session tree for **Remove this
   Proxmox server**, and the edit window has a **Remove** button. Before, removing was only possible under Settings,

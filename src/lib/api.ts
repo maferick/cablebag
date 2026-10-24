@@ -237,6 +237,47 @@ export interface WireGuardInfo extends WireGuardProfile {
   status: WireGuardStatus | null;
 }
 
+export interface DockerPort {
+  private: number;
+  proto: string;
+  public: number | null;
+}
+
+export interface DockerContainer {
+  id: string;
+  name: string;
+  image: string;
+  /** running, exited, restarting, paused, created, dead */
+  state: string;
+  /** healthy, unhealthy, starting, or empty. */
+  health: string;
+  started: string;
+  restarts: number;
+  ports: DockerPort[];
+  project: string;
+  service: string;
+  working_dir: string;
+  config_files: string[];
+  /** Made in Portainer: its compose files are inside Portainer's data. */
+  portainer: boolean;
+}
+
+export interface DockerListing {
+  /** direct, sudo (without a password), denied or none */
+  access: string;
+  /** plugin, standalone or none */
+  compose: string;
+  containers: DockerContainer[];
+  portainer: { container: string; data: string; url_port: number | null; https: boolean } | null;
+}
+
+export interface ExecResult {
+  output: string;
+  exit: number | null;
+  timed_out: boolean;
+  truncated: boolean;
+}
+
 export interface ProxmoxGuest {
   vmid: number;
   name: string;
@@ -379,6 +420,13 @@ export const api = {
   restoreData: (path: string) => invoke<number>("restore_data", { path }),
   restartApp: () => invoke<void>("restart_app"),
   filesOpen: (id: string, session: Session, onData: Channel<ArrayBuffer>) => invoke<void>("files_open", { id, session, onData }),
+  /** Containers, over the connection of a Containers tab (opened with filesOpen). */
+  dockerList: (tab: string) => invoke<DockerListing>("docker_list", { tab }),
+  dockerContainer: (tab: string, sudo: boolean, id: string, action: string) => invoke<ExecResult>("docker_container", { tab, sudo, id, action }),
+  dockerCompose: (tab: string, compose: string, sudo: boolean, project: string, dir: string, files: string[], action: string) =>
+    invoke<ExecResult>("docker_compose", { tab, compose, sudo, project, dir, files, action }),
+  dockerPortainerFile: (tab: string, sudo: boolean, portainer: string, data: string, path: string) =>
+    invoke<string>("docker_portainer_file", { tab, sudo, portainer, data, path }),
   openStream: (id: string, session: Session, cols: number, rows: number, log: LogSpec | undefined, onData: Channel<ArrayBuffer>) =>
     invoke<void>("term_open_stream", { id, session, cols, rows, log: log ?? null, onData }),
   fileOpen: (target: string) => invoke<void>("file_open", { target }),
