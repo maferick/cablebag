@@ -122,14 +122,23 @@ tabs, at the same time.
 
 ## Containers
 
-- **Like Portainer, inside Cablebag.** Right-click an SSH session for **Containers**: every container on that
-  server, grouped by compose project, with state, health and published ports (click one to open it in a web tab).
+- **Like Portainer, inside Cablebag.** Right-click an SSH session for **Containers**: a short list of every
+  container on that server, with only what is wrong standing out ("23 restarts", "unhealthy"), and the details of
+  the one you pick next to it: image, web ports to open, its project and compose file, and Logs, Shell, Restart and
+  Stop.
 - **Where is that compose file?** Each project shows its compose file; open it in Cablebag's editor, then apply it
   (`docker compose up -d`), pull new images, or restart, stop and start the whole project.
-- **Stacks made in Portainer** are marked, and their compose file is shown read-only with where it lives, so you
-  change it in Portainer.
-- Per container: logs that keep following, a shell inside, restart, start, stop and pause.
-- Docker is asked over SSH; no Docker port is opened.
+- **Stacks and templates.** **New stack** puts a compose file in `~/stacks/<name>` on the server and starts it,
+  from scratch or from a template with blanks that are asked when you use it. Save any running project, or a
+  container started without Compose, as a template; passwords in it become blanks.
+- **Move a stack to another server.** Cablebag finds every folder it uses on the shared storage (a NAS folder
+  mounted under another name or depth, or local on the NAS itself), checks ports, networks, images and logins
+  there, stops it here, starts it there, and goes back by itself when it does not come up healthy.
+- **Ask the assistant** about a container: it gets the state and the last log lines to start from.
+- **Stacks made in Portainer** are marked, and their compose file is shown read-only, so you change it in
+  Portainer.
+- Docker is asked over SSH; no Docker port is opened. Where the login may only use Docker through sudo with a
+  password (a NAS), Cablebag asks it once per tab or takes it from the session's vault login.
 
 ## Proxmox
 
@@ -164,8 +173,8 @@ tabs, at the same time.
 ## Sync
 
 Sessions, folders, folder settings, macros, tunnels, WireGuard networks, credential sources (without their
-secrets), browser profiles (without their cookies), pinned sites, workspaces and the assistant's memory sync
-through a private git repository of your own, encrypted.
+secrets), browser profiles (without their cookies), pinned sites, workspaces, container templates and the
+assistant's memory sync through a private git repository of your own, encrypted.
 Passwords and private keys stay out. When the same item changed on two PCs, Settings, Sync names the conflict
 and says whose version was kept.
 

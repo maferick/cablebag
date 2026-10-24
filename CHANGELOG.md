@@ -6,7 +6,9 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.19.1 · not released yet
+## 0.20.0 · 24 October 2026
+
+**Stacks, templates and moving them between servers**
 
 - **A calmer Containers tab.** On the left a short list: each container on one line with a dot, and how long it
   runs, or what is wrong ("23 restarts", "unhealthy", "stopped"). Projects with more than one container group
