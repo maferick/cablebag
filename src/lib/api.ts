@@ -260,6 +260,37 @@ export interface DockerContainer {
   config_files: string[];
   /** Made in Portainer: its compose files are inside Portainer's data. */
   portainer: boolean;
+  mounts: { kind: "bind" | "volume"; source: string; dest: string; rw: boolean }[];
+  networks: string[];
+  network_mode: string;
+  privileged: boolean;
+  devices: string[];
+}
+
+/** Shared storage of a server: NAS folders mounted there, or (on the NAS) its own volumes. */
+export interface DockerMounts {
+  ips: string[];
+  shared: { host: string; path: string; local: string }[];
+  roots: string[];
+  aliases: [string, string][];
+}
+
+export interface DockerTranslation {
+  path: string;
+  /** nas, local (only on this server) or host (a file of the server itself) */
+  kind: "nas" | "local" | "host";
+  to: string | null;
+  nas: string | null;
+}
+
+export interface DockerTarget {
+  arch: string;
+  names: string[];
+  networks: string[];
+  ports: number[];
+  images: string[];
+  logins: string[];
+  stack_exists: boolean;
 }
 
 export interface DockerListing {
@@ -271,6 +302,8 @@ export interface DockerListing {
   portainer: { container: string; data: string; url_port: number | null; https: boolean } | null;
   /** Compose files in ~/stacks on the server, also of stacks without containers now. */
   stacks: string[];
+  /** Docker refused the login, but sudo is there (perhaps with a password). */
+  sudo_possible: boolean;
 }
 
 export interface ExecResult {
@@ -430,6 +463,12 @@ export const api = {
   dockerPortainerFile: (tab: string, sudo: boolean, portainer: string, data: string, path: string) =>
     invoke<string>("docker_portainer_file", { tab, sudo, portainer, data, path }),
   dockerLogs: (tab: string, sudo: boolean, id: string, lines: number) => invoke<string>("docker_logs", { tab, sudo, id, lines }),
+  dockerMounts: (tab: string) => invoke<DockerMounts>("docker_mounts", { tab }),
+  dockerTranslate: (paths: string[], from: DockerMounts, to: DockerMounts) => invoke<DockerTranslation[]>("docker_translate", { paths, from, to }),
+  dockerTarget: (tab: string, sudo: boolean, images: string[], stack: string) => invoke<DockerTarget>("docker_target", { tab, sudo, images, stack }),
+  dockerDigests: (tab: string, sudo: boolean, images: string[]) => invoke<Record<string, string>>("docker_digests", { tab, sudo, images }),
+  /** Docker as root through sudo with the login's password for this tab; null turns it off. */
+  dockerUseSudoPassword: (tab: string, session: Session | null) => invoke<void>("docker_use_sudo_password", { tab, session }),
   /** Writes ~/stacks/<name>/compose.yml (and .env) on the server and starts it. */
   dockerCreateStack: (tab: string, compose: string, sudo: boolean, name: string, file: string, env: string) =>
     invoke<{ dir: string; output: string; exit: number | null }>("docker_create_stack", { tab, compose, sudo, name, file, env }),

@@ -347,6 +347,32 @@ async fn docker_compose(app: AppHandle, tab: String, compose: String, sudo: bool
 }
 
 #[tauri::command]
+async fn docker_mounts(app: AppHandle, tab: String) -> CmdResult<docker::Mounts> {
+    docker::mounts(&app, &tab).await.map_err(err)
+}
+
+#[tauri::command]
+fn docker_translate(paths: Vec<String>, from: docker::Mounts, to: docker::Mounts) -> Vec<docker::Translation> {
+    docker::translate(&paths, &from, &to)
+}
+
+#[tauri::command]
+async fn docker_target(app: AppHandle, tab: String, sudo: bool, images: Vec<String>, stack: String) -> CmdResult<docker::Target> {
+    docker::target(&app, &tab, sudo, &images, &stack).await.map_err(err)
+}
+
+#[tauri::command]
+async fn docker_digests(app: AppHandle, tab: String, sudo: bool, images: Vec<String>) -> CmdResult<std::collections::HashMap<String, String>> {
+    docker::digests(&app, &tab, sudo, &images).await.map_err(err)
+}
+
+/// Docker through sudo with the login's password for this Containers tab (None: back to without).
+#[tauri::command]
+fn docker_use_sudo_password(tab: String, session: Option<Session>) {
+    docker::use_sudo_password(&tab, session);
+}
+
+#[tauri::command]
 async fn docker_logs(app: AppHandle, tab: String, sudo: bool, id: String, lines: u32) -> CmdResult<String> {
     docker::logs(&app, &tab, sudo, &id, lines).await.map_err(err)
 }
@@ -1219,6 +1245,11 @@ pub fn run() {
             docker_logs,
             docker_create_stack,
             docker_container_compose,
+            docker_mounts,
+            docker_translate,
+            docker_target,
+            docker_digests,
+            docker_use_sudo_password,
             sftp_mkdir,
             sftp_new_file,
             sftp_rename,

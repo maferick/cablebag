@@ -8,8 +8,9 @@ use crate::AppState;
 use anyhow::{anyhow, bail, Result};
 use serde::Serialize;
 use serde_json::Value;
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use crate::store::Session;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
 
@@ -41,6 +42,24 @@ pub struct Container {
     pub config_files: Vec<String>,
     /// Made by Portainer: its compose files are inside Portainer's data, not in a folder of the server.
     pub portainer: bool,
+    /// What the container uses from the server: folders and files (bind), Docker volumes (volume).
+    pub mounts: Vec<MountInfo>,
+    /// The Docker networks it is on, and host when it uses the server's own network.
+    pub networks: Vec<String>,
+    pub network_mode: String,
+    pub privileged: bool,
+    /// Devices of the server it uses (/dev/dri, a USB stick).
+    pub devices: Vec<String>,
+}
+
+#[derive(Debug, Serialize, PartialEq)]
+pub struct MountInfo {
+    /// bind or volume
+    pub kind: String,
+    /// The folder on the server, or the volume's name.
+    pub source: String,
+    pub dest: String,
+    pub rw: bool,
 }
 
 #[derive(Debug, Serialize, PartialEq)]
@@ -64,23 +83,26 @@ pub struct Listing {
     pub portainer: Option<Portainer>,
     /// The compose files in ~/stacks on the server, also of stacks that have no containers now.
     pub stacks: Vec<String>,
+    /// Docker said no to the login, but sudo is there (it may want a password).
+    pub sudo_possible: bool,
 }
 
 /// One line per container, as JSON. Single quotes are not allowed in it: the script sends it inside '...'.
 /// .State whole, since .State.Health is missing (not empty) on containers without a health check.
-const FORMAT: &str = r#"{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Config.Image}},"state":{{json .State}},"restarts":{{.RestartCount}},"labels":{{json .Config.Labels}},"ports":{{json .NetworkSettings.Ports}},"mounts":{{json .Mounts}}}"#;
+const FORMAT: &str = r#"{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Config.Image}},"state":{{json .State}},"restarts":{{.RestartCount}},"labels":{{json .Config.Labels}},"ports":{{json .NetworkSettings.Ports}},"mounts":{{json .Mounts}},"hc":{"net":{{json .HostConfig.NetworkMode}},"priv":{{json .HostConfig.Privileged}},"dev":{{json .HostConfig.Devices}}},"nets":{{json .NetworkSettings.Networks}}}"#;
 
 fn list_script() -> String {
     format!(
         r#"D=docker
 if docker ps -q >/dev/null 2>&1; then echo "access direct"
 elif sudo -n docker ps -q >/dev/null 2>&1; then echo "access sudo"; D="sudo -n docker"
-elif command -v docker >/dev/null 2>&1; then echo "access denied"; exit 0
+elif command -v docker >/dev/null 2>&1; then echo "access denied"; command -v sudo >/dev/null 2>&1 && echo "sudo yes"; exit 0
 else echo "access none"; exit 0; fi
 if $D compose version >/dev/null 2>&1; then echo "compose plugin"
 elif command -v docker-compose >/dev/null 2>&1; then echo "compose standalone"
 else echo "compose none"; fi
-for f in "$HOME"/stacks/*/compose.yml "$HOME"/stacks/*/compose.yaml "$HOME"/stacks/*/docker-compose.yml "$HOME"/stacks/*/docker-compose.yaml; do [ -f "$f" ] && echo "stack $f"; done
+{HOME}
+for f in "$h"/stacks/*/compose.yml "$h"/stacks/*/compose.yaml "$h"/stacks/*/docker-compose.yml "$h"/stacks/*/docker-compose.yaml; do [ -f "$f" ] && echo "stack $f"; done
 ids=$($D ps -aq --no-trunc)
 [ -z "$ids" ] || $D inspect --format '{FORMAT}' $ids"#
     )
@@ -95,10 +117,55 @@ fn conn(app: &AppHandle, tab: &str) -> Result<Arc<crate::ssh::SshConn>> {
     app.state::<AppState>().ssh.lock().get(tab).cloned().ok_or_else(|| anyhow!("This Containers tab is not connected."))
 }
 
+/// Containers tabs whose login may only use Docker through sudo with a password: their scripts run as root,
+/// with the password from the session's vault login or asked (as the assistant does).
+/// The password sudo took is kept in memory while the tab is open, so it is asked once, not for every refresh.
+static AS_ROOT: LazyLock<parking_lot::Mutex<HashMap<String, (Session, Option<String>)>>> = LazyLock::new(Default::default);
+/// One password question at a time: commands that start together wait for the first answer.
+static ASKING: LazyLock<tokio::sync::Mutex<()>> = LazyLock::new(Default::default);
+
+pub fn use_sudo_password(tab: &str, session: Option<Session>) {
+    match session {
+        Some(s) => AS_ROOT.lock().insert(tab.to_string(), (s, None)),
+        None => AS_ROOT.lock().remove(tab),
+    };
+}
+
 async fn run(app: &AppHandle, tab: &str, script: &str, timeout: Duration) -> Result<ExecResult> {
+    if AS_ROOT.lock().contains_key(tab) {
+        let mut asking = None;
+        if AS_ROOT.lock().get(tab).is_some_and(|(_, pw)| pw.is_none()) {
+            asking = Some(ASKING.lock().await);
+        }
+        let Some((session, known)) = AS_ROOT.lock().get(tab).cloned() else { bail!("This Containers tab is closed.") };
+        let why = "Docker on this server only works as root.";
+        return match crate::agent::exec_root(app, tab, &session, script, true, timeout, known, Some(why)).await {
+            Ok((res, used)) => {
+                if let Some(e) = AS_ROOT.lock().get_mut(tab) {
+                    e.1 = used.or(e.1.take());
+                }
+                drop(asking);
+                Ok(res)
+            }
+            Err(err) => {
+                // Cancelled or refused: back to without sudo, so the next refresh does not ask again. The tab offers
+                // the choice anew.
+                let text = err.to_string();
+                if text.contains("No password given") || text.contains("did not accept the password") {
+                    AS_ROOT.lock().remove(tab);
+                } else if let Some(e) = AS_ROOT.lock().get_mut(tab) {
+                    e.1 = None;
+                }
+                Err(err)
+            }
+        };
+    }
     let conn = conn(app, tab)?;
     exec_line(&conn, &format!("sh -c {}", sh_quote(script)), timeout).await
 }
+
+/// The login's home, also when the script runs as root through sudo.
+const HOME: &str = r#"h="$HOME"; [ -n "$SUDO_USER" ] && h=$(eval echo "~$SUDO_USER")"#;
 
 pub async fn list(app: &AppHandle, tab: &str) -> Result<Listing> {
     let r = run(app, tab, &list_script(), Duration::from_secs(30)).await?;
@@ -112,10 +179,13 @@ fn parse_listing(output: &str) -> Result<Listing> {
     let mut access = String::new();
     let mut compose = "none".to_string();
     let mut stacks = Vec::new();
+    let mut sudo_possible = false;
     let mut raw = Vec::new();
     for line in output.lines().map(str::trim) {
         if let Some(a) = line.strip_prefix("access ") {
             access = a.to_string();
+        } else if line == "sudo yes" {
+            sudo_possible = true;
         } else if let Some(f) = line.strip_prefix("stack ") {
             stacks.push(f.to_string());
         } else if let Some(c) = line.strip_prefix("compose ") {
@@ -132,7 +202,7 @@ fn parse_listing(output: &str) -> Result<Listing> {
     let portainer = raw.iter().find_map(portainer_of);
     let mut containers: Vec<Container> = raw.iter().map(|v| container(v, portainer.as_ref())).collect();
     containers.sort_by(|a, b| (a.project.is_empty(), &a.project, &a.name).cmp(&(b.project.is_empty(), &b.project, &b.name)));
-    Ok(Listing { access, compose, containers, portainer, stacks })
+    Ok(Listing { access, compose, containers, portainer, stacks, sudo_possible })
 }
 
 /// The Portainer container (the image says so, and it has a /data mount).
@@ -199,6 +269,22 @@ fn container(v: &Value, portainer: Option<&Portainer>) -> Container {
         portainer: !working_dir.is_empty() && in_portainer(&working_dir),
         working_dir,
         config_files,
+        mounts: v["mounts"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|m| matches!(m["Type"].as_str(), Some("bind" | "volume")))
+            .map(|m| MountInfo {
+                kind: m["Type"].as_str().unwrap_or("").to_string(),
+                source: if m["Type"] == "volume" { m["Name"].as_str() } else { m["Source"].as_str() }.unwrap_or("").to_string(),
+                dest: m["Destination"].as_str().unwrap_or("").to_string(),
+                rw: m["RW"] != false,
+            })
+            .collect(),
+        networks: v["nets"].as_object().map(|n| n.keys().cloned().collect()).unwrap_or_default(),
+        network_mode: v["hc"]["net"].as_str().unwrap_or("").to_string(),
+        privileged: v["hc"]["priv"] == true,
+        devices: v["hc"]["dev"].as_array().into_iter().flatten().filter_map(|d| d["PathOnHost"].as_str().map(String::from)).collect(),
     }
 }
 
@@ -297,9 +383,11 @@ pub async fn create_stack(app: &AppHandle, tab: &str, compose: &str, sudo: bool,
     let env_part = if env.trim().is_empty() { String::new() } else { format!(" && printf %s '{}' | base64 -d > \"$d/.env\"", b64(env)) };
     let program = compose_program(compose, sudo);
     let script = format!(
-        r#"d="$HOME/stacks/{name}"
+        r#"{HOME}
+d="$h/stacks/{name}"
 if [ -e "$d/compose.yml" ] || [ -e "$d/docker-compose.yml" ]; then echo "exists $d"; exit 3; fi
 umask 077 && mkdir -p "$d" && printf %s '{}' | base64 -d > "$d/compose.yml"{env_part} || exit 4
+[ -z "$SUDO_USER" ] || chown "$SUDO_USER" "$h/stacks" "$d" "$d/compose.yml" "$d/.env" 2>/dev/null
 echo "dir $d"
 cd "$d" && {program} -p {name} -f compose.yml up -d 2>&1"#,
         b64(file)
@@ -339,6 +427,231 @@ pub async fn container_compose(app: &AppHandle, tab: &str, sudo: bool, id: &str)
         _ => Value::Null,
     };
     Ok(compose_from(c, &img))
+}
+
+/// What a server holds of shared storage: NFS and SMB mounts (a NAS folder, mounted here), and, when the server is
+/// the NAS itself, its own volumes, with its addresses to recognise it in the other server's mounts.
+#[derive(Debug, Serialize, serde::Deserialize, Default, Clone)]
+pub struct Mounts {
+    pub ips: Vec<String>,
+    pub shared: Vec<Shared>,
+    /// Folders that are the storage itself (an Asustor or Synology /volume1).
+    pub roots: Vec<String>,
+    /// The same folder under another name on the NAS: /share/Docker for /volume2/Docker.
+    pub aliases: Vec<(String, String)>,
+}
+
+#[derive(Debug, Serialize, serde::Deserialize, Clone, PartialEq)]
+pub struct Shared {
+    /// The NAS, as the mount names it (an address or a name).
+    pub host: String,
+    /// The folder on the NAS; for SMB the share as /share/<name>/...
+    pub path: String,
+    /// Where it is mounted on this server.
+    pub local: String,
+}
+
+const MOUNTS: &str = r#"for a in $(hostname -I 2>/dev/null); do echo "ip $a"; done
+ip -4 -o addr show 2>/dev/null | while read -r n i f a rest; do echo "ip ${a%/*}"; done
+while read -r src dst typ rest; do case "$typ" in nfs|nfs4|cifs|smb3) echo "shared $src $dst";; esac; done < /proc/mounts
+for v in /volume[0-9]*; do [ -d "$v" ] && echo "root $v"; done
+for s in /share/*; do [ -d "$s" ] || continue; n=${s#/share/}; for v in /volume[0-9]*/"$n"; do [ -d "$v" ] && echo "alias $s $v"; done; done"#;
+
+pub async fn mounts(app: &AppHandle, tab: &str) -> Result<Mounts> {
+    let conn = conn(app, tab)?;
+    let r = exec_line(&conn, &format!("sh -c {}", sh_quote(MOUNTS)), Duration::from_secs(20)).await?;
+    Ok(parse_mounts(&r.output))
+}
+
+/// /proc/mounts writes a space as \040.
+fn unescape(s: &str) -> String {
+    s.replace("\\040", " ").replace("\\011", "\t").replace("\\134", "\\")
+}
+
+fn parse_mounts(out: &str) -> Mounts {
+    let mut m = Mounts::default();
+    for line in out.lines().map(str::trim) {
+        let mut w = line.splitn(3, ' ');
+        match (w.next(), w.next(), w.next()) {
+            (Some("ip"), Some(ip), None) if !ip.is_empty() && !m.ips.contains(&ip.to_string()) && ip != "127.0.0.1" => m.ips.push(ip.to_string()),
+            (Some("shared"), Some(src), Some(dst)) => {
+                let src = unescape(src);
+                let local = unescape(dst);
+                // NFS: host:/path. SMB: //host/share/sub, kept as /share/<share>/sub (where an Asustor keeps it).
+                let found = if let Some(rest) = src.strip_prefix("//") {
+                    rest.split_once('/').map(|(h, p)| (h.to_string(), format!("/share/{p}")))
+                } else {
+                    src.split_once(":/").map(|(h, p)| (h.to_string(), format!("/{p}")))
+                };
+                if let Some((host, path)) = found {
+                    m.shared.push(Shared { host, path: path.trim_end_matches('/').to_string(), local: local.trim_end_matches('/').to_string() });
+                }
+            }
+            (Some("root"), Some(r), None) => m.roots.push(r.to_string()),
+            (Some("alias"), Some(a), Some(b)) => m.aliases.push((a.to_string(), b.to_string())),
+            _ => {}
+        }
+    }
+    m
+}
+
+/// Where a path of one server is on the other one.
+#[derive(Debug, Serialize, PartialEq)]
+pub struct Translation {
+    pub path: String,
+    /// nas: on shared storage; local: only on this server (to copy); host: a file of the server itself
+    /// (/etc/localtime), the same path on the other one.
+    pub kind: String,
+    /// The path on the other server; None when it does not have that storage.
+    pub to: Option<String>,
+    /// The place on the NAS, as host:/path.
+    pub nas: Option<String>,
+}
+
+fn under(path: &str, base: &str) -> Option<String> {
+    if path == base {
+        Some(String::new())
+    } else {
+        path.strip_prefix(base).filter(|r| r.starts_with('/') || base.ends_with('/')).map(String::from)
+    }
+}
+
+/// /share/Docker/x -> /volume2/Docker/x with the NAS's own aliases.
+fn canonical(path: &str, aliases: &[(String, String)]) -> String {
+    for (a, real) in aliases {
+        if let Some(rest) = under(path, a) {
+            return format!("{real}{rest}");
+        }
+    }
+    path.to_string()
+}
+
+/// The NAS and the place on it for a path of a server, through its mounts (the most precise one), or itself
+/// when the server is the NAS.
+fn to_nas(path: &str, m: &Mounts, aliases: &[(String, String)]) -> Option<(Vec<String>, String)> {
+    let best = m.shared.iter().filter_map(|s| under(path, &s.local).map(|rest| (s, rest))).max_by_key(|(s, _)| s.local.len());
+    if let Some((s, rest)) = best {
+        return Some((vec![s.host.clone()], canonical(&format!("{}{rest}", s.path), aliases)));
+    }
+    let real = canonical(path, &m.aliases);
+    if m.roots.iter().any(|r| under(&real, r).is_some()) {
+        return Some((m.ips.clone(), real));
+    }
+    None
+}
+
+fn from_nas(hosts: &[String], nas: &str, m: &Mounts, aliases: &[(String, String)]) -> Option<String> {
+    let best = m
+        .shared
+        .iter()
+        .filter(|s| hosts.iter().any(|h| h.eq_ignore_ascii_case(&s.host)))
+        .filter_map(|s| under(nas, &canonical(&s.path, aliases)).map(|rest| (s, rest)))
+        .max_by_key(|(s, _)| s.path.len());
+    if let Some((s, rest)) = best {
+        return Some(format!("{}{rest}", s.local));
+    }
+    // The other server is the NAS itself.
+    if hosts.iter().any(|h| m.ips.contains(h)) && m.roots.iter().any(|r| under(nas, r).is_some()) {
+        return Some(nas.to_string());
+    }
+    None
+}
+
+/// Translates the bind paths of a stack from one server to another through their shared storage.
+pub fn translate(paths: &[String], from: &Mounts, to: &Mounts) -> Vec<Translation> {
+    let aliases: Vec<(String, String)> = from.aliases.iter().chain(to.aliases.iter()).cloned().collect();
+    paths
+        .iter()
+        .map(|p| {
+            if ["/etc/", "/dev/", "/run/", "/var/run/", "/sys/", "/proc/"].iter().any(|h| p.starts_with(h)) {
+                return Translation { path: p.clone(), kind: "host".into(), to: Some(p.clone()), nas: None };
+            }
+            match to_nas(p, from, &aliases) {
+                Some((hosts, nas)) => {
+                    // The NAS by any of its names: the address the mount uses, and the NAS's own addresses.
+                    let mut ids = hosts.clone();
+                    ids.extend(to.shared.iter().filter(|s| from.ips.contains(&s.host)).map(|s| s.host.clone()));
+                    let target = from_nas(&ids, &nas, to, &aliases);
+                    Translation { path: p.clone(), kind: "nas".into(), to: target, nas: Some(format!("{}:{nas}", hosts.first().cloned().unwrap_or_default())) }
+                }
+                None => Translation { path: p.clone(), kind: "local".into(), to: None, nas: None },
+            }
+        })
+        .collect()
+}
+
+/// What the other server already has: container names, networks, ports in use, images, registries it is logged
+/// in to, its processor and whether the stack's folder exists.
+#[derive(Debug, Serialize, Default)]
+pub struct Target {
+    pub arch: String,
+    pub names: Vec<String>,
+    pub networks: Vec<String>,
+    pub ports: Vec<u16>,
+    pub images: Vec<String>,
+    pub logins: Vec<String>,
+    pub stack_exists: bool,
+}
+
+pub async fn target(app: &AppHandle, tab: &str, sudo: bool, images: &[String], stack: &str) -> Result<Target> {
+    if !stack.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        bail!("That is not a stack name.");
+    }
+    let d = docker(sudo);
+    let imgs: String = images.iter().map(|i| sh_quote(i)).collect::<Vec<_>>().join(" ");
+    let script = format!(
+        r#"{HOME}
+echo "arch $(uname -m)"
+{d} ps -a --format '{{{{.Names}}}}' | sed 's/^/name /'
+{d} network ls --format '{{{{.Name}}}}' | sed 's/^/net /'
+{d} ps --format '{{{{.Ports}}}}' | tr ',' '\n' | sed -n 's/.*:\([0-9][0-9]*\)->.*/port \1/p'
+(ss -ltnH 2>/dev/null || netstat -ltn 2>/dev/null) | awk '{{print $4}}' | sed -n 's/.*:\([0-9][0-9]*\)$/port \1/p'
+for i in {imgs}; do {d} image inspect "$i" >/dev/null 2>&1 && echo "have $i"; done
+for c in "$h/.docker/config.json" "$HOME/.docker/config.json"; do [ -f "$c" ] && tr -d ' \n\t' < "$c" | grep -o '"auths":{{.*' | grep -o '"[^"]*":{{"auth' | cut -d'"' -f2 | sed 's/^/login /'; done
+[ -e "$h/stacks/{stack}" ] && echo "stack exists""#
+    );
+    let r = run(app, tab, &script, Duration::from_secs(60)).await?;
+    let mut t = Target::default();
+    for line in r.output.lines().map(str::trim) {
+        if let Some(v) = line.strip_prefix("arch ") {
+            t.arch = v.to_string();
+        } else if let Some(v) = line.strip_prefix("name ") {
+            t.names.push(v.to_string());
+        } else if let Some(v) = line.strip_prefix("net ") {
+            t.networks.push(v.to_string());
+        } else if let Some(v) = line.strip_prefix("port ") {
+            if let Ok(p) = v.parse() {
+                if !t.ports.contains(&p) {
+                    t.ports.push(p);
+                }
+            }
+        } else if let Some(v) = line.strip_prefix("have ") {
+            t.images.push(v.to_string());
+        } else if let Some(v) = line.strip_prefix("login ") {
+            t.logins.push(v.to_string());
+        } else if line == "stack exists" {
+            t.stack_exists = true;
+        }
+    }
+    Ok(t)
+}
+
+/// The exact versions of images as they run now (name@sha256:...), to start the same on the other server.
+pub async fn digests(app: &AppHandle, tab: &str, sudo: bool, images: &[String]) -> Result<HashMap<String, String>> {
+    let d = docker(sudo);
+    let imgs: String = images.iter().map(|i| sh_quote(i)).collect::<Vec<_>>().join(" ");
+    let r = run(app, tab, &format!("for i in {imgs}; do printf '%s ' \"$i\"; {d} image inspect --format '{{{{json .RepoDigests}}}}' \"$i\" 2>/dev/null || echo; done"), Duration::from_secs(30)).await?;
+    let mut out = HashMap::new();
+    for line in r.output.lines() {
+        if let Some((img, json)) = line.split_once(' ') {
+            if let Ok(list) = serde_json::from_str::<Vec<String>>(json.trim()) {
+                if let Some(first) = list.first().and_then(|d| d.split_once('@')) {
+                    out.insert(img.to_string(), first.1.to_string());
+                }
+            }
+        }
+    }
+    Ok(out)
 }
 
 /// Whether an environment variable's name says it holds a secret (MYSQL_ROOT_PASSWORD, API_KEY, ...).
@@ -536,6 +849,58 @@ mod tests {
                 "volumes:\n  pgdata:\n    external: true\n"
             )
         );
+    }
+
+    fn nfs(path: &str, local: &str) -> Shared {
+        Shared { host: "192.0.2.116".into(), path: path.into(), local: local.into() }
+    }
+
+    #[test]
+    fn mounts_from_the_server() {
+        let m = parse_mounts(concat!(
+            "ip 192.0.2.92\nip 172.17.0.1\nip 192.0.2.92\nip 127.0.0.1\n",
+            "shared 192.0.2.116:/volume2/Docker /mnt/dockers\n",
+            "shared //nas/Media/sub /mnt/my\\040media\n",
+            "root /volume1\nalias /share/Docker /volume2/Docker\n"
+        ));
+        assert_eq!(m.ips, vec!["192.0.2.92", "172.17.0.1"]);
+        assert_eq!(m.shared, vec![nfs("/volume2/Docker", "/mnt/dockers"), Shared { host: "nas".into(), path: "/share/Media/sub".into(), local: "/mnt/my media".into() }]);
+        assert_eq!((m.roots.len(), m.aliases.len()), (1, 1));
+    }
+
+    #[test]
+    fn paths_between_servers() {
+        let docker92 = Mounts { ips: vec!["192.0.2.92".into()], shared: vec![nfs("/volume2/Docker", "/mnt/dockers"), nfs("/volume1/Photo-Archive", "/mnt/Photo-Archive")], ..Default::default() };
+        let nas = Mounts {
+            ips: vec!["192.0.2.116".into()],
+            roots: vec!["/volume1".into(), "/volume2".into()],
+            aliases: vec![("/share/Docker".into(), "/volume2/Docker".into())],
+            ..Default::default()
+        };
+        let other_name = Mounts { ips: vec!["192.0.2.54".into()], shared: vec![nfs("/volume2/Docker", "/mnt/docker-nas")], ..Default::default() };
+        let deeper = Mounts { shared: vec![nfs("/volume2/Docker", "/mnt/dockers"), nfs("/volume2/Docker/streamonitor", "/mnt/streamonitor")], ..Default::default() };
+        let shallower = Mounts { shared: vec![nfs("/volume2", "/mnt/vol2")], ..Default::default() };
+        let one = |p: &str, from: &Mounts, to: &Mounts| translate(&[p.to_string()], from, to).remove(0);
+
+        // A Docker machine to the NAS, where the same folder is local, and back (also by its /share name).
+        let t = one("/mnt/dockers/streamonitor/config.json", &docker92, &nas);
+        assert_eq!((t.kind.as_str(), t.to.as_deref()), ("nas", Some("/volume2/Docker/streamonitor/config.json")));
+        assert_eq!(t.nas.as_deref(), Some("192.0.2.116:/volume2/Docker/streamonitor/config.json"));
+        assert_eq!(one("/volume2/Docker/registry/data", &nas, &docker92).to.as_deref(), Some("/mnt/dockers/registry/data"));
+        assert_eq!(one("/share/Docker/registry/data", &nas, &docker92).to.as_deref(), Some("/mnt/dockers/registry/data"));
+        // Another mount name, a deeper mount (the most precise wins) and a shallower one.
+        assert_eq!(one("/mnt/dockers/cam-backup", &docker92, &other_name).to.as_deref(), Some("/mnt/docker-nas/cam-backup"));
+        assert_eq!(one("/mnt/dockers/streamonitor/data", &docker92, &deeper).to.as_deref(), Some("/mnt/streamonitor/data"));
+        assert_eq!(one("/mnt/dockers/streamonitor", &docker92, &deeper).to.as_deref(), Some("/mnt/streamonitor"));
+        assert_eq!(one("/mnt/dockers/cam-backup", &docker92, &shallower).to.as_deref(), Some("/mnt/vol2/Docker/cam-backup"));
+        // On the NAS, but not mounted on the other machine.
+        let t = one("/mnt/Photo-Archive/2024", &docker92, &other_name);
+        assert_eq!((t.kind.as_str(), t.to), ("nas", None));
+        // Only on this server, and files of the server itself.
+        assert_eq!(one("/opt/recoder/state", &docker92, &nas).kind, "local");
+        assert_eq!(one("/mnt/dockersX/a", &docker92, &nas).kind, "local");
+        let t = one("/etc/localtime", &docker92, &nas);
+        assert_eq!((t.kind.as_str(), t.to.as_deref()), ("host", Some("/etc/localtime")));
     }
 
     #[test]

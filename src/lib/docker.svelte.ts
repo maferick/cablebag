@@ -1,7 +1,27 @@
 // Containers on SSH servers: which servers turned out to have Docker (so the search box can offer them), and the
 // terminal tabs for a container's logs and a shell inside it, which are ordinary SSH tabs running docker.
 import { app } from "./state.svelte";
-import type { DockerContainer, Session } from "./api";
+import { api, type DockerContainer, type DockerListing, type Session } from "./api";
+
+/**
+ * A compose file of a Portainer stack: from this server's Portainer, or, for a server Portainer manages through
+ * its agent (a NAS), from the Portainer on another open server. A file counts only when it names the stack's
+ * services, so the stack with the same number in another Portainer is not taken for it.
+ */
+export async function portainerFile(tab: string, listing: DockerListing, sudo: boolean, path: string, services: string[]): Promise<string> {
+  const fits = (text: string) => services.every((s) => !s || new RegExp(`^\\s+["']?${s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']?\\s*:`, "m").test(text));
+  if (listing.portainer) {
+    const text = await api.dockerPortainerFile(tab, sudo, listing.portainer.container, listing.portainer.data, path);
+    if (fits(text)) return text;
+  }
+  for (const t of app.tabs.filter((x) => x.type === "docker" && x.id !== tab && x.status === "connected")) {
+    const l = await api.dockerList(t.id).catch(() => null);
+    if (!l?.portainer) continue;
+    const text = await api.dockerPortainerFile(t.id, l.access === "sudo", l.portainer.container, l.portainer.data, path).catch(() => "");
+    if (text && fits(text)) return text;
+  }
+  throw new Error("This stack was made in Portainer, but none of the open servers runs the Portainer that made it. Open the Containers of the server where that Portainer runs, then try again.");
+}
 
 const KEY = "docker.known";
 
@@ -32,6 +52,14 @@ class Containers {
     return app.sessions.filter((s) => s.kind === "ssh" && this.known.includes(s.id));
   }
 
+  /** Containers tabs that use Docker through sudo with the login's password. */
+  asRoot = $state<Record<string, true>>({});
+
+  /** How docker is started in a terminal of the server: directly, sudo without a password, or sudo that asks. */
+  prefix(tab: string, sudo: boolean): string {
+    return this.asRoot[tab] ? "sudo " : sudo ? "sudo -n " : "";
+  }
+
   /** A terminal tab on the same server running one docker command, closed when the command ends. */
   private run(server: Session, title: string, command: string) {
     app.openSession({
@@ -42,12 +70,12 @@ class Containers {
     });
   }
 
-  logs(server: Session, c: DockerContainer, sudo: boolean) {
-    this.run(server, `${c.name} logs`, `${sudo ? "sudo -n " : ""}docker logs -f --tail 300 ${c.name}`);
+  logs(server: Session, c: DockerContainer, prefix: string) {
+    this.run(server, `${c.name} logs`, `${prefix}docker logs -f --tail 300 ${c.name}`);
   }
 
-  shell(server: Session, c: DockerContainer, sudo: boolean) {
-    this.run(server, `${c.name} shell`, `${sudo ? "sudo -n " : ""}docker exec -it ${c.name} sh -c 'command -v bash >/dev/null && exec bash || exec sh'`);
+  shell(server: Session, c: DockerContainer, prefix: string) {
+    this.run(server, `${c.name} shell`, `${prefix}docker exec -it ${c.name} sh -c 'command -v bash >/dev/null && exec bash || exec sh'`);
   }
 }
 
@@ -98,3 +126,26 @@ class Templates {
 }
 
 export const templates = new Templates();
+
+/** One stack moved from one server to another: who did what, kept on this PC (newest first, at most 200). */
+export interface MoveRecord {
+  at: number;
+  project: string;
+  from: string;
+  to: string;
+  /** moved, rolled back, failed */
+  result: string;
+  note?: string;
+}
+
+class Moves {
+  get list(): MoveRecord[] {
+    return (app.settings["docker.moves"] as MoveRecord[]) ?? [];
+  }
+
+  async add(m: MoveRecord) {
+    await app.setSetting("docker.moves", [m, ...this.list].slice(0, 200));
+  }
+}
+
+export const moves = new Moves();

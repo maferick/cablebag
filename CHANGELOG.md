@@ -25,6 +25,16 @@ installs it and starts Cablebag again. Every version is also on the
 - **Ask the assistant** about a container: it gets the state, where the container comes from and its last 100
   log lines, and the button asks the right question when something is wrong ("Why does it keep restarting?").
 - The Portainer button at the top is gone; stacks made in Portainer keep **Open in Portainer**.
+- **Move a stack to another server.** **Check the move** first: every folder the stack uses is looked up on the
+  shared storage (NFS or SMB), so a NAS folder mounted under another name or at another depth on the other
+  server is found, and on the NAS itself the folder is local. The check also names folders and Docker volumes
+  that are only on this server, ports already in use there, container names, missing networks, a different
+  processor, private registries the other server is not logged in to, devices and host networking; images are
+  pinned to the exact versions running now. Then **Move** stops it here (never both on the same data at once),
+  starts it there, waits until it is healthy, and goes back by itself when it is not. Every move is kept in a
+  list. The other server's Containers tab has to be open.
+- **Docker through sudo with your password**, on a server where the login may not use Docker (a NAS): the
+  password comes from the session's vault login or is asked once per tab.
 
 ## 0.19.0 · 24 October 2026
 

@@ -8,14 +8,15 @@
   import { app, newSession, type Tab } from "../state.svelte";
   import { ask } from "../ask.svelte";
   import { menu } from "../menu.svelte";
-  import { containers, templates, blankSecrets } from "../docker.svelte";
+  import { containers, templates, blankSecrets, portainerFile } from "../docker.svelte";
   import { assistant } from "../assistant.svelte";
   import NewStackDialog from "./NewStackDialog.svelte";
+  import MoveStackDialog from "./MoveStackDialog.svelte";
   import { writeText } from "../clipboard";
   import Modal from "./Modal.svelte";
   import {
     Container, RefreshCw, RotateCw, ScrollText, TerminalSquare, Play, Square, Pause, FileCode, ExternalLink, Download,
-    Copy, Search, X, Plus, Layers, Trash2, Sparkles,
+    Copy, Search, X, Plus, Layers, Trash2, Sparkles, Truck, KeyRound,
   } from "@lucide/svelte";
   import "./tools/tool.css";
 
@@ -33,6 +34,17 @@
   let viewing = $state<{ path: string; onServer: string; text: string } | null>(null);
   let listEl = $state<HTMLDivElement>();
   let newStack = $state(false);
+  let moving = $state("");
+  let sudoNote = $state("");
+
+  /** Docker as root through sudo with the login's password (the vault login, or asked once). */
+  async function useSudoPassword() {
+    sudoNote = "";
+    await api.dockerUseSudoPassword(tab.id, $state.snapshot(server));
+    containers.asRoot[tab.id] = true;
+    listing = null;
+    await load();
+  }
 
   // svelte-ignore state_referenced_locally
   const server = tab.session!;
@@ -53,6 +65,11 @@
     return () => {
       clearInterval(timer);
       un.then((f) => f());
+      // Closed (not only reconnecting): the sudo password kept for it goes.
+      if (!app.tabs.some((t) => t.id === tab.id)) {
+        api.dockerUseSudoPassword(tab.id, null).catch(() => {});
+        delete containers.asRoot[tab.id];
+      }
     };
   });
 
@@ -70,7 +87,15 @@
       // Start on the container that needs a look, otherwise the first.
       if (!listing.containers.some((c) => c.id === picked)) picked = (listing.containers.find(needsLook) ?? listing.containers[0])?.id ?? "";
     } catch (e) {
-      error = String(e);
+      const text = String(e);
+      // Cancelled or a password sudo refused: back to the view without sudo, which offers it again.
+      if (containers.asRoot[tab.id] && /No password given|did not accept the password/.test(text)) {
+        delete containers.asRoot[tab.id];
+        sudoNote = /did not accept/.test(text) ? "sudo did not accept that password." : "No password given, so Docker is not used through sudo.";
+        loading = false;
+        return load();
+      }
+      error = text;
     } finally {
       loading = false;
     }
@@ -215,21 +240,21 @@
     }
   }
 
+  /** The services of the project a container belongs to, to recognise its compose file. */
+  const servicesOf = (c: DockerContainer) => [...new Set(all.filter((x) => x.project === c.project).map((x) => x.service))];
+
   /** A compose file: in Cablebag's editor when it is a file on the server, read-only when it is Portainer's. */
   async function openFile(c: DockerContainer, path: string) {
     if (!c.portainer) {
       app.openEditor(tab.id, path);
       return;
     }
-    const p = listing?.portainer;
-    if (!p) {
-      app.notify("This stack was made in Portainer, but Cablebag cannot find the Portainer container on this server to read it from.", "error");
-      return;
-    }
     try {
-      const text = await api.dockerPortainerFile(tab.id, sudo, p.container, p.data, path);
-      const inside = path.startsWith(p.data) ? `/data${path.slice(p.data.length)}` : path;
-      viewing = { path: inside, onServer: `${p.data}${inside.slice("/data".length)}`, text };
+      const text = await portainerFile(tab.id, listing!, sudo, path, servicesOf(c));
+      const p = listing?.portainer;
+      const inside = p && path.startsWith(p.data) ? `/data${path.slice(p.data.length)}` : path;
+      // On a server Portainer manages through its agent, the file is with that Portainer, not on this server.
+      viewing = { path: inside, onServer: p ? `${p.data}${inside.slice("/data".length)}` : "", text };
     } catch (e) {
       app.notify(String(e), "error");
     }
@@ -243,9 +268,7 @@
       if (c.project && c.config_files.length) {
         const f = c.config_files[0];
         if (c.portainer) {
-          const p = listing?.portainer;
-          if (!p) throw new Error("Cannot find the Portainer container to read this stack from.");
-          compose = await api.dockerPortainerFile(tab.id, sudo, p.container, p.data, f);
+          compose = await portainerFile(tab.id, listing!, sudo, f, servicesOf(c));
         } else {
           compose = (await api.readText(tab.id, f)).text;
           env = await api.readText(tab.id, `${c.working_dir}/.env`).then((r) => r.text, () => "");
@@ -297,8 +320,8 @@
     picked = c.id;
     const on = c.state === "running";
     menu.show(e, [
-      { label: "Logs", icon: ScrollText, action: () => containers.logs(server, c, sudo) },
-      { label: "Shell inside", icon: TerminalSquare, disabled: !on, action: () => containers.shell(server, c, sudo) },
+      { label: "Logs", icon: ScrollText, action: () => containers.logs(server, c, containers.prefix(tab.id, sudo)) },
+      { label: "Shell inside", icon: TerminalSquare, disabled: !on, action: () => containers.shell(server, c, containers.prefix(tab.id, sudo)) },
       "sep",
       on
         ? { label: "Restart", icon: RotateCw, action: () => containerAction(c, "restart") }
@@ -328,7 +351,7 @@
     <div class="title">
       <h2>{server.name || server.host}</h2>
       {#if listing && (listing.access === "direct" || listing.access === "sudo")}
-        <span class="muted">{running} running{listing.access === "sudo" ? ", through sudo" : ""}</span>
+        <span class="muted">{running} running{listing.access === "sudo" || containers.asRoot[tab.id] ? ", through sudo" : ""}</span>
         {#if lookCount}<span class="badge warn">{lookCount} {lookCount === 1 ? "needs" : "need"} a look</span>{/if}
       {/if}
     </div>
@@ -357,10 +380,17 @@
     <p class="note muted">Docker is not installed on this server, or it is not on the PATH of {server.username || "this login"}.</p>
   {:else if listing.access === "denied"}
     <p class="note muted">
-      Docker is installed, but {server.username || "this login"} may not use it, and sudo wants a password. Add the user
-      to the docker group (<code>sudo usermod -aG docker {server.username || "$USER"}</code>, then log in again), or log
-      in as root.
+      Docker is installed, but {server.username || "this login"} may not use it{listing.sudo_possible ? ", and sudo wants a password" : ""}.
+      Add the user to the docker group (<code>sudo usermod -aG docker {server.username || "$USER"}</code>, then log in
+      again), or log in as root.
     </p>
+    {#if listing.sudo_possible}
+      <p class="note">
+        {#if sudoNote}<span class="bad">{sudoNote}</span><br />{/if}
+        <button class="btn" onclick={useSudoPassword}><KeyRound size={14} /> Use sudo with your password</button>
+        <span class="muted small">The password comes from the session's vault login, or Cablebag asks for it.</span>
+      </p>
+    {/if}
   {:else}
     <div class="body">
       <div class="left">
@@ -446,8 +476,8 @@
             {stateText(current)}{current.restarts ? `, restarted ${current.restarts} ${current.restarts === 1 ? "time" : "times"}` : ""}
           </p>
           <div class="acts">
-            <button class="btn" onclick={() => containers.logs(server, current, sudo)}><ScrollText size={14} /> Logs</button>
-            <button class="btn" disabled={!on} onclick={() => containers.shell(server, current, sudo)}><TerminalSquare size={14} /> Shell</button>
+            <button class="btn" onclick={() => containers.logs(server, current, containers.prefix(tab.id, sudo))}><ScrollText size={14} /> Logs</button>
+            <button class="btn" disabled={!on} onclick={() => containers.shell(server, current, containers.prefix(tab.id, sudo))}><TerminalSquare size={14} /> Shell</button>
             {#if on}
               <button class="btn" disabled={!!busy[current.id]} onclick={() => containerAction(current, "restart")}><RotateCw size={14} /> Restart</button>
               <button class="btn" disabled={!!busy[current.id]} onclick={() => containerAction(current, "stop")}><Square size={14} /> Stop</button>
@@ -496,6 +526,9 @@
                 </button>
                 {#if !current.portainer}<p class="muted small mono path">{f}</p>{/if}
               {/each}
+              {#if current.config_files.length && listing.compose !== "none"}
+                <div class="acts"><button class="btn" onclick={() => (moving = current.project)}><Truck size={14} /> Move to another server...</button></div>
+              {/if}
               {#if current.portainer}
                 <p class="muted small">Made in Portainer: change and redeploy it there.</p>
                 <div class="acts">
@@ -541,6 +574,20 @@
   />
 {/if}
 
+{#if moving && listing}
+  <MoveStackDialog
+    tab={tab.id}
+    {listing}
+    project={moving}
+    items={listing.containers.filter((c) => c.project === moving)}
+    onclose={() => (moving = "")}
+    ondone={() => {
+      moving = "";
+      load(true);
+    }}
+  />
+{/if}
+
 {#if output}
   <Modal title={output.title} width={720} warning={!output.ok} onclose={() => (output = null)}>
     <pre class="out">{output.text}</pre>
@@ -554,8 +601,8 @@
 {#if viewing}
   <Modal title={viewing.path.split("/").pop() ?? "Compose file"} width={820} onclose={() => (viewing = null)}>
     <p class="muted small view-note">
-      Made in Portainer. Inside Portainer it is <span class="mono">{viewing.path}</span>; on the server
-      <span class="mono">{viewing.onServer}</span> (only root can change it there). Change it in Portainer, so Portainer
+      Made in Portainer. Inside Portainer it is <span class="mono">{viewing.path}</span>{#if viewing.onServer}; on the server
+      <span class="mono">{viewing.onServer}</span> (only root can change it there){/if}. Change it in Portainer, so Portainer
       knows.
     </p>
     <pre class="out file">{viewing.text}</pre>

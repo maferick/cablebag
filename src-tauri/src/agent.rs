@@ -706,7 +706,7 @@ const MAX_OUTPUT: usize = 256 * 1024;
 
 /// The password sudo asks for: the session's vault login, a saved password, a login the vault holds for this
 /// server, or a question to the user. Also says whether the user wants a typed password remembered.
-async fn sudo_password(app: &AppHandle, session: &Session) -> Result<(String, bool)> {
+async fn sudo_password(app: &AppHandle, session: &Session, why: Option<&str>) -> Result<(String, bool)> {
     let state = app.state::<AppState>();
     let item = session.data.get("vault_item").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
     if !item.is_empty() {
@@ -728,10 +728,13 @@ async fn sudo_password(app: &AppHandle, session: &Session) -> Result<(String, bo
             }
         }
     }
-    let message = format!(
-        "The assistant needs root for a command you approved. sudo asks for the password of {} on this server, also when you logged in with a key. It goes to sudo only, never to the AI.",
-        session.username
-    );
+    let message = match why {
+        Some(w) => format!("{w} sudo asks for the password of {} on this server, also when you logged in with a key.", session.username),
+        None => format!(
+            "The assistant needs root for a command you approved. sudo asks for the password of {} on this server, also when you logged in with a key. It goes to sudo only, never to the AI.",
+            session.username
+        ),
+    };
     state
         .prompts
         .ask_secret(app, &format!("sudo on {}", session.host), &message, "Password", true)
@@ -855,6 +858,22 @@ pub fn limit_output(mut s: String) -> (String, bool) {
 /// Runs one command on its own channel of the tab's SSH login.
 /// `session` is the tab's saved session, used only to find the sudo password.
 pub async fn exec(app: &AppHandle, tab_id: &str, session: &Session, command: &str, root: bool, timeout: Duration) -> Result<ExecResult> {
+    Ok(exec_root(app, tab_id, session, command, root, timeout, None, None).await?.0)
+}
+
+/// As exec, for others than the assistant: `known` is a sudo password that worked before (kept by the caller),
+/// `why` is the question shown when a password has to be asked. Also gives back the password sudo took.
+#[allow(clippy::too_many_arguments)]
+pub async fn exec_root(
+    app: &AppHandle,
+    tab_id: &str,
+    session: &Session,
+    command: &str,
+    root: bool,
+    timeout: Duration,
+    known: Option<String>,
+    why: Option<&str>,
+) -> Result<(ExecResult, Option<String>)> {
     let conn = app.state::<AppState>().ssh.lock().get(tab_id).cloned().ok_or_else(|| anyhow!("This SSH tab is not connected."))?;
     let mut channel = tokio::time::timeout(Duration::from_secs(15), conn.handle.channel_open_session())
         .await
@@ -874,15 +893,22 @@ pub async fn exec(app: &AppHandle, tab_id: &str, session: &Session, command: &st
         .await
         .map_err(|_| anyhow!("The server did not start the command in time."))??;
     let mut keep: Option<String> = None;
+    let mut used: Option<String> = None;
     if how == Root::SudoPassword {
-        let (pw, save) = sudo_password(app, session).await?;
+        let (pw, save) = match known {
+            Some(pw) => (pw, false),
+            None => sudo_password(app, session, why).await?,
+        };
         channel.data(format!("{pw}\n").as_bytes()).await?;
+        // No second try on the same channel: after a wrong password sudo would wait for one until the time is up.
+        let _ = channel.eof().await;
         if save {
-            keep = Some(pw);
+            keep = Some(pw.clone());
         }
+        used = Some(pw);
     }
     let res = collect(&mut channel, timeout).await;
-    if how == Root::SudoPassword && res.exit == Some(1) && res.output.contains("incorrect password") {
+    if how == Root::SudoPassword && res.exit == Some(1) && (res.output.contains("incorrect password") || res.output.contains("Sorry, try again")) {
         bail!("sudo did not accept the password.");
     }
     // sudo took the typed password: remember it, as asked.
@@ -890,7 +916,7 @@ pub async fn exec(app: &AppHandle, tab_id: &str, session: &Session, command: &st
         let state = app.state::<AppState>();
         let _ = state.vault.save_password(&state.store.lock(), "ssh", &session.host, session.port, &session.username, &pw);
     }
-    Ok(res)
+    Ok((res, used))
 }
 
 #[cfg(test)]
