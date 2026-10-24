@@ -6,6 +6,12 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.18.3 · not released yet
+
+- **A Proxmox server can be removed where you edit it.** Right-click it in the session tree for **Remove this
+  Proxmox server**, and the edit window has a **Remove** button. Before, removing was only possible under Settings,
+  Proxmox servers.
+
 ## 0.18.2 · 24 October 2026
 
 - **Remote files follow the terminal.** Beside an SSH tab the files go to the folder you `cd` to in the terminal,

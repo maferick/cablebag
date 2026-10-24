@@ -271,6 +271,16 @@
       ...proxmox.nodes(src).map((n) => ({ label: `Shell on the node ${n}`, icon: Terminal, action: () => proxmox.openNodeShell(src, n) })),
       { label: "Recent tasks", icon: ListOrdered, action: () => (proxmox.dialog = { kind: "tasks", src }) },
       { label: "Edit this Proxmox server", icon: Pencil, action: () => (app.proxmoxEditing = src) },
+      "sep",
+      {
+        label: "Remove this Proxmox server",
+        icon: Trash2,
+        danger: true,
+        action: async () => {
+          if (await ask.confirm("Remove Proxmox server", `Remove "${src.name}" from Cablebag? Its guests leave the sessions tree; nothing changes on the server.`, { okLabel: "Remove", danger: true }))
+            await proxmox.remove(src.id);
+        },
+      },
     ]);
   }
 

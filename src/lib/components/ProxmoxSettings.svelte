@@ -83,13 +83,12 @@
     }
   }
 
-  async function remove(s: ProxmoxSource) {
+  async function remove(s: ProxmoxSource): Promise<boolean> {
     if (!(await ask.confirm("Remove Proxmox server", `Remove "${s.name}" from Cablebag? Its guests leave the sessions tree; nothing changes on the server.`, { okLabel: "Remove", danger: true })))
-      return;
-    await api.proxmoxDeleteSource(s.id);
-    delete proxmox.listings[s.id];
-    await proxmox.load();
+      return false;
+    await proxmox.remove(s.id);
     if (editing?.id === s.id) editing = null;
+    return true;
   }
 
   $effect.pre(() => {
@@ -173,6 +172,10 @@
 
     {#if result}<p class="result" class:bad={!result.ok}>{result.text}</p>{/if}
     <div class="buttons">
+      {#if editing.id}
+        <button class="btn danger-text" onclick={async () => (await remove(editing!)) && close()}><Trash2 size={14} /> Remove</button>
+        <span class="grow"></span>
+      {/if}
       <button class="btn" onclick={close}>Cancel</button>
       <button class="btn" disabled={busy} onclick={test}><PlugZap size={14} /> {busy ? "Connecting..." : "Save and test"}</button>
       <button
@@ -266,5 +269,8 @@
   .btn.small {
     padding: 3px 9px;
     font-size: 12px;
+  }
+  .danger-text {
+    color: var(--danger-text);
   }
 </style>

@@ -31,6 +31,13 @@ class ProxmoxStore {
     this.sources = await api.proxmoxSources();
   }
 
+  /** Takes a server out of Cablebag (and the token secret Cablebag kept for it); nothing changes on the server. */
+  async remove(id: string) {
+    await api.proxmoxDeleteSource(id);
+    delete this.listings[id];
+    await this.load();
+  }
+
   start() {
     if (this.started) return;
     this.started = true;
