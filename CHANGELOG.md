@@ -6,7 +6,7 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.20.2 · not released yet
+## 0.20.2 · 25 October 2026
 
 - **Drag and drop in the session tree.** Drag sessions, folders and Proxmox servers: into the middle of a folder
   to put them in it, or to the top or bottom edge of a row of the same kind to put them in your own order; drop on
