@@ -6,6 +6,13 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.20.3 · not released yet
+
+- **Drag and drop works now.** In 0.20.2 dragging in the session tree did nothing on Windows, because Cablebag
+  keeps Windows' own file dropping on (for dragging files in from Explorer). Dragging now follows the mouse
+  itself: a small label shows what you carry, and Escape cancels. The same fix makes reordering pinned sites on
+  the left strip and swapping panes in tiled view work, and the pane you would swap with is now clearly lit up.
+
 ## 0.20.2 · 25 October 2026
 
 - **Drag and drop in the session tree.** Drag sessions, folders and Proxmox servers: into the middle of a folder

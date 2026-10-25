@@ -6,6 +6,7 @@
   import { browserProfiles, SHARED } from "../browserProfiles.svelte";
   import { pins, type Pin } from "../pins.svelte";
   import { openInMenu } from "../webMenu.svelte";
+  import { pressToDrag } from "../pointerDrag";
   import { Pencil, PinOff, Users } from "@lucide/svelte";
 
   function label(p: Pin): string {
@@ -24,6 +25,26 @@
   }
 
   let dragging = $state<string | null>(null);
+  /** The pin the dragged one goes in front of ("end": after the last one). */
+  let before = $state<string | null>(null);
+
+  function press(e: PointerEvent, p: Pin) {
+    pressToDrag(e, {
+      label: label(p),
+      start: () => (dragging = p.id),
+      move: (el) => {
+        const dt = el?.dataset.dt ?? "";
+        before = dt === "pin-end" ? "end" : dt.startsWith("pin:") ? dt.slice(4) : null;
+      },
+      drop: () => {
+        if (dragging && before) pins.move(dragging, before === "end" ? null : before);
+      },
+      end: () => {
+        dragging = null;
+        before = null;
+      },
+    });
+  }
 </script>
 
 <nav class="strip" aria-label="Pinned sites">
@@ -37,22 +58,13 @@
       class:active={t && app.activeId === t.id}
       class:asleep={!t}
       class:dragging={dragging === p.id}
+      class:before={dragging && before === p.id && dragging !== p.id}
+      data-dt="pin:{p.id}"
       title="{name}{who}{t?.unread ? `, ${t.unread} unread` : ''}"
       aria-label="{name}{who}{t?.unread ? `, ${t.unread} unread` : ''}"
-      draggable="true"
       onclick={() => pins.show(p)}
       oncontextmenu={(e) => pinMenu(e, p)}
-      ondragstart={(e) => {
-        dragging = p.id;
-        e.dataTransfer?.setData("text/plain", p.id);
-      }}
-      ondragend={() => (dragging = null)}
-      ondragover={(e) => dragging && e.preventDefault()}
-      ondrop={(e) => {
-        e.preventDefault();
-        if (dragging) pins.move(dragging, p.id);
-        dragging = null;
-      }}
+      onpointerdown={(e) => press(e, p)}
     >
       {#if color}<span class="bar" style:background={color} aria-hidden="true"></span>{/if}
       <span class="letter" aria-hidden="true">{name.trim().charAt(0).toUpperCase()}</span>
@@ -60,16 +72,7 @@
     </button>
   {/each}
   <!-- Dropping below the last pin moves a pin to the end. -->
-  <div
-    class="end"
-    role="presentation"
-    ondragover={(e) => dragging && e.preventDefault()}
-    ondrop={(e) => {
-      e.preventDefault();
-      if (dragging) pins.move(dragging, null);
-      dragging = null;
-    }}
-  ></div>
+  <div class="end" class:before={dragging && before === "end"} role="presentation" data-dt="pin-end"></div>
 </nav>
 
 <style>
@@ -113,6 +116,11 @@
   }
   .pin.dragging {
     opacity: 0.4;
+  }
+  /* Where a dragged pin goes: a line above the pin it lands in front of, or above the empty end. */
+  .pin.before,
+  .end.before {
+    box-shadow: 0 -5px 0 -3px var(--accent);
   }
   .bar {
     position: absolute;

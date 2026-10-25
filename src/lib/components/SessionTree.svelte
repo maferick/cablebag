@@ -11,6 +11,7 @@
   import { writeText } from "../clipboard";
   import { assistant } from "../assistant.svelte";
   import { pins } from "../pins.svelte";
+  import { pressToDrag } from "../pointerDrag";
   import { webItems, folderItem as folderProfileItem } from "../webMenu.svelte";
   import type { ProxmoxGuest, ProxmoxSource } from "../api";
   import { api, type Folder, type Session } from "../api";
@@ -450,23 +451,45 @@
     return false;
   }
 
-  function startDrag(e: DragEvent, d: Drag) {
-    e.stopPropagation();
-    drag = d;
-    e.dataTransfer?.setData("text/plain", "cablebag");
-    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  let treeEl = $state<HTMLDivElement>();
+
+  /** A row (or the tree's empty part) under the pointer, from its data-dt: folder:ID, session:ID, pve:ID or root. */
+  function targetOf(el: HTMLElement | null): Target | null {
+    const dt = el?.dataset.dt;
+    if (!dt || !treeEl?.contains(el)) return null;
+    if (dt === "root") return { kind: "root" };
+    const [kind, ...rest] = dt.split(":");
+    return { kind: kind as "folder" | "session" | "pve", id: rest.join(":") };
   }
 
-  function endDrag() {
-    drag = null;
-    hint = null;
+  /** Press on a row: dragging starts once the pointer moves (see pointerDrag.ts). */
+  function press(e: PointerEvent, d: Drag, label: string) {
+    pressToDrag(e, {
+      label,
+      start: () => (drag = d),
+      move: (el, _x, y) => {
+        const t = targetOf(el);
+        const w = t && el ? whereAt(t, el.getBoundingClientRect(), y) : null;
+        hint = t && w ? { key: tkey(t), where: w } : null;
+        // Near the top or bottom edge of the tree, it scrolls.
+        const r = treeEl?.getBoundingClientRect();
+        if (treeEl && r) treeEl.scrollTop += y < r.top + 24 ? -12 : y > r.bottom - 24 ? 12 : 0;
+      },
+      drop: () => {
+        const h = hint;
+        if (h) dropAt(h.key === "root" ? { kind: "root" } : targetOf(treeEl?.querySelector<HTMLElement>(`[data-dt="${h.key}"]`) ?? null) ?? { kind: "root" }, h.where);
+      },
+      end: () => {
+        drag = null;
+        hint = null;
+      },
+    });
   }
 
   /** What dropping here would do, from where the pointer is on the row; null when it cannot go there. */
-  function whereOn(e: DragEvent, t: Target): Where | null {
+  function whereAt(t: Target, r: DOMRect, clientY: number): Where | null {
     if (!drag || t.kind === "root") return drag ? "into" : null;
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const y = (e.clientY - r.top) / r.height;
+    const y = (clientY - r.top) / r.height;
     const edge: Where = y < 0.5 ? "before" : "after";
     if (t.kind === "folder") {
       if (drag.kind === "folder") {
@@ -480,15 +503,6 @@
     return drag.kind === "pve" && drag.id !== t.id ? edge : null;
   }
 
-  function over(e: DragEvent, t: Target) {
-    const w = whereOn(e, t);
-    if (!w) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-    if (hint?.key !== tkey(t) || hint.where !== w) hint = { key: tkey(t), where: w };
-  }
-
   /** Puts the moved item at its new place among its siblings and saves the order of all of them. */
   function placed<T extends { id: string }>(list: T[], moved: T, target: string | null, where: Where): T[] {
     const rest = list.filter((x) => x.id !== moved.id);
@@ -498,13 +512,9 @@
     return rest;
   }
 
-  async function drop(e: DragEvent, t: Target) {
-    const where = whereOn(e, t);
+  async function dropAt(t: Target, where: Where) {
     const d = drag;
-    endDrag();
-    if (!d || !where) return;
-    e.preventDefault();
-    e.stopPropagation();
+    if (!d) return;
     // The folder it lands in, and the row it goes before or after.
     const folderOf = (): string | null => {
       if (t.kind === "root") return null;
@@ -569,7 +579,7 @@
     </button>
   </div>
   {#if view === "web"}
-    <div class="tree" role="tree" tabindex="-1" onkeydown={treeKeys} oncontextmenu={(e) => e.preventDefault()}>
+    <div class="tree" role="tree" tabindex="-1" bind:this={treeEl} onkeydown={treeKeys} oncontextmenu={(e) => e.preventDefault()}>
       {@render web()}
     </div>
   {:else}
@@ -579,10 +589,9 @@
     tabindex="-1"
     onkeydown={treeKeys}
     class:drop-root={hint?.key === "root"}
+    data-dt="root"
+    bind:this={treeEl}
     oncontextmenu={(e) => folderMenu(e, null)}
-    ondragover={(e) => over(e, { kind: "root" })}
-    ondragleave={(e) => e.currentTarget === e.target && hint?.key === "root" && (hint = null)}
-    ondrop={(e) => drop(e, { kind: "root" })}
   >
     {@render level(null, 0)}
     {#if !app.sessions.length}
@@ -609,15 +618,12 @@
         aria-selected="false"
         aria-expanded={isOpen}
         style:padding-left="{6 + depth * 14}px"
-        draggable="true"
+        data-dt="folder:{f.id}"
         data-drop={hintOf({ kind: "folder", id: f.id })}
         onclick={() => toggle(f.id)}
         onkeydown={(e) => e.key === "Enter" && toggle(f.id)}
         oncontextmenu={(e) => folderMenu(e, f)}
-        ondragstart={(e) => startDrag(e, { kind: "folder", id: f.id })}
-        ondragend={endDrag}
-        ondragover={(e) => over(e, { kind: "folder", id: f.id })}
-        ondrop={(e) => drop(e, { kind: "folder", id: f.id })}
+        onpointerdown={(e) => press(e, { kind: "folder", id: f.id }, f.name)}
       >
         <span class="chev" class:open={isOpen}><ChevronRight size={13} /></span>
         {#if isOpen}<FolderOpen size={15} class="ficon" />{:else}<FolderIcon size={15} class="ficon" />{/if}
@@ -645,7 +651,7 @@
       role="treeitem"
       tabindex="0"
       aria-selected={selected === s.id}
-      draggable="true"
+      data-dt="session:{s.id}"
       data-drop={hintOf({ kind: "session", id: s.id })}
       style:padding-left="{24 + depth * 14}px"
       title={`${k.label}${s.host ? ` - ${s.username ? s.username + "@" : ""}${s.host}${s.port && s.port !== k.defaultPort ? ":" + s.port : ""}` : ""}${s.comment ? `\n${s.comment}` : ""}`}
@@ -653,10 +659,7 @@
       ondblclick={() => app.openSession(s)}
       onkeydown={(e) => e.key === "Enter" && app.openSession(s)}
       oncontextmenu={(e) => sessionMenu(e, s)}
-      ondragstart={(e) => startDrag(e, { kind: "session", id: s.id })}
-      ondragend={endDrag}
-      ondragover={(e) => over(e, { kind: "session", id: s.id })}
-      ondrop={(e) => drop(e, { kind: "session", id: s.id })}
+      onpointerdown={(e) => press(e, { kind: "session", id: s.id }, s.name || s.host)}
     >
       <span class="kicon" class:pending={!k.ready}>
         <k.icon size={14} />
@@ -747,10 +750,9 @@
     style:padding-left="{6 + depth * 14}px"
     onclick={() => toggle(key)}
     onkeydown={(e) => e.key === "Enter" && toggle(key)}
+    data-dt="folder:{f.id}"
     data-drop={hintOf({ kind: "folder", id: f.id })}
     oncontextmenu={(e) => folderMenu(e, f)}
-    ondragover={(e) => over(e, { kind: "folder", id: f.id })}
-    ondrop={(e) => drop(e, { kind: "folder", id: f.id })}
   >
     <span class="chev" class:open={open[key]}><ChevronRight size={13} /></span>
     {#if open[key]}<FolderOpen size={15} class="ficon" />{:else}<FolderIcon size={15} class="ficon" />{/if}
@@ -803,15 +805,13 @@
     role="treeitem"
     tabindex="0"
     aria-selected={selected === s.id}
-    draggable="true"
     style:padding-left="{24 + depth * 14}px"
     title={`${s.host}${s.comment ? `\n${s.comment}` : ""}`}
     onclick={() => (selected = s.id)}
     ondblclick={() => app.openSession(s)}
     onkeydown={(e) => e.key === "Enter" && app.openSession(s)}
     oncontextmenu={(e) => sessionMenu(e, s)}
-    ondragstart={(e) => startDrag(e, { kind: "session", id: s.id })}
-    ondragend={endDrag}
+    onpointerdown={(e) => press(e, { kind: "session", id: s.id }, s.name || s.host)}
   >
     <span class="kicon"><Globe size={14} /></span>
     <span class="name">{s.name || s.host}</span>
@@ -838,15 +838,12 @@
         aria-expanded={isOpen}
         style:padding-left="{6 + depth * 14}px"
         title={`Proxmox: ${src.url}`}
-        draggable="true"
+        data-dt="pve:{src.id}"
         data-drop={hintOf({ kind: "pve", id: src.id })}
         onclick={() => toggle(key)}
         onkeydown={(e) => e.key === "Enter" && toggle(key)}
         oncontextmenu={(e) => pveMenu(e, src)}
-        ondragstart={(e) => startDrag(e, { kind: "pve", id: src.id })}
-        ondragend={endDrag}
-        ondragover={(e) => over(e, { kind: "pve", id: src.id })}
-        ondrop={(e) => drop(e, { kind: "pve", id: src.id })}
+        onpointerdown={(e) => press(e, { kind: "pve", id: src.id }, src.name)}
       >
         <span class="chev" class:open={isOpen}><ChevronRight size={13} /></span>
         <ServerCog size={15} class="ficon" />
@@ -876,9 +873,7 @@
             aria-selected={selected === gid}
             style:padding-left="{38 + depth * 14}px"
             title={guestTitle(src, g)}
-            draggable="true"
-            ondragstart={(e) => startDrag(e, { kind: "guest", src, g })}
-            ondragend={endDrag}
+            onpointerdown={(e) => press(e, { kind: "guest", src, g }, g.name)}
             onclick={() => (selected = gid)}
             ondblclick={() => proxmox.openDefault(src, g)}
             onkeydown={(e) => e.key === "Enter" && proxmox.openDefault(src, g)}
@@ -904,8 +899,10 @@
   .row[data-drop="after"] {
     box-shadow: inset 0 -2px 0 var(--accent);
   }
-  .row[data-drop="into"] {
+  .row[data-drop="into"],
+  .row[data-drop="into"]:hover {
     background: color-mix(in srgb, var(--accent) 18%, transparent);
+    box-shadow: inset 0 0 0 1px var(--accent);
   }
   .tree.drop-root {
     box-shadow: inset 0 0 0 1px var(--accent);

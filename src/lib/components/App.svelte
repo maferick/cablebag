@@ -7,6 +7,7 @@
   import "../theme.css";
   import { app, statusWord, type Tab, type TabStatus, type Transfer } from "../state.svelte";
   import { tiles, type Divider, type Rect } from "../tiles.svelte";
+  import { pressToDrag } from "../pointerDrag";
   import { Maximize2, Minimize2, X, EllipsisVertical, Plus, Minus, Equal, RotateCw, MoveHorizontal, MoveVertical, PanelLeft, Columns2, Rows2, ArrowLeft, ArrowRight, ArrowUp, ArrowDown } from "@lucide/svelte";
   import { menu, type MenuEntry } from "../menu.svelte";
   import type { PromptRequest } from "../api";
@@ -151,11 +152,25 @@
   }
 
   // Drag a pane's header onto another pane to swap them.
+  // Drag a pane's header onto another pane to swap them (with the pointer, see pointerDrag.ts).
   let dragging = $state<string | null>(null);
-  function dropOn(e: DragEvent, target: string) {
-    e.preventDefault();
-    if (dragging && dragging !== target) tiles.swap(dragging, target);
-    dragging = null;
+  let dropTarget = $state<string | null>(null);
+  function pressPane(e: PointerEvent, t: Tab) {
+    pressToDrag(e, {
+      label: t.title,
+      start: () => (dragging = t.id),
+      move: (el) => {
+        const dt = el?.dataset.dt ?? "";
+        dropTarget = dt.startsWith("pane:") && dt.slice(5) !== t.id ? dt.slice(5) : null;
+      },
+      drop: () => {
+        if (dragging && dropTarget) tiles.swap(dragging, dropTarget);
+      },
+      end: () => {
+        dragging = null;
+        dropTarget = null;
+      },
+    });
   }
 
   /** The right Alt key (AltGr) is held. */
@@ -460,24 +475,19 @@
               class:focused={headed && app.activeId === t.id}
               class:splitfocus={!tiling && app.split !== "1" && app.activeId === t.id}
               class:target={!!dragging && dragging !== t.id}
+              class:droptarget={dropTarget === t.id}
               style={cellStyle(r)}
               role="presentation"
+              data-dt="pane:{t.id}"
               onmousedown={() => (app.activeId = t.id)}
-              ondragover={(e) => dragging && e.preventDefault()}
-              ondrop={(e) => dropOn(e, t.id)}
             >
               {#if headed && shown && !barred(t)}
                 <div
                   class="ph"
                   role="toolbar"
                   tabindex="-1"
-                  draggable="true"
                   title="Drag onto another pane to swap them; double-click to zoom"
-                  ondragstart={(e) => {
-                    dragging = t.id;
-                    e.dataTransfer?.setData("text/plain", t.title);
-                  }}
-                  ondragend={() => (dragging = null)}
+                  onpointerdown={(e) => pressPane(e, t)}
                   ondblclick={() => tiles.toggleZoom(t.id)}
                   oncontextmenu={(e) => menu.show(e, paneMenu(t))}
                 >
@@ -546,13 +556,8 @@
     class="lead"
     role="toolbar"
     tabindex="-1"
-    draggable="true"
     title="Drag onto another pane to swap them; double-click to zoom"
-    ondragstart={(e) => {
-      dragging = t.id;
-      e.dataTransfer?.setData("text/plain", t.title);
-    }}
-    ondragend={() => (dragging = null)}
+    onpointerdown={(e) => pressPane(e, t)}
     ondblclick={() => tiles.toggleZoom(t.id)}
     oncontextmenu={(e) => menu.show(e, paneMenu(t))}
   >
@@ -668,9 +673,18 @@
     pointer-events: none;
     z-index: 3;
   }
-  .cell.target {
-    outline: 2px dashed var(--accent);
-    outline-offset: -4px;
+  /* Drawn over the pane's content (an outline would sit under the terminal). */
+  .cell.target::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border: 2px dashed var(--accent);
+    pointer-events: none;
+    z-index: 20;
+  }
+  .cell.droptarget::after {
+    border-style: solid;
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
   }
   .body {
     position: absolute;
