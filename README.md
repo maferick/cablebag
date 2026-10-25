@@ -131,9 +131,9 @@ tabs, at the same time.
 - **Stacks and templates.** **New stack** puts a compose file in `~/stacks/<name>` on the server and starts it,
   from scratch or from a template with blanks that are asked when you use it. Save any running project, or a
   container started without Compose, as a template; passwords in it become blanks.
-- **Move a stack to another server.** Cablebag finds every folder it uses on the shared storage (a NAS folder
-  mounted under another name or depth, or local on the NAS itself), checks ports, networks, images and logins
-  there, stops it here, starts it there, and goes back by itself when it does not come up healthy.
+- **Move a stack to another server.** Cablebag finds where every folder it uses is on the other server, checks
+  ports, networks, images and logins there, stops it here, starts it there, and goes back by itself when it does
+  not come up healthy.
 - **Ask the assistant** about a container: it gets the state and the last log lines to start from.
 - **Stacks made in Portainer** are marked, and their compose file is shown read-only, so you change it in
   Portainer.

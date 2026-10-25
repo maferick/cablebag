@@ -236,6 +236,20 @@
       { label: "Open with SSH", icon: Terminal, action: () => open("ssh") },
       { label: "Open with RDP", icon: Monitor, action: () => open("rdp") },
       ...(running ? [{ label: "Open the console", icon: MonitorPlay, action: () => proxmox.openConsole(src, g) }] : []),
+      // A saved SSH session for the guest's address knows the right login; otherwise the one Open with SSH uses.
+      ...(running && !isWindows(g)
+        ? [
+            {
+              label: "Containers",
+              icon: Container,
+              action: () => {
+                const saved = app.sessions.find((s) => s.kind === "ssh" && g.ips.includes(s.host));
+                const s = saved ?? proxmox.session(src, g, "ssh");
+                if (s) app.openContainers(s);
+              },
+            },
+          ]
+        : []),
       { label: "Open the console in the browser", icon: Globe, action: () => proxmox.openConsoleInBrowser(src, g) },
       {
         label: "Save as a session",
