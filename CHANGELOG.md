@@ -6,7 +6,7 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.20.1 · not released yet
+## 0.20.1 · 25 October 2026
 
 - **Containers of a Proxmox guest**: right-click a running Linux VM or container in a Proxmox folder for
   **Containers**. It uses your saved SSH session for that address when there is one.

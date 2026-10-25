@@ -92,12 +92,14 @@ tabs, at the same time.
 ![The Web view with recent sites and bookmark folders, the strip of pinned sites with an unread count, and a web tab framed in the colour of its browser profile](assets/web-tabs.png)
 
 - **A browser profile per tenant or account.** Each profile keeps its own cookies and logins, so two Azure
-  tenants, two Teams or two of anything are signed in side by side. Choose one per web session or once for a
-  folder; **Private** keeps nothing after the tab closes. The tab, the pane header and a frame around the page show
-  the profile's name and colour, so two tenants never look alike.
+  tenants, two Teams or two of anything are signed in side by side. The profile button in the address bar opens
+  the page in another profile, makes a new one from just a name, and keeps a profile for the session or its whole
+  folder; a folder can also get one with a right-click. A **Private window** keeps nothing after it closes. The
+  tab, the pane header and a frame around the page show the profile's name and colour, so two tenants never look
+  alike.
 - **Servers and Web.** The sidebar switches between your servers and your web sessions. The Web view shows the
-  sites you opened last, then your bookmark folders (without Chrome's own "Bookmarks bar" level), by folder or by
-  site.
+  sites you opened last, then your bookmark folders (without Chrome's own "Bookmarks bar" level), by folder, by
+  site or by profile.
 - **Pinned sites** sit on a strip at the left edge with their profile's colour and the unread count of their
   page. Pinned sites open at the start and keep running, so Teams keeps its notifications coming; the same site
   can be pinned once per profile.
