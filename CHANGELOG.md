@@ -6,7 +6,7 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.20.3 · not released yet
+## 0.20.3 · 25 October 2026
 
 - **Drag and drop works now.** In 0.20.2 dragging in the session tree did nothing on Windows, because Cablebag
   keeps Windows' own file dropping on (for dragging files in from Explorer). Dragging now follows the mouse
