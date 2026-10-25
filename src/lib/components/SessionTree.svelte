@@ -64,15 +64,24 @@
   }
 
   function childFolders(parent: string | null): Folder[] {
-    return app.folders.filter((f) => f.parent_id === parent).sort((a, b) => a.name.localeCompare(b.name));
+    return app.folders.filter((f) => f.parent_id === parent).sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0) || a.name.localeCompare(b.name));
   }
 
   function childSessions(folder: string | null): Session[] {
     return app.sessions.filter((s) => s.folder_id === folder && matches(s));
   }
 
+  /** The Proxmox servers shown in a folder (or at the top), in the order they are kept. */
+  function pveIn(parent: string | null) {
+    return proxmox.sources.filter((src) => {
+      const f = src.folder_id && app.folders.some((x) => x.id === src.folder_id) ? src.folder_id : null;
+      return f === parent;
+    });
+  }
+
   function hasMatch(folder: string): boolean {
     if (childSessions(folder).length) return true;
+    if (pveIn(folder).some((src) => (proxmox.listings[src.id]?.guests ?? []).some(guestMatches))) return true;
     return childFolders(folder).some((f) => hasMatch(f.id));
   }
 
@@ -422,13 +431,126 @@
     await app.reloadLibrary();
   }
 
-  // Drag a session onto a folder to move it.
-  let dragId: string | null = null;
-  async function dropOn(folder: string | null) {
-    const s = app.sessions.find((x) => x.id === dragId);
-    dragId = null;
-    if (!s || s.folder_id === folder) return;
-    await app.saveSession({ ...$state.snapshot(s), folder_id: folder } as Session);
+  // ---- Drag and drop: sessions, folders, Proxmox servers and machines. In the middle of a folder: into it; at the
+  // top or bottom edge of a row of the same kind: before or after it, to put things in your own order. ----
+  type Drag = { kind: "session" | "folder" | "pve"; id: string } | { kind: "guest"; src: ProxmoxSource; g: ProxmoxGuest };
+  type Target = { kind: "folder" | "session" | "pve"; id: string } | { kind: "root" };
+  type Where = "before" | "after" | "into";
+  let drag = $state<Drag | null>(null);
+  let hint = $state<{ key: string; where: Where } | null>(null);
+  const tkey = (t: Target) => (t.kind === "root" ? "root" : `${t.kind}:${t.id}`);
+  const hintOf = (t: Target) => (hint?.key === tkey(t) ? hint.where : "");
+
+  /** Whether folder a is inside folder b (or is b). */
+  function within(a: string | null, b: string): boolean {
+    for (let cur = a, i = 0; cur && i < 50; i++) {
+      if (cur === b) return true;
+      cur = app.folders.find((f) => f.id === cur)?.parent_id ?? null;
+    }
+    return false;
+  }
+
+  function startDrag(e: DragEvent, d: Drag) {
+    e.stopPropagation();
+    drag = d;
+    e.dataTransfer?.setData("text/plain", "cablebag");
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  }
+
+  function endDrag() {
+    drag = null;
+    hint = null;
+  }
+
+  /** What dropping here would do, from where the pointer is on the row; null when it cannot go there. */
+  function whereOn(e: DragEvent, t: Target): Where | null {
+    if (!drag || t.kind === "root") return drag ? "into" : null;
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const y = (e.clientY - r.top) / r.height;
+    const edge: Where = y < 0.5 ? "before" : "after";
+    if (t.kind === "folder") {
+      if (drag.kind === "folder") {
+        if (drag.id === t.id) return null;
+        if (y > 0.25 && y < 0.75) return within(t.id, drag.id) ? null : "into";
+        return edge;
+      }
+      return "into";
+    }
+    if (t.kind === "session") return drag.kind === "session" && drag.id !== t.id ? edge : null;
+    return drag.kind === "pve" && drag.id !== t.id ? edge : null;
+  }
+
+  function over(e: DragEvent, t: Target) {
+    const w = whereOn(e, t);
+    if (!w) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    if (hint?.key !== tkey(t) || hint.where !== w) hint = { key: tkey(t), where: w };
+  }
+
+  /** Puts the moved item at its new place among its siblings and saves the order of all of them. */
+  function placed<T extends { id: string }>(list: T[], moved: T, target: string | null, where: Where): T[] {
+    const rest = list.filter((x) => x.id !== moved.id);
+    const at = target ? rest.findIndex((x) => x.id === target) : -1;
+    if (at < 0) return [...rest, moved];
+    rest.splice(where === "after" ? at + 1 : at, 0, moved);
+    return rest;
+  }
+
+  async function drop(e: DragEvent, t: Target) {
+    const where = whereOn(e, t);
+    const d = drag;
+    endDrag();
+    if (!d || !where) return;
+    e.preventDefault();
+    e.stopPropagation();
+    // The folder it lands in, and the row it goes before or after.
+    const folderOf = (): string | null => {
+      if (t.kind === "root") return null;
+      if (t.kind === "folder") return where === "into" ? t.id : (app.folders.find((f) => f.id === t.id)?.parent_id ?? null);
+      if (t.kind === "session") return app.sessions.find((x) => x.id === t.id)?.folder_id ?? null;
+      const src = proxmox.sources.find((x) => x.id === t.id);
+      return src?.folder_id && app.folders.some((f) => f.id === src.folder_id) ? src.folder_id : null;
+    };
+    const folder = folderOf();
+    const near = t.kind !== "root" && where !== "into" ? t.id : null;
+    if (d.kind === "session") {
+      const s = app.sessions.find((x) => x.id === d.id);
+      if (!s) return;
+      if (!near) {
+        if (s.folder_id !== folder) await app.saveSession({ ...$state.snapshot(s), folder_id: folder } as Session);
+        return;
+      }
+      const order = placed(app.sessions.filter((x) => x.folder_id === folder), s, near, where);
+      for (const [i, x] of order.entries())
+        if (x.sort !== i || x.folder_id !== folder) await api.saveSession({ ...($state.snapshot(x) as Session), folder_id: folder, sort: i });
+      await app.reloadLibrary();
+    } else if (d.kind === "folder") {
+      const f = app.folders.find((x) => x.id === d.id);
+      if (!f || (folder && within(folder, f.id))) return;
+      const order = near ? placed(childFolders(folder), f, near, where) : [...childFolders(folder).filter((x) => x.id !== f.id), f];
+      for (const [i, x] of order.entries())
+        if ((x.sort ?? 0) !== i || x.parent_id !== folder) await api.saveFolder({ ...($state.snapshot(x) as Folder), parent_id: folder, sort: i });
+      if (folder) open[folder] = true;
+      await app.reloadLibrary();
+    } else if (d.kind === "pve") {
+      const src = proxmox.sources.find((x) => x.id === d.id);
+      if (!src) return;
+      const order = near ? placed(proxmox.sources, src, near, where) : proxmox.sources;
+      await api.proxmoxArrange(src.id, folder ?? "", order.map((x) => x.id));
+      if (folder) open[folder] = true;
+      await proxmox.load();
+    } else if (d.kind === "guest") {
+      // A Proxmox machine dropped in a folder stays there as a saved session.
+      const s = proxmox.session(d.src, d.g, isWindows(d.g) ? "rdp" : "ssh");
+      if (!s) return;
+      s.folder_id = folder;
+      await api.saveSession(s);
+      await app.reloadLibrary();
+      if (folder) open[folder] = true;
+      app.notify(`${d.g.name} saved${folder ? ` in ${app.folders.find((f) => f.id === folder)?.name}` : ""}`);
+    }
   }
 </script>
 
@@ -456,9 +578,11 @@
     role="tree"
     tabindex="-1"
     onkeydown={treeKeys}
+    class:drop-root={hint?.key === "root"}
     oncontextmenu={(e) => folderMenu(e, null)}
-    ondragover={(e) => e.preventDefault()}
-    ondrop={() => dropOn(null)}
+    ondragover={(e) => over(e, { kind: "root" })}
+    ondragleave={(e) => e.currentTarget === e.target && hint?.key === "root" && (hint = null)}
+    ondrop={(e) => drop(e, { kind: "root" })}
   >
     {@render level(null, 0)}
     {#if !app.sessions.length}
@@ -485,14 +609,15 @@
         aria-selected="false"
         aria-expanded={isOpen}
         style:padding-left="{6 + depth * 14}px"
+        draggable="true"
+        data-drop={hintOf({ kind: "folder", id: f.id })}
         onclick={() => toggle(f.id)}
         onkeydown={(e) => e.key === "Enter" && toggle(f.id)}
         oncontextmenu={(e) => folderMenu(e, f)}
-        ondragover={(e) => e.preventDefault()}
-        ondrop={(e) => {
-          e.stopPropagation();
-          dropOn(f.id);
-        }}
+        ondragstart={(e) => startDrag(e, { kind: "folder", id: f.id })}
+        ondragend={endDrag}
+        ondragover={(e) => over(e, { kind: "folder", id: f.id })}
+        ondrop={(e) => drop(e, { kind: "folder", id: f.id })}
       >
         <span class="chev" class:open={isOpen}><ChevronRight size={13} /></span>
         {#if isOpen}<FolderOpen size={15} class="ficon" />{:else}<FolderIcon size={15} class="ficon" />{/if}
@@ -509,9 +634,7 @@
       {/if}
     {/if}
   {/each}
-  {#if parent === null}
-    {@render pveFolders()}
-  {/if}
+  {@render pveFolders(parent, depth)}
   {#each childSessions(parent) as s (s.id)}
     {@const k = kindInfo(s.kind)}
     {@const live = liveState(s)}
@@ -523,13 +646,17 @@
       tabindex="0"
       aria-selected={selected === s.id}
       draggable="true"
+      data-drop={hintOf({ kind: "session", id: s.id })}
       style:padding-left="{24 + depth * 14}px"
       title={`${k.label}${s.host ? ` - ${s.username ? s.username + "@" : ""}${s.host}${s.port && s.port !== k.defaultPort ? ":" + s.port : ""}` : ""}${s.comment ? `\n${s.comment}` : ""}`}
       onclick={() => (selected = s.id)}
       ondblclick={() => app.openSession(s)}
       onkeydown={(e) => e.key === "Enter" && app.openSession(s)}
       oncontextmenu={(e) => sessionMenu(e, s)}
-      ondragstart={() => (dragId = s.id)}
+      ondragstart={(e) => startDrag(e, { kind: "session", id: s.id })}
+      ondragend={endDrag}
+      ondragover={(e) => over(e, { kind: "session", id: s.id })}
+      ondrop={(e) => drop(e, { kind: "session", id: s.id })}
     >
       <span class="kicon" class:pending={!k.ready}>
         <k.icon size={14} />
@@ -620,12 +747,10 @@
     style:padding-left="{6 + depth * 14}px"
     onclick={() => toggle(key)}
     onkeydown={(e) => e.key === "Enter" && toggle(key)}
+    data-drop={hintOf({ kind: "folder", id: f.id })}
     oncontextmenu={(e) => folderMenu(e, f)}
-    ondragover={(e) => e.preventDefault()}
-    ondrop={(e) => {
-      e.stopPropagation();
-      dropOn(f.id);
-    }}
+    ondragover={(e) => over(e, { kind: "folder", id: f.id })}
+    ondrop={(e) => drop(e, { kind: "folder", id: f.id })}
   >
     <span class="chev" class:open={open[key]}><ChevronRight size={13} /></span>
     {#if open[key]}<FolderOpen size={15} class="ficon" />{:else}<FolderIcon size={15} class="ficon" />{/if}
@@ -685,7 +810,8 @@
     ondblclick={() => app.openSession(s)}
     onkeydown={(e) => e.key === "Enter" && app.openSession(s)}
     oncontextmenu={(e) => sessionMenu(e, s)}
-    ondragstart={() => (dragId = s.id)}
+    ondragstart={(e) => startDrag(e, { kind: "session", id: s.id })}
+    ondragend={endDrag}
   >
     <span class="kicon"><Globe size={14} /></span>
     <span class="name">{s.name || s.host}</span>
@@ -697,8 +823,8 @@
   </div>
 {/snippet}
 
-{#snippet pveFolders()}
-  {#each proxmox.sources as src (src.id)}
+{#snippet pveFolders(parent: string | null, depth: number)}
+  {#each pveIn(parent) as src (src.id)}
     {@const key = pveKey(src.id)}
     {@const l = proxmox.listings[src.id]}
     {@const guests = (l?.guests ?? []).filter(guestMatches)}
@@ -710,11 +836,17 @@
         tabindex="0"
         aria-selected="false"
         aria-expanded={isOpen}
-        style:padding-left="6px"
+        style:padding-left="{6 + depth * 14}px"
         title={`Proxmox: ${src.url}`}
+        draggable="true"
+        data-drop={hintOf({ kind: "pve", id: src.id })}
         onclick={() => toggle(key)}
         onkeydown={(e) => e.key === "Enter" && toggle(key)}
         oncontextmenu={(e) => pveMenu(e, src)}
+        ondragstart={(e) => startDrag(e, { kind: "pve", id: src.id })}
+        ondragend={endDrag}
+        ondragover={(e) => over(e, { kind: "pve", id: src.id })}
+        ondrop={(e) => drop(e, { kind: "pve", id: src.id })}
       >
         <span class="chev" class:open={isOpen}><ChevronRight size={13} /></span>
         <ServerCog size={15} class="ficon" />
@@ -727,7 +859,7 @@
       </div>
       {#if isOpen}
         {#if l?.error}
-          <div class="row note bad" style:padding-left="38px" title={l.error}>
+          <div class="row note bad" style:padding-left="{38 + depth * 14}px" title={l.error}>
             <span class="name">{l.error}</span>
             <button class="icon-btn" title="Try again" aria-label="Try again" onclick={() => proxmox.refresh(src.id)}><RefreshCw size={12} /></button>
           </div>
@@ -742,8 +874,11 @@
             role="treeitem"
             tabindex="0"
             aria-selected={selected === gid}
-            style:padding-left="38px"
+            style:padding-left="{38 + depth * 14}px"
             title={guestTitle(src, g)}
+            draggable="true"
+            ondragstart={(e) => startDrag(e, { kind: "guest", src, g })}
+            ondragend={endDrag}
             onclick={() => (selected = gid)}
             ondblclick={() => proxmox.openDefault(src, g)}
             onkeydown={(e) => e.key === "Enter" && proxmox.openDefault(src, g)}
@@ -763,6 +898,18 @@
 {/snippet}
 
 <style>
+  .row[data-drop="before"] {
+    box-shadow: inset 0 2px 0 var(--accent);
+  }
+  .row[data-drop="after"] {
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+  .row[data-drop="into"] {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  .tree.drop-root {
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
   .row.off .name {
     color: var(--muted);
   }

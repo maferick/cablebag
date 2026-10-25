@@ -200,6 +200,8 @@ export interface ProxmoxSource {
   rdp_user: string;
   /** WireGuard network the server and its guests are reached through; empty = directly. */
   wireguard?: string;
+  /** The folder of the session tree it shows in; empty = the top level. */
+  folder_id?: string;
   /** Only in listings: whether Cablebag keeps the token secret itself. */
   has_secret?: boolean;
 }
@@ -523,6 +525,8 @@ export const api = {
   proxmoxSources: () => invoke<ProxmoxSource[]>("proxmox_sources"),
   proxmoxSaveSource: (source: ProxmoxSource, secret?: string) => invoke<ProxmoxSource>("proxmox_save_source", { source, secret: secret || null }),
   proxmoxDeleteSource: (id: string) => invoke<void>("proxmox_delete_source", { id }),
+  /** A server into a folder of the tree ("" = top level), and the servers in this order. */
+  proxmoxArrange: (id: string, folder: string, order: string[]) => invoke<void>("proxmox_arrange", { id, folder, order }),
   proxmoxList: (id: string) => invoke<ProxmoxGuest[]>("proxmox_list", { id }),
   proxmoxPower: (id: string, g: ProxmoxGuest, action: string) =>
     invoke<void>("proxmox_power", { id, node: g.node, kind: g.kind, vmid: g.vmid, action }),

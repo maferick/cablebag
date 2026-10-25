@@ -6,6 +6,16 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.20.2 · not released yet
+
+- **Drag and drop in the session tree.** Drag sessions, folders and Proxmox servers: into the middle of a folder
+  to put them in it, or to the top or bottom edge of a row of the same kind to put them in your own order; drop on
+  the empty part of the tree for the top level. A line or a lit-up folder shows where it goes. Proxmox servers and
+  WSL sessions can live in a folder now, and dragging a Proxmox machine onto a folder keeps it there as a saved
+  session.
+- **Tools close again**: clicking a tool in the sidebar's Tools list while it shows closes it and goes back to
+  the tab you were on, as the Settings and Tunnels buttons do; the open tool is lit up in the list.
+
 ## 0.20.1 · 25 October 2026
 
 - **Containers of a Proxmox guest**: right-click a running Linux VM or container in a Proxmox folder for

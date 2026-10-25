@@ -9,7 +9,9 @@
 <div class="tools">
   <section>
     {#each TOOLS as t}
-      <button class="tool" onclick={() => app.openTool(t.id, t.name)} title={t.description}>
+      <!-- As the Settings and Tunnels buttons: a second press closes the tool and goes back to where you were. -->
+      {@const shown = app.active?.type === "tool" && app.active.tool === t.id}
+      <button class="tool" class:on={shown} aria-pressed={shown} onclick={() => app.toggleTool(t.id, t.name)} title={shown ? `Close ${t.name}` : t.description}>
         <t.icon size={15} />
         <span>{t.name}</span>
         {#if t.id === "tunnels" && runningTunnels}<em class="live">{runningTunnels} running</em>{/if}
@@ -39,6 +41,10 @@
   }
   button.tool:hover {
     background: var(--hover);
+  }
+  button.tool.on {
+    background: var(--hover);
+    box-shadow: inset 2px 0 0 var(--accent);
   }
   .tool span {
     flex: 1;

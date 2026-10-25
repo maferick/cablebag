@@ -712,6 +712,11 @@ fn proxmox_save_source(app: AppHandle, source: proxmox::Source, secret: Option<S
 }
 
 #[tauri::command]
+fn proxmox_arrange(app: AppHandle, id: String, folder: String, order: Vec<String>) -> CmdResult<()> {
+    proxmox::arrange(&app, &id, &folder, &order).map_err(err)
+}
+
+#[tauri::command]
 fn proxmox_delete_source(app: AppHandle, id: String) -> CmdResult<()> {
     proxmox::delete_source(&app, &id).map_err(err)
 }
@@ -1312,6 +1317,7 @@ pub fn run() {
             wireguard_keypair,
             wireguard_public_key,
             proxmox_delete_source,
+            proxmox_arrange,
             proxmox_list,
             proxmox_power,
             net_port_scan,

@@ -105,6 +105,8 @@ Everything here was checked in the source of the current version.
   characters.
 - There is no high contrast theme; Windows high contrast mode has not been tested.
 - Pinned sites can only be put in another order by dragging them on the strip.
+- The order of sessions, folders and Proxmox servers in the tree can only be changed by dragging. Moving a session
+  to another folder also works from its editor (Folder); a folder or Proxmox server only by dragging.
 
 ## Supported environments
 

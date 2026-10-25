@@ -43,6 +43,8 @@ pub struct Source {
     /// WireGuard network the server is reached through (its API, console and node SSH), and the guests' sessions
     /// made from it; empty = directly.
     pub wireguard: String,
+    /// The folder of the session tree it shows in; empty = the top level.
+    pub folder_id: String,
 }
 
 #[derive(Serialize)]
@@ -106,6 +108,17 @@ pub fn save_source(app: &AppHandle, mut src: Source, secret: Option<String>) -> 
         state.vault.save_password(&state.store.lock(), "proxmox", &src.url, 0, &src.token_id, secret.trim())?;
     }
     Ok(src)
+}
+
+/// Puts a server in a folder of the session tree (empty: the top level) and the servers in the given order
+/// (servers not named keep their place after them).
+pub fn arrange(app: &AppHandle, id: &str, folder: &str, order: &[String]) -> Result<()> {
+    let mut list = sources(app);
+    if let Some(s) = list.iter_mut().find(|s| s.id == id) {
+        s.folder_id = folder.to_string();
+    }
+    list.sort_by_key(|s| order.iter().position(|o| o == &s.id).unwrap_or(usize::MAX));
+    save_sources(app, &list)
 }
 
 /// Removes a source and the token secret Cablebag kept for it.
