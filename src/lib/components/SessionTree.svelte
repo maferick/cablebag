@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { browserProfiles } from "../browserProfiles.svelte";
+  import { browserProfiles, PRIVATE, SHARED } from "../browserProfiles.svelte";
   import { ask } from "../ask.svelte";
   import { containers } from "../docker.svelte";
   import { treeKeys } from "../keyNav";
@@ -11,7 +11,7 @@
   import { writeText } from "../clipboard";
   import { assistant } from "../assistant.svelte";
   import { pins } from "../pins.svelte";
-  import { webItems } from "../webMenu.svelte";
+  import { webItems, folderItem as folderProfileItem } from "../webMenu.svelte";
   import type { ProxmoxGuest, ProxmoxSource } from "../api";
   import { api, type Folder, type Session } from "../api";
   import {
@@ -23,7 +23,7 @@
   /** Servers: the session tree without folders of only web sessions. Web: the web sessions on their own. */
   let view = $state<"servers" | "web">(stored("tree.view") === "web" ? "web" : "servers");
   /** The web sessions by the folders they are in, or by site. */
-  let webBy = $state<"folder" | "site">(stored("tree.webBy") === "site" ? "site" : "folder");
+  let webBy = $state<"folder" | "site" | "profile">((["site", "profile"] as const).find((v) => v === stored("tree.webBy")) ?? "folder");
 
   function stored(k: string): string | null {
     try {
@@ -169,6 +169,18 @@
     return { many, single };
   });
 
+  /** By profile: the web sessions of each browser profile (as they open: their own or their folder's), then Default. */
+  const byProfile = $derived.by(() => {
+    const groups = new Map<string, Session[]>();
+    for (const s of webSessions) {
+      const id = app.withFolderDefaults(s).data?.browser_profile;
+      const k = id && (id === PRIVATE || browserProfiles.get(id)) ? id : SHARED;
+      groups.set(k, [...(groups.get(k) ?? []), s]);
+    }
+    const order = [...browserProfiles.list.map((p) => p.id), PRIVATE, SHARED];
+    return order.filter((id) => groups.has(id)).map((id) => ({ id, name: browserProfiles.name(id), color: browserProfiles.color(id), list: groups.get(id)!.sort((a, b) => (a.name || a.host).localeCompare(b.name || b.host)) }));
+  });
+
   /** The sites opened last, apart from the pinned ones. */
   const recent = $derived(
     webSessions
@@ -192,7 +204,7 @@
     remember("tree.view", v);
   }
 
-  function setWebBy(v: "folder" | "site") {
+  function setWebBy(v: "folder" | "site" | "profile") {
     webBy = v;
     remember("tree.webBy", v);
   }
@@ -365,6 +377,7 @@
               },
             },
             { label: "Rename folder", icon: Pencil, action: () => renameFolder(f) },
+            ...(webFolders.some.has(f.id) ? [folderProfileItem(f)] : []),
             { label: "Folder settings (user, key, vault login, jump host)", icon: Settings2, action: () => (app.folderEditing = f) },
             ((app.settings["ai.protected"] as string[] | undefined) ?? []).includes(f.id)
               ? { label: "Protected for the assistant (click to lift)", icon: ShieldCheck, action: () => assistant.setProtected(f.id, false) }
@@ -563,6 +576,7 @@
       <span class="by" role="radiogroup" aria-label="Group the sites">
         <button role="radio" aria-checked={webBy === "folder"} class:on={webBy === "folder"} onclick={() => setWebBy("folder")}>by folder</button>
         <button role="radio" aria-checked={webBy === "site"} class:on={webBy === "site"} onclick={() => setWebBy("site")}>by site</button>
+        <button role="radio" aria-checked={webBy === "profile"} class:on={webBy === "profile"} onclick={() => setWebBy("profile")}>by profile</button>
       </span>
     </div>
     {#if webBy === "folder"}
@@ -576,6 +590,10 @@
           {@render webRow(s, 0)}
         {/each}
       {/if}
+    {:else if webBy === "profile"}
+      {#each byProfile as g (g.id)}
+        {@render group(`prof:${g.id}`, g.name, g.list, 0, g.color)}
+      {/each}
     {:else}
       {#each bySite.many as [site, list] (site)}
         {@render group(`site:${site}`, site, list, 0)}
@@ -612,6 +630,9 @@
     <span class="chev" class:open={open[key]}><ChevronRight size={13} /></span>
     {#if open[key]}<FolderOpen size={15} class="ficon" />{:else}<FolderIcon size={15} class="ficon" />{/if}
     <span class="name">{f.name}</span>
+    {#if f.data?.browser_profile && browserProfiles.get(f.data.browser_profile)}
+      <span class="idot" style:background={browserProfiles.color(f.data.browser_profile) ?? "var(--faint)"} title="Browser profile of this folder: {browserProfiles.name(f.data.browser_profile)}"></span>
+    {/if}
     <span class="count">{webCount(f.id)}</span>
   </div>
   {#if open[key]}
@@ -624,7 +645,7 @@
   {/if}
 {/snippet}
 
-{#snippet group(key: string, name: string, list: Session[], depth: number)}
+{#snippet group(key: string, name: string, list: Session[], depth: number, color?: string)}
   <div
     class="row folder"
     role="treeitem"
@@ -638,6 +659,7 @@
     <span class="chev" class:open={open[key]}><ChevronRight size={13} /></span>
     {#if open[key]}<FolderOpen size={15} class="ficon" />{:else}<FolderIcon size={15} class="ficon" />{/if}
     <span class="name">{name}</span>
+    {#if color}<span class="idot" style:background={color} aria-hidden="true"></span>{/if}
     <span class="count">{list.length}</span>
   </div>
   {#if open[key]}

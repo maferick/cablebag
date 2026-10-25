@@ -10,6 +10,13 @@ installs it and starts Cablebag again. Every version is also on the
 
 - **Containers of a Proxmox guest**: right-click a running Linux VM or container in a Proxmox folder for
   **Containers**. It uses your saved SSH session for that address when there is one.
+- **Browser profiles, easier.** The profile button in a web tab's address bar is always there (it says
+  **Default** when the tab has no profile) and does it all: open the page in another profile, **New profile for
+  this page...**, **Always open this session in...** and **For the whole folder ...**; after a choice the page
+  opens again in that profile. In the Web view, a folder shows its profile's colour, and right-clicking it gives
+  **Browser profile for this folder...**. A new profile needs only a name (the folder's is suggested); Cablebag
+  picks a colour no other profile has. The Web view can also be grouped **by profile**. Plain words: **Default**
+  and **Private window**.
 
 ## 0.20.0 · 24 October 2026
 

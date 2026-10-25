@@ -15,16 +15,16 @@
 
 <div class="bpp">
   <select value={value ?? ""} onchange={(e) => (value = e.currentTarget.value)}>
-    <option value="">{inherited ? `${browserProfiles.name(inherited)} (from ${from})` : "Cablebag's shared profile"}</option>
-    {#if inherited}<option value={SHARED}>Cablebag's shared profile</option>{/if}
-    {#each browserProfiles.list as p (p.id)}<option value={p.id}>Profile: {p.name}</option>{/each}
-    <option value={PRIVATE}>Private (nothing kept once the last private tab closes)</option>
+    <option value="">{inherited ? `${browserProfiles.name(inherited)} (from ${from})` : "Default"}</option>
+    {#if inherited}<option value={SHARED}>Default</option>{/if}
+    {#each browserProfiles.list as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+    <option value={PRIVATE}>Private window (nothing kept after it closes)</option>
     {#if value && value !== SHARED && value !== PRIVATE && !chosen}<option value={value}>A browser profile that is gone</option>{/if}
   </select>
   {#if chosen}
     <button class="btn" title="Change the name or colour of {chosen.name}" onclick={() => (editing = chosen)}><Pencil size={14} /> Edit</button>
   {/if}
-  <button class="btn" title="Make a browser profile with its own cookies and logins" onclick={() => (editing = null)}><Plus size={14} /> New</button>
+  <button class="btn" title="Make a browser profile with its own cookies and logins" onclick={async () => { const id = await browserProfiles.askNew(); if (id) value = id; }}><Plus size={14} /> New</button>
 </div>
 
 {#if editing !== undefined}

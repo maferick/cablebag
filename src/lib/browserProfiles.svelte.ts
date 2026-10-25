@@ -1,6 +1,8 @@
 // Browser profiles: named sets of cookies and logins for web tabs, so a second Azure tenant, Teams or other
 // account can be signed in next to the first. Kept in the setting browser.profiles, which Sync carries.
-import { api } from "./api";
+import { api, type Folder, type Session } from "./api";
+import { ask } from "./ask.svelte";
+import { TAB_COLORS } from "./tabColors";
 import { app } from "./state.svelte";
 
 export type BrowserProfile = {
@@ -11,7 +13,7 @@ export type BrowserProfile = {
   muted?: boolean;
 };
 
-/** The value for "Cablebag's shared profile" (it also ends what a folder above gives). */
+/** The value for Default, Cablebag's own cookies and logins (it also ends what a folder above gives). */
 export const SHARED = "none";
 /** The value for a private tab: nothing is kept after it closes. */
 export const PRIVATE = "private";
@@ -25,10 +27,44 @@ class BrowserProfiles {
     return this.list.find((p) => p.id === id);
   }
 
+  /** Plain words: Default is Cablebag's own cookies and logins, a private window keeps nothing. */
   name(id: string | undefined): string {
-    if (!id || id === SHARED) return "Cablebag's shared profile";
-    if (id === PRIVATE) return "Private (nothing kept)";
+    if (!id || id === SHARED) return "Default";
+    if (id === PRIVATE) return "Private window";
     return this.get(id)?.name ?? "a browser profile that is gone";
+  }
+
+  /** A tab colour no other profile has yet, so two tenants never look alike. */
+  freeColor(): string {
+    const used = new Set(this.list.map((p) => p.color));
+    const colors = TAB_COLORS.map((c) => c.value).filter(Boolean);
+    return colors.find((c) => !used.has(c)) ?? colors[this.list.length % colors.length];
+  }
+
+  /** A new profile from just a name (suggested from the folder or site); its colour is picked. Null when cancelled. */
+  async askNew(suggest = ""): Promise<string | null> {
+    const name = await ask.text("New browser profile", "Name, such as the customer or tenant", suggest, "Create");
+    if (!name?.trim()) return null;
+    const id = await this.save({ id: "", name: name.trim(), color: this.freeColor() });
+    app.notify(`Browser profile ${name.trim()} made`);
+    return id;
+  }
+
+  /** The profile a saved web session always opens in; null follows its folder. */
+  async setForSession(s: Session, id: string | null) {
+    const data = { ...($state.snapshot(s.data) ?? {}) };
+    if (id === null) delete data.browser_profile;
+    else data.browser_profile = id;
+    await app.saveSession({ ...($state.snapshot(s) as Session), data });
+  }
+
+  /** The profile of a folder's web sessions (and its subfolders'); null follows the folder above. */
+  async setForFolder(f: Folder, id: string | null) {
+    const data = { ...($state.snapshot(f.data) ?? {}) };
+    if (id === null) delete data.browser_profile;
+    else data.browser_profile = id;
+    await api.saveFolder({ ...($state.snapshot(f) as Folder), data });
+    await app.reloadLibrary();
   }
 
   /** The profile a web tab uses, with its name and colour; null for other tabs and the shared profile. */
@@ -71,7 +107,7 @@ class BrowserProfiles {
     await api.browserProfileForget(id);
   }
 
-  /** Deletes the profile: sessions and folders that used it go back to the shared profile. */
+  /** Deletes the profile: sessions and folders that used it go back to Default. */
   async remove(id: string) {
     await this.closeTabs(id);
     for (const s of app.sessions.filter((s) => s.data?.browser_profile === id)) {

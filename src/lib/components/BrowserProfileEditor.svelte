@@ -7,7 +7,7 @@
 
   let { profile, onclose, onsaved }: { profile: BrowserProfile | null; onclose: () => void; onsaved?: (id: string) => void } = $props();
   // svelte-ignore state_referenced_locally
-  let editing = $state<BrowserProfile>(profile ? { ...profile } : { id: "", name: "", color: TAB_COLORS[5].value });
+  let editing = $state<BrowserProfile>(profile ? { ...profile } : { id: "", name: "", color: browserProfiles.freeColor() });
 
   async function save() {
     if (!editing.name.trim()) return app.notify("Give the profile a name, such as the customer or tenant.", "error");

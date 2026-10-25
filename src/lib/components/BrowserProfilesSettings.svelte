@@ -28,7 +28,7 @@
   }
 
   async function remove(p: BrowserProfile) {
-    if (!(await ask.confirm("Delete browser profile", `Delete ${p.name} with its cookies and logins? Its open tabs close, and sessions and folders that use it go back to Cablebag's shared profile.`, { okLabel: "Delete", danger: true })))
+    if (!(await ask.confirm("Delete browser profile", `Delete ${p.name} with its cookies and logins? Its open tabs close, and sessions and folders that use it go back to Default.`, { okLabel: "Delete", danger: true })))
       return;
     await browserProfiles.remove(p.id);
     app.notify(`Browser profile ${p.name} deleted`);
@@ -63,12 +63,13 @@
     <div class="empty">
       <Globe size={16} />
       <p>
-        No browser profiles yet. Web sessions all share Cablebag's own cookies and logins, so you are signed in to one
-        account per site. Make a profile for a second tenant, customer or Teams.
+        No browser profiles yet. Web sessions all use Default, so you are signed in to one account per site. Make a
+        profile for a second tenant, customer or Teams: here, with the profile button in a web tab's address bar, or by
+        right-clicking a folder of web sessions.
       </p>
     </div>
   {/each}
-  <div class="add"><button class="btn" onclick={() => (editing = null)}><Plus size={14} /> New browser profile</button></div>
+  <div class="add"><button class="btn" onclick={() => browserProfiles.askNew()}><Plus size={14} /> New browser profile</button></div>
 </SettingsSection>
 
 {#if editing !== undefined}

@@ -10,10 +10,11 @@
   import { browserProfiles, PRIVATE, SHARED } from "../browserProfiles.svelte";
   import { unreadFromTitle } from "../unread";
   import { pins } from "../pins.svelte";
+  import { alwaysMenu, folderMenu } from "../webMenu.svelte";
   import { vault } from "../vault.svelte";
   import { ask } from "../ask.svelte";
   import FillLoginDialog from "./FillLoginDialog.svelte";
-  import { ArrowLeft, ArrowRight, RotateCw, ExternalLink, Globe, ChevronDown, KeyRound } from "@lucide/svelte";
+  import { ArrowLeft, ArrowRight, RotateCw, ExternalLink, Globe, ChevronDown, KeyRound, Plus, Star, FolderCog } from "@lucide/svelte";
 
   let { tab, visible }: { tab: Tab; visible: boolean } = $props();
   let area: HTMLDivElement;
@@ -49,9 +50,29 @@
     };
     const openIn = (id: string) => tab.session && app.openSession({ ...$state.snapshot(tab.session), id: "", name: "", host: page(), data: { ...$state.snapshot(tab.session.data), browser_profile: id } });
     const items: MenuEntry[] = browserProfiles.list.filter((p) => p.id !== profileId).map((p) => ({ label: `Open this page in ${p.name}`, action: () => openIn(p.id) }));
-    if (profileId !== PRIVATE) items.push({ label: "Open this page privately", action: () => openIn(PRIVATE) });
-    if (profileId) items.push({ label: "Open this page in the shared profile", action: () => openIn(SHARED) });
-    items.push("sep", { label: "Browser profiles...", action: () => app.openSettings("browsers") });
+    if (profileId !== PRIVATE) items.push({ label: "Open this page in a private window", action: () => openIn(PRIVATE) });
+    if (profileId) items.push({ label: "Open this page in Default", action: () => openIn(SHARED) });
+    // The saved session (and its folder) this tab came from: make the choice stick, right here.
+    const saved = tab.session?.id ? app.sessions.find((s) => s.id === tab.session!.id) : undefined;
+    const folder = saved?.folder_id ? app.folders.find((f) => f.id === saved.folder_id) : undefined;
+    items.push("sep", {
+      label: "New profile for this page...",
+      icon: Plus,
+      action: async () => {
+        const id = await browserProfiles.askNew(folder?.name ?? "");
+        if (id) openIn(id);
+      },
+    });
+    // A tab keeps the profile it opened with: after the choice it opens again, in the profile chosen.
+    const reopen = () => {
+      const now = app.sessions.find((s) => s.id === saved?.id);
+      if (!now) return;
+      app.openSession(now);
+      app.closeTab(tab.id);
+    };
+    if (saved) items.push({ label: "Always open this session in...", icon: Star, action: () => menu.again(alwaysMenu(saved, reopen)) });
+    if (folder) items.push({ label: `For the whole folder ${folder.name}...`, icon: FolderCog, action: () => menu.again(folderMenu(folder, reopen)) });
+    items.push("sep", { label: "Manage browser profiles", action: () => app.openSettings("browsers") });
     return items;
   }
 
@@ -240,16 +261,17 @@
       <input id={`addr-${tab.id}`} bind:value={address} spellcheck="false" autocomplete="off" aria-label="Address" />
     </form>
     <button class="icon-btn" title="Fill a login from your credential sources" aria-label="Fill a login from your credential sources" onclick={(e) => fillMenu(e.currentTarget as HTMLElement)}><KeyRound size={15} /></button>
-    {#if profile || browserProfiles.list.length}
-      <button
-        class="profile"
-        title={profile ? `This tab uses the cookies and logins of ${profile.name}. Click to open this page in another profile.` : "This tab uses Cablebag's shared cookies and logins. Click to open this page in a profile."}
-        onclick={(e) => menu.showAt(e.currentTarget as HTMLElement, otherProfiles())}
-      >
-        <span class="dot" style:background={profile?.color || "var(--faint)"} aria-hidden="true"></span>{profile?.name ?? "Shared profile"}
-        <ChevronDown size={12} />
-      </button>
-    {/if}
+    <!-- Always there: it is where you find out an account is the wrong one, and where you make a profile. -->
+    <button
+      class="profile"
+      title={profile
+        ? `This tab uses the cookies and logins of ${profile.name}. Click for another profile, or to keep one for this session or folder.`
+        : "This tab uses the Default cookies and logins. Click to open it in a profile, make one, or keep one for this session or folder."}
+      onclick={(e) => menu.showAt(e.currentTarget as HTMLElement, otherProfiles())}
+    >
+      <span class="dot" style:background={profile?.color || "var(--faint)"} aria-hidden="true"></span>{profile?.name ?? "Default"}
+      <ChevronDown size={12} />
+    </button>
     <button class="icon-btn" title="Open in the web browser on this PC" aria-label="Open in the web browser on this PC" onclick={() => openUrl(current)}><ExternalLink size={15} /></button>
   </div>
   <!-- A frame in the profile's colour around the page, so its identity shows wherever you look. -->
