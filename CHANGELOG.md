@@ -6,7 +6,7 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.20.5 · not released yet
+## 0.20.5 · 26 October 2026
 
 - **Remote desktop works again while web tabs are open.** An RDP session stopped at "main window missing" as soon
   as a web tab (Teams, Outlook, any site) was open in the same window. Choosing a Vaultwarden login had the same
