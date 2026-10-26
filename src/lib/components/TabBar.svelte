@@ -19,6 +19,7 @@
   import { bufferText } from "../terms";
   import { writeText } from "../clipboard";
   import { macros } from "../macros.svelte";
+  import { pins } from "../pins.svelte";
 
   async function saveOutput(t: Tab) {
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
@@ -140,6 +141,7 @@
   <div class="tabs" role="tablist" tabindex="-1" onkeydown={tabKeys}>
     {#each shown as t (t.id)}
       {@const Icon = iconOf(t)}
+      {@const favicon = t.type === "browser" ? (t.icon ?? pins.siteIcon(t.session?.id)) : undefined}
       <div
         class="tab"
         class:active={t.id === app.activeId}
@@ -155,7 +157,7 @@
         title={t.session ? `${kindInfo(t.session.kind).label} ${t.session.host}` : t.title}
       >
         <span class="kicon">
-          <Icon size={14} />
+          {#if favicon}<img class="favicon" src={favicon} alt="" draggable="false" />{:else}<Icon size={14} />{/if}
           {#if t.type !== "tool"}<span class="dot smark {t.status}" role="img" aria-label={statusWord(t.status)} title={statusWord(t.status)}></span>{/if}
         </span>
         {#if renaming === t.id}
@@ -321,6 +323,12 @@
   }
   .tab.active .kicon {
     color: var(--text);
+  }
+  .favicon {
+    display: block;
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
   }
   .dot {
     position: absolute;

@@ -31,6 +31,25 @@ export function profileOfTab(t: Tab): string {
   return profileKey(t.session?.data?.browser_profile);
 }
 
+/** Whether a page is on the same site as a session's address: the same host, or one under the same domain
+ * (sits-it.xurrent.com and app.xurrent.com; not login.microsoftonline.com for teams.cloud.microsoft). */
+export function sameSite(page: string, address: string): boolean {
+  const host = (u: string) => {
+    try {
+      return new URL(/^[a-z]+:\/\//i.test(u) ? u : `https://${u}`).hostname.toLowerCase();
+    } catch {
+      return "";
+    }
+  };
+  const a = host(page);
+  const b = host(address);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (/^[\d.]+$|:/.test(b)) return false;
+  const base = b.split(".").slice(-2).join(".");
+  return a === base || a.endsWith(`.${base}`);
+}
+
 /** Opens a web session in a given profile (once; the session keeps its own). */
 export function openIn(s: Session, profile: string, keepRunning = false) {
   const data: Record<string, any> = { ...($state.snapshot(s.data) ?? {}), browser_profile: profile };
@@ -84,16 +103,24 @@ class Pins {
 
   /** The icon a pin shows: the last one its site's page had (a data URL), or none yet. */
   icon(p: Pin): string | undefined {
-    return (app.settings["browser.icons"] as Record<string, string> | undefined)?.[p.session];
+    return this.siteIcon(p.session);
   }
 
-  /** Remembers a site's icon (setting browser.icons, this PC only), so its pin has it before the site opens again. */
-  async setIcon(session: string, data: string) {
-    const all = (app.settings["browser.icons"] as Record<string, string> | undefined) ?? {};
-    if (all[session] === data) return;
+  /** The remembered icon of a web session's site. */
+  siteIcon(session: string | undefined): string | undefined {
+    return session ? (app.settings["browser.siteIcons"] as Record<string, string> | undefined)?.[session] : undefined;
+  }
+
+  /** Remembers a site's icon (setting browser.siteIcons, this PC only), so its pin has it before the site opens
+   * again. Only an icon of the site's own pages counts: on a sign-in page elsewhere (Microsoft's, for Teams) the
+   * tab shows that page's icon, but the pin keeps the site's. */
+  async setIcon(s: Session, page: string, data: string) {
+    if (!sameSite(page, s.host)) return;
+    const all = (app.settings["browser.siteIcons"] as Record<string, string> | undefined) ?? {};
+    if (all[s.id] === data) return;
     // Sessions that were deleted take their icons with them.
-    const kept = Object.fromEntries(Object.entries(all).filter(([id]) => app.sessions.some((s) => s.id === id)));
-    await app.setSetting("browser.icons", { ...kept, [session]: data });
+    const kept = Object.fromEntries(Object.entries(all).filter(([id]) => app.sessions.some((x) => x.id === id)));
+    await app.setSetting("browser.siteIcons", { ...kept, [s.id]: data });
   }
 
   /** Moves a pin to the place of another (dragging on the strip). */

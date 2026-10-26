@@ -6,6 +6,13 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.20.7 · not released yet
+
+- **Web tabs show their page's icon**, as in a browser.
+- **Pins keep their site's own icon.** A site that first sends you to a sign-in page elsewhere (Teams and Outlook
+  to Microsoft's, with your organisation's logo) gave its pin that page's icon. A pin now only takes an icon
+  from the site itself; the wrong ones are gone and the right ones come back the next time each site is open.
+
 ## 0.20.6 · 26 October 2026
 
 - **Microsoft Defender removed 0.20.5 on some PCs**, taking it for a trojan (Trojan:Win32/Bearfoos.A!ml, a false

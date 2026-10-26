@@ -11,6 +11,8 @@ struct SiteIcon {
     id: String,
     /// data:image/png;base64,...
     data: String,
+    /// The page the icon belongs to (a sign-in page on another site has an icon of its own).
+    url: String,
 }
 
 /// Icons bigger than this are left out (a site's icon is a few kilobytes).
@@ -24,11 +26,13 @@ pub fn attach(app: &AppHandle, id: &str, wv: &Webview) {
         let _ = wv.with_webview(move |p| unsafe {
             use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2_15, COREWEBVIEW2_FAVICON_IMAGE_FORMAT_PNG};
             use webview2_com::{FaviconChangedEventHandler, GetFaviconCompletedHandler};
-            use windows::core::Interface;
+            use windows::core::{Interface, PWSTR};
             let Ok(core) = p.controller().CoreWebView2() else { return };
             let Ok(core15) = core.cast::<ICoreWebView2_15>() else { return };
             let handler = FaviconChangedEventHandler::create(Box::new(move |sender, _| {
                 let Some(sender) = sender else { return Ok(()) };
+                let mut source = PWSTR::null();
+                let url = if sender.Source(&mut source).is_ok() { webview2_com::take_pwstr(source) } else { String::new() };
                 let core15 = sender.cast::<ICoreWebView2_15>()?;
                 let (app, id) = (app.clone(), id.clone());
                 let done = GetFaviconCompletedHandler::create(Box::new(move |result, stream| {
@@ -38,7 +42,7 @@ pub fn attach(app: &AppHandle, id: &str, wv: &Webview) {
                     if !png.is_empty() && png.len() <= MAX_BYTES {
                         use base64::Engine;
                         let data = format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(&png));
-                        let _ = app.emit("browser-icon", SiteIcon { id, data });
+                        let _ = app.emit("browser-icon", SiteIcon { id, data, url });
                     }
                     Ok(())
                 }));

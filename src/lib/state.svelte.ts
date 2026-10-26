@@ -34,6 +34,8 @@ export interface Tab {
   edit?: { tab: string; path: string };
   /** For a web tab: the unread count its page shows in the title. */
   unread?: number;
+  /** For a web tab: the icon of the page it shows (a data URL). */
+  icon?: string;
 }
 
 export interface Transfer {
