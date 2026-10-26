@@ -358,43 +358,87 @@
     ]);
   }
 
+  /** Adds a site with just its address (and a name, if wanted); the rest comes from its folder. */
+  async function newSite(folder: string | null) {
+    const where = app.folders.find((f) => f.id === folder)?.name;
+    const got = await ask.fields(
+      "Add a site",
+      where ? `In the folder ${where}. Profile and other choices: Edit, after adding.` : "Profile and other choices: Edit, after adding.",
+      [
+        { name: "address", label: "Web address", value: "" },
+        { name: "name", label: "Name (leave empty to use the address)", value: "" },
+      ],
+      "Add",
+    );
+    const address = got?.address.trim();
+    if (!address) return;
+    const s = newSession("browser");
+    s.folder_id = folder;
+    s.host = address;
+    s.name = got!.name.trim() || siteName(address);
+    const saved = await app.saveSession(s);
+    if (folder) open[`web:${folder}`] = true;
+    selected = saved?.id ?? selected;
+  }
+
+  /** "https://portal.example.com/login" becomes "portal.example.com". */
+  function siteName(address: string): string {
+    try {
+      return new URL(/^[a-z]+:\/\//i.test(address) ? address : `https://${address}`).host || address;
+    } catch {
+      return address;
+    }
+  }
+
   function folderMenu(e: MouseEvent, f: Folder | null) {
+    // In the Web view the menu makes sites; in the Servers view, sessions.
+    const web = view === "web";
     menu.show(e, [
       {
-        label: "New session here",
+        label: web ? "New site here" : "New session here",
         icon: Plus,
         action: () => {
+          if (web) return newSite(f?.id ?? null);
           const s = newSession("ssh");
           s.folder_id = f?.id ?? null;
           app.editing = s;
         },
       },
       { label: "New folder", icon: FolderPlus, action: () => newFolder(f?.id ?? null) },
-      ...(f ? [] : [{ label: "Add a Proxmox server", icon: ServerCog, action: () => (app.proxmoxEditing = "new") }]),
+      ...(f || web ? [] : [{ label: "Add a Proxmox server", icon: ServerCog, action: () => (app.proxmoxEditing = "new") }]),
       ...(f
         ? ([
             {
-              label: "Open all sessions in this folder",
+              label: web ? "Open all sites in this folder" : "Open all sessions in this folder",
               icon: Play,
-              action: () => app.sessions.filter((s) => s.folder_id === f.id).forEach((s) => app.openSession(s)),
+              action: () => app.sessions.filter((s) => s.folder_id === f.id && isWeb(s) === web).forEach((s) => app.openSession(s)),
             },
-            {
-              label: "Run a command on all its servers",
-              icon: ListChecks,
-              action: () => {
-                app.runManyFolder = f.id;
-                app.openTool("runmany", "Run on many servers");
-              },
-            },
+            ...(web
+              ? []
+              : [
+                  {
+                    label: "Run a command on all its servers",
+                    icon: ListChecks,
+                    action: () => {
+                      app.runManyFolder = f.id;
+                      app.openTool("runmany", "Run on many servers");
+                    },
+                  },
+                ]),
             { label: "Rename folder", icon: Pencil, action: () => renameFolder(f) },
-            ...(webFolders.some.has(f.id) ? [folderProfileItem(f)] : []),
-            { label: "Folder settings (user, key, vault login, jump host)", icon: Settings2, action: () => (app.folderEditing = f) },
-            ((app.settings["ai.protected"] as string[] | undefined) ?? []).includes(f.id)
-              ? { label: "Protected for the assistant (click to lift)", icon: ShieldCheck, action: () => assistant.setProtected(f.id, false) }
-              : { label: "Protect from the assistant", icon: Shield, action: () => assistant.setProtected(f.id, true) },
-            ...(reach.enabled
-              ? [{ label: "Check which hosts answer", icon: Activity, action: () => reach.checkNow(keysOf(allIn(f.id))) }]
-              : []),
+            ...(webFolders.some.has(f.id) || web ? [folderProfileItem(f)] : []),
+            // Settings for logging in to servers; none of them apply to sites.
+            ...(web
+              ? []
+              : [
+                  { label: "Folder settings (user, key, vault login, jump host)", icon: Settings2, action: () => (app.folderEditing = f) },
+                  ((app.settings["ai.protected"] as string[] | undefined) ?? []).includes(f.id)
+                    ? { label: "Protected for the assistant (click to lift)", icon: ShieldCheck, action: () => assistant.setProtected(f.id, false) }
+                    : { label: "Protect from the assistant", icon: Shield, action: () => assistant.setProtected(f.id, true) },
+                  ...(reach.enabled
+                    ? [{ label: "Check which hosts answer", icon: Activity, action: () => reach.checkNow(keysOf(allIn(f.id))) }]
+                    : []),
+                ]),
             "sep",
             {
               label: "Delete folder",
@@ -579,7 +623,7 @@
     </button>
   </div>
   {#if view === "web"}
-    <div class="tree" role="tree" tabindex="-1" bind:this={treeEl} onkeydown={treeKeys} oncontextmenu={(e) => e.preventDefault()}>
+    <div class="tree" role="tree" tabindex="-1" bind:this={treeEl} onkeydown={treeKeys} oncontextmenu={(e) => folderMenu(e, null)}>
       {@render web()}
     </div>
   {:else}
@@ -683,7 +727,7 @@
     <div class="empty">
       <p>No web sessions yet. Bring in your bookmarks from Chrome, Edge or Firefox, or add a site.</p>
       <button class="btn" onclick={() => (app.importOpen = true)}><Upload size={14} /> Import bookmarks</button>
-      <button class="btn" onclick={() => (app.editing = newSession("browser"))}><Plus size={14} /> New web session</button>
+      <button class="btn" onclick={() => newSite(null)}><Plus size={14} /> Add a site</button>
     </div>
   {:else if q}
     {#each webMatches as s (s.id)}
@@ -702,7 +746,10 @@
       {/each}
     {/if}
     <div class="cap">
-      <span>Sites</span>
+      <span class="sites">
+        Sites
+        <button class="add" title="Add a site" aria-label="Add a site" onclick={() => newSite(null)}><Plus size={12} /></button>
+      </span>
       <span class="by" role="radiogroup" aria-label="Group the sites">
         <button role="radio" aria-checked={webBy === "folder"} class:on={webBy === "folder"} onclick={() => setWebBy("folder")}>by folder</button>
         <button role="radio" aria-checked={webBy === "site"} class:on={webBy === "site"} onclick={() => setWebBy("site")}>by site</button>
@@ -1103,6 +1150,23 @@
     margin: 10px 6px 3px;
     font-size: 11px;
     color: var(--faint);
+  }
+  .sites {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .add {
+    display: inline-flex;
+    padding: 1px;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    color: var(--faint);
+  }
+  .add:hover {
+    color: var(--text);
+    background: var(--raised);
   }
   .by {
     display: inline-flex;

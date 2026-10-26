@@ -2,7 +2,9 @@
   import Modal from "./Modal.svelte";
   import { ask } from "../ask.svelte";
 
-  const req = $derived(ask.current!);
+  // The question stays readable while the box closes (ask.current is already empty then).
+  let last = ask.current!;
+  const req = $derived.by(() => (last = ask.current ?? last));
   const typed = $derived(!!(req.input || req.inputs));
   let value = $state(ask.current?.input?.value ?? "");
   let values = $state<Record<string, string>>(Object.fromEntries((ask.current?.inputs ?? []).map((f) => [f.name, f.value])));

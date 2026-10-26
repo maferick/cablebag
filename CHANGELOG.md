@@ -6,6 +6,16 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.20.4 · not released yet
+
+- **Adding a site is quick in the Web view.** A **+** next to "Sites", and right-clicking a folder or the empty
+  part of the list, opens a small box that asks only for the web address (and a name, if you want one). The site
+  lands in that folder and takes its browser profile. Before, the Web view only offered this while it was empty,
+  and a folder's menu made an SSH session in the full session form.
+- **Folder menus in the Web view** leave out what is only for servers (running a command on them, logins and jump
+  hosts, checking which hosts answer), and "Open all" opens just the sites.
+- Closing a small question box (Escape or Cancel) no longer causes an error.
+
 ## 0.20.3 · 25 October 2026
 
 - **Drag and drop works now.** In 0.20.2 dragging in the session tree did nothing on Windows, because Cablebag
