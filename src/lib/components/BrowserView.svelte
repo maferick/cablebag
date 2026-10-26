@@ -167,6 +167,10 @@
         tab.unread = unreadFromTitle(e.payload.title);
       }
     });
+    // The site's icon, for its pin on the strip. Only saved sessions have pins.
+    const unIcon = listen<{ id: string; data: string }>("browser-icon", (e) => {
+      if (e.payload.id === tab.id && tab.session?.id) pins.setIcon(tab.session.id, e.payload.data);
+    });
     // A link that opens a new tab: a tab of its own here, with this tab's profile and network.
     const unNew = listen<{ from: string; url: string }>("browser-new-tab", (e) => {
       if (e.payload.from !== tab.id || !tab.session) return;
@@ -212,7 +216,7 @@
     return () => {
       clearInterval(sleeper);
       ro.disconnect();
-      for (const u of [un, unNew, unDl, unNote, unClick]) u.then((f) => f());
+      for (const u of [un, unNew, unDl, unNote, unClick, unIcon]) u.then((f) => f());
     };
   });
 

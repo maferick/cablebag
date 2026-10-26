@@ -179,6 +179,7 @@ pub async fn open(app: &AppHandle, id: &str, url: &str, wireguard: Option<String
         });
     let wv = window.add_child(builder, LogicalPosition::new(x, y), LogicalSize::new(w.max(1.0), h.max(1.0)))?;
     crate::webnotify::attach(app, id, &wv);
+    crate::webicon::attach(app, id, &wv);
     Ok(())
 }
 

@@ -28,6 +28,7 @@ mod updater;
 mod vault;
 mod vnc;
 mod webfill;
+mod webicon;
 mod webnotify;
 mod wg;
 mod winrm;

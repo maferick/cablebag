@@ -6,6 +6,13 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.20.6 · not released yet
+
+- **Pinned sites show their own icon** on the strip at the left, instead of a letter. Cablebag picks up the icon
+  the first time the site is open and remembers it on this PC, so the pin keeps it after a restart. A site without
+  an icon keeps its letter.
+- Updated tokio to 1.54.1, a fix to its timers.
+
 ## 0.20.5 · 26 October 2026
 
 - **Remote desktop works again while web tabs are open.** An RDP session stopped at "main window missing" as soon

@@ -82,6 +82,20 @@ class Pins {
     await this.store(((app.settings["browser.pins"] as Pin[] | undefined) ?? []).filter((p) => p.id !== id).sort((a, b) => a.sort - b.sort));
   }
 
+  /** The icon a pin shows: the last one its site's page had (a data URL), or none yet. */
+  icon(p: Pin): string | undefined {
+    return (app.settings["browser.icons"] as Record<string, string> | undefined)?.[p.session];
+  }
+
+  /** Remembers a site's icon (setting browser.icons, this PC only), so its pin has it before the site opens again. */
+  async setIcon(session: string, data: string) {
+    const all = (app.settings["browser.icons"] as Record<string, string> | undefined) ?? {};
+    if (all[session] === data) return;
+    // Sessions that were deleted take their icons with them.
+    const kept = Object.fromEntries(Object.entries(all).filter(([id]) => app.sessions.some((s) => s.id === id)));
+    await app.setSetting("browser.icons", { ...kept, [session]: data });
+  }
+
   /** Moves a pin to the place of another (dragging on the strip). */
   async move(id: string, before: string | null) {
     const list = this.list;

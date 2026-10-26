@@ -53,6 +53,7 @@
     {@const name = label(p)}
     {@const color = p.profile === SHARED ? undefined : browserProfiles.color(p.profile)}
     {@const who = p.profile === SHARED ? "" : ` (${browserProfiles.name(p.profile)})`}
+    {@const icon = pins.icon(p)}
     <button
       class="pin"
       class:active={t && app.activeId === t.id}
@@ -67,7 +68,11 @@
       onpointerdown={(e) => press(e, p)}
     >
       {#if color}<span class="bar" style:background={color} aria-hidden="true"></span>{/if}
-      <span class="letter" aria-hidden="true">{name.trim().charAt(0).toUpperCase()}</span>
+      {#if icon}
+        <img class="icon" src={icon} alt="" draggable="false" />
+      {:else}
+        <span class="letter" aria-hidden="true">{name.trim().charAt(0).toUpperCase()}</span>
+      {/if}
       {#if t?.unread}<span class="badge" aria-hidden="true">{t.unread > 99 ? "99+" : t.unread}</span>{/if}
     </button>
   {/each}
@@ -111,8 +116,16 @@
     border-color: var(--accent);
     box-shadow: 0 0 0 1px var(--accent);
   }
-  .pin.asleep .letter {
+  .pin.asleep .letter,
+  .pin.asleep .icon {
     opacity: 0.6;
+  }
+  .icon {
+    display: block;
+    width: 18px;
+    height: 18px;
+    margin: auto;
+    object-fit: contain;
   }
   .pin.dragging {
     opacity: 0.4;
