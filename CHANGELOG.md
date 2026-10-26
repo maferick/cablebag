@@ -6,7 +6,7 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.20.4 · not released yet
+## 0.20.4 · 26 October 2026
 
 - **Adding a site is quick in the Web view.** A **+** next to "Sites", and right-clicking a folder or the empty
   part of the list, opens a small box that asks only for the web address (and a name, if you want one). The site
