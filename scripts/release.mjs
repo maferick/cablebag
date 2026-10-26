@@ -1,22 +1,21 @@
 // Publishes a new Cablebag version: node scripts/release.mjs <version> ["<what changed>"] [--dry]
 //
-// 1. Sets the version, writes the third-party notices, commits and tags (on main, which is GitHub's main).
+// 1. Sets the version, writes the third-party notices, commits and tags (on main, which is GitHub's main); the
+//    tag carries the notes.
 // 2. Scans every tracked file for private words, before anything leaves this PC.
-// 3. Builds the installer, signed with the update key from Vaultwarden (held in memory only).
-// 4. Writes latest.json, the file installed copies check for updates.
-// 5. Scans the built programs too, pushes main and the tag, and creates the GitHub release with the
-//    installer, its signature and latest.json.
-// With --dry it stops before anything leaves this PC (the commit and tag stay local).
+// 3. Pushes main and the tag. GitHub builds the installer on its own servers (.github/workflows/release.yml),
+//    signed with the update key kept in the repository's secrets, and makes a draft release with the installer,
+//    its signature and latest.json, the file installed copies check for updates.
+// 4. Downloads that build and scans the programs for private words too (the list never leaves this PC), then
+//    publishes the draft. When the scan finds something, the draft is deleted and nothing is published.
+// With --dry it stops before anything leaves this PC (the commit and tag stay local). A test build without a
+// release: Actions > Release > Run workflow.
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const REPO = "maferick/cablebag";
-/** Private settings of the PC that releases, outside the repository: { "vaultHost": "user@host" }. */
-const LOCAL = JSON.parse(readFileSync(join(homedir(), ".cablebag", "release.json"), "utf8"));
-const VAULT_HOST = LOCAL.vaultHost;
-const VAULT_ITEM = "cablebag-updater-key";
 
 const [version, notes = "", ...flags] = process.argv.slice(2);
 const dry = flags.includes("--dry") || notes === "--dry";
@@ -54,60 +53,55 @@ run("node", ["scripts/notices.mjs"]);
 run("cargo", ["update", "-p", "cablebag", "--offline", "--manifest-path", "src-tauri/Cargo.toml"]);
 run("git", ["add", "-A"]);
 if (out("git", ["status", "--porcelain"])) run("git", ["commit", "-q", "-m", `Cablebag ${version}`]);
-run("git", ["tag", "-f", `v${version}`]);
+// verbatim: lines starting with # (headings in the notes) stay in.
+run("git", ["tag", "-a", "-f", "--cleanup=verbatim", `v${version}`, "-m", text]);
 
 // 2. Nothing personal in what is published.
 step("Scan");
 run("node", ["scripts/scan-private.mjs", ...out("git", ["ls-files"]).split("\n").filter(Boolean)]);
 
-// 3. Build, signed. Paths of this PC are taken out of the programs.
-step("Build");
-const key = JSON.parse(
-  // A fresh vault session every time: a stale one makes bw ask for the master password instead.
-  out(
-    "ssh",
-    [
-      "-o",
-      "BatchMode=yes",
-      VAULT_HOST,
-      `export PATH=$PATH:/snap/bin; S=$(BW_PASSWORD="$(cat ~/.bw_master)" timeout 60 bw unlock --passwordenv BW_PASSWORD --raw </dev/null) && timeout 40 bw get item ${VAULT_ITEM} --session "$S" </dev/null`,
-    ],
-    { timeout: 150_000 },
-  ),
-);
-const env = {
-  ...process.env,
-  TAURI_SIGNING_PRIVATE_KEY: key.notes.split("\n")[0].trim(),
-  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: key.login.password,
-  RUSTFLAGS: `${process.env.RUSTFLAGS ?? ""} --remap-path-prefix=${homedir()}=~ --remap-path-prefix=${process.cwd()}=cablebag`.trim(),
-};
-run("npm", ["run", "tauri", "build"], { env, shell: true });
-
-const bundle = "src-tauri/target/release/bundle/nsis";
-const setup = `Cablebag_${version}_x64-setup.exe`;
-if (!existsSync(join(bundle, setup)) || !existsSync(join(bundle, `${setup}.sig`))) throw new Error(`${setup} or its signature is missing.`);
-
-// 4. The update list.
-const latest = {
-  version,
-  notes: text,
-  pub_date: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
-  platforms: {
-    "windows-x86_64": {
-      signature: readFileSync(join(bundle, `${setup}.sig`), "utf8").trim(),
-      url: `https://github.com/${REPO}/releases/download/v${version}/${setup}`,
-    },
-  },
-};
-writeFileSync(join(bundle, "latest.json"), JSON.stringify(latest, null, 2) + "\n");
-
-// 5. The programs too, then out.
-step("Publish");
-run("node", ["scripts/scan-private.mjs", "src-tauri/target/release/cablebag.exe", "rdp-helper/publish/cablebag-rdp.exe", "build", "--packed", join(bundle, setup), join(bundle, "latest.json")]);
+// 3. Out: GitHub builds it.
 if (dry) {
-  console.log(`\nDry run done: ${join(bundle, setup)} and latest.json are ready; the commit and tag v${version} are local. Nothing was pushed.`);
+  console.log(`
+Dry run done: the commit and tag v${version} are local. Nothing was pushed.`);
   process.exit(0);
 }
+step("Build on GitHub");
 run("git", ["push", "-q", "origin", "main", `v${version}`]);
-run("gh", ["release", "create", `v${version}`, "--repo", REPO, "--title", `Cablebag ${version}`, "--notes", text, join(bundle, setup), join(bundle, `${setup}.sig`), join(bundle, "latest.json")]);
-console.log(`\nReleased: https://github.com/${REPO}/releases/tag/v${version}`);
+const tag = `v${version}`;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let id = "";
+for (let i = 0; i < 40 && !id; i++) {
+  await sleep(5000);
+  const runs = JSON.parse(out("gh", ["run", "list", "--repo", REPO, "--workflow", "release.yml", "--limit", "20", "--json", "databaseId,headBranch,event"]));
+  id = String(runs.find((r) => r.headBranch === tag && r.event === "push")?.databaseId ?? "");
+}
+if (!id) throw new Error(`GitHub did not start building ${tag}; see https://github.com/${REPO}/actions`);
+console.log(`Building: https://github.com/${REPO}/actions/runs/${id}`);
+run("gh", ["run", "watch", id, "--repo", REPO, "--exit-status", "--interval", "30"]);
+
+// 4. The programs too, then public.
+step("Scan the build");
+const dir = mkdtempSync(join(tmpdir(), `cablebag-${version}-`));
+run("gh", ["run", "download", id, "--repo", REPO, "--name", "release", "--dir", dir]);
+const nsis = join(dir, "src-tauri", "target", "release", "bundle", "nsis");
+const setup = `Cablebag_${version}_x64-setup.exe`;
+try {
+  run("node", [
+    "scripts/scan-private.mjs",
+    join(dir, "src-tauri", "target", "release", "cablebag.exe"),
+    join(dir, "rdp-helper", "publish", "cablebag-rdp.exe"),
+    join(dir, "build"),
+    join(nsis, "latest.json"),
+    "--packed",
+    join(nsis, setup),
+  ]);
+} catch {
+  run("gh", ["release", "delete", tag, "--repo", REPO, "--yes"]);
+  throw new Error(`A private word is in the build of ${version}; the draft release was deleted and nothing was published.`);
+}
+step("Publish");
+run("gh", ["release", "edit", tag, "--repo", REPO, "--draft=false", "--latest"]);
+rmSync(dir, { recursive: true, force: true });
+console.log(`
+Released: https://github.com/${REPO}/releases/tag/${tag}`);

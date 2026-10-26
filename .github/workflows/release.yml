@@ -1,0 +1,94 @@
+# Builds a release on GitHub's own servers when scripts/release.mjs pushes a version tag (v1.2.3): the installer,
+# signed with the update key (repository secrets), its signature and latest.json, as a DRAFT release that nobody
+# else sees and installed copies do not find. The maintainer's PC then scans the built programs for private words
+# and publishes the draft (see release.mjs). Run by hand (Actions > Release > Run workflow) it builds the same
+# without making a release: a test.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Set up .NET 8 SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Cache the X server download
+        uses: actions/cache@v6
+        with:
+          path: xserver/cache
+          key: xserver-${{ hashFiles('scripts/xserver.json') }}
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          shared-key: release
+
+      - name: Install npm packages
+        run: npm ci
+
+      # beforeBuildCommand builds the Remote Desktop helper, fetches the X server and builds the frontend.
+      # Paths of the build machine are taken out of the programs.
+      - name: Build the installer, signed for updates
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          $env:RUSTFLAGS = "--remap-path-prefix=$env:USERPROFILE=~ --remap-path-prefix=$env:GITHUB_WORKSPACE=cablebag"
+          npm run tauri build
+
+      - name: Write the update list and the notes
+        run: node scripts/latest.mjs
+
+      # Everything that gets published, plus the programs inside the installer, for the private-word scan on the
+      # maintainer's PC (the list of private words never leaves it).
+      - name: Keep the build
+        uses: actions/upload-artifact@v7
+        with:
+          name: release
+          if-no-files-found: error
+          path: |
+            src-tauri/target/release/bundle/nsis/*-setup.exe
+            src-tauri/target/release/bundle/nsis/*-setup.exe.sig
+            src-tauri/target/release/bundle/nsis/latest.json
+            src-tauri/target/release/bundle/nsis/notes.md
+            src-tauri/target/release/cablebag.exe
+            rdp-helper/publish/cablebag-rdp.exe
+            build/
+
+      - name: Make the draft release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart("v")
+          $b = "src-tauri/target/release/bundle/nsis"
+          $setup = "$b/Cablebag_${v}_x64-setup.exe"
+          gh release create "${{ github.ref_name }}" --draft --verify-tag --title "Cablebag $v" --notes-file "$b/notes.md" $setup "$setup.sig" "$b/latest.json"

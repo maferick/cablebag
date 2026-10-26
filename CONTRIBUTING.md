@@ -27,9 +27,10 @@ This repository is where Cablebag is developed, so pull requests work the normal
 `main`, open the pull request, and it is reviewed and merged here by the maintainer or a trusted
 collaborator. Your commits keep you as their author.
 
-Releases are made from `main` by the maintainer: `scripts/release.mjs` sets the version, tags, builds the
-installer, signs it with the update key (which never leaves the maintainer's PC) and creates the GitHub
-release. A merged change ships in the next release, and the release notes say what changed.
+Releases are made from `main` by the maintainer: `scripts/release.mjs` sets the version and tags it, GitHub
+builds the installer on its own servers and signs it with the update key (a repository secret), and the
+release is published after a last check of the build. A merged change ships in the next release, and the
+release notes say what changed.
 
 A few practical points:
 

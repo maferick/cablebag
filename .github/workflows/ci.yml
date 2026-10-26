@@ -1,6 +1,6 @@
 # Checks every push to main and every pull request: frontend types (svelte-check) and the backend unit
-# tests (cargo test --lib), on Windows and on Linux. Nothing is signed or published here; releases are made
-# from main on the maintainer's PC by scripts/release.mjs.
+# tests (cargo test --lib), on Windows and on Linux. Nothing is signed or published here; releases are built
+# by release.yml when scripts/release.mjs pushes a version tag.
 name: CI
 
 on:
