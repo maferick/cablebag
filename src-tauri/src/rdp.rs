@@ -370,7 +370,9 @@ pub async fn open(app: AppHandle, id: String, session: Session, geo: Geometry) -
         None => String::new(),
     };
 
-    let window = app.get_webview_window("main").ok_or_else(|| anyhow!("main window missing"))?;
+    // get_window, not get_webview_window: with web tabs open the window holds more than one webview, and then
+    // get_webview_window("main") finds nothing.
+    let window = app.get_window("main").ok_or_else(|| anyhow!("main window missing"))?;
     let hwnd = window.hwnd()?.0 as isize as i64;
     clip_children(hwnd);
     let mut cmd = Command::new(helper_path()?);

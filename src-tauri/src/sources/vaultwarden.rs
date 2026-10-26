@@ -250,7 +250,7 @@ pub fn keep_mode(app: &AppHandle) -> String {
 /// Ok(false) when Hello is not set up here, an error when the person cancels.
 pub async fn hello_confirm(app: &AppHandle, message: &str) -> Result<bool> {
     #[cfg(windows)]
-    let hwnd = app.get_webview_window("main").and_then(|w| w.hwnd().ok()).map(|h| h.0 as isize).unwrap_or(0);
+    let hwnd = app.get_window("main").and_then(|w| w.hwnd().ok()).map(|h| h.0 as isize).unwrap_or(0);
     // No Hello on other platforms: the stub verify gets no window and answers Unavailable.
     #[cfg(not(windows))]
     let hwnd = {

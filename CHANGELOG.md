@@ -6,6 +6,12 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.20.5 · not released yet
+
+- **Remote desktop works again while web tabs are open.** An RDP session stopped at "main window missing" as soon
+  as a web tab (Teams, Outlook, any site) was open in the same window. Choosing a Vaultwarden login had the same
+  cause; its window now sits in front of Cablebag again.
+
 ## 0.20.4 · 26 October 2026
 
 - **Adding a site is quick in the Web view.** A **+** next to "Sites", and right-clicking a folder or the empty
