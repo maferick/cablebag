@@ -459,7 +459,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | time-macros (Rust) | 0.2.32 | MIT OR Apache-2.0 | https://github.com/time-rs/time |
 | tinystr (Rust) | 0.8.4 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | tinyvec (Rust) | 1.13.3 | Zlib OR Apache-2.0 OR MIT | https://github.com/Lokathor/tinyvec |
-| tokio (Rust) | 1.54.0 | MIT | https://github.com/tokio-rs/tokio |
+| tokio (Rust) | 1.54.1 | MIT | https://github.com/tokio-rs/tokio |
 | tokio-macros (Rust) | 2.7.2 | MIT | https://github.com/tokio-rs/tokio |
 | tokio-native-tls (Rust) | 0.3.1 | MIT | https://github.com/tokio-rs/tls |
 | tokio-rustls (Rust) | 0.26.6 | MIT OR Apache-2.0 | https://github.com/rustls/tokio-rustls |
