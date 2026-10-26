@@ -6,7 +6,12 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.20.6 · not released yet
+## 0.20.6 · 26 October 2026
+
+- **Microsoft Defender removed 0.20.5 on some PCs**, taking it for a trojan (Trojan:Win32/Bearfoos.A!ml, a false
+  alarm from its machine-learning guess; it has been reported to Microsoft). Releases are now built on GitHub's
+  own servers and checked with Defender before they go out. If Cablebag disappeared, install this version from
+  the releases page; your sessions and settings are kept.
 
 - **Pinned sites show their own icon** on the strip at the left, instead of a letter. Cablebag picks up the icon
   the first time the site is open and remembers it on this PC, so the pin keeps it after a restart. A site without

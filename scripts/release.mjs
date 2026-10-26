@@ -6,8 +6,9 @@
 // 3. Pushes main and the tag. GitHub builds the installer on its own servers (.github/workflows/release.yml),
 //    signed with the update key kept in the repository's secrets, and makes a draft release with the installer,
 //    its signature and latest.json, the file installed copies check for updates.
-// 4. Downloads that build and scans the programs for private words too (the list never leaves this PC), then
-//    publishes the draft. When the scan finds something, the draft is deleted and nothing is published.
+// 4. Downloads that build and scans the programs for private words too (the list never leaves this PC) and
+//    with Microsoft Defender, then publishes the draft. A private word deletes the draft; a Defender hit keeps it
+//    unpublished.
 // With --dry it stops before anything leaves this PC (the commit and tag stay local). A test build without a
 // release: Actions > Release > Run workflow.
 import { execFileSync } from "node:child_process";
@@ -62,8 +63,7 @@ run("node", ["scripts/scan-private.mjs", ...out("git", ["ls-files"]).split("\n")
 
 // 3. Out: GitHub builds it.
 if (dry) {
-  console.log(`
-Dry run done: the commit and tag v${version} are local. Nothing was pushed.`);
+  console.log(`\nDry run done: the commit and tag v${version} are local. Nothing was pushed.`);
   process.exit(0);
 }
 step("Build on GitHub");
@@ -100,8 +100,28 @@ try {
   run("gh", ["release", "delete", tag, "--repo", REPO, "--yes"]);
   throw new Error(`A private word is in the build of ${version}; the draft release was deleted and nothing was published.`);
 }
+
+// 5. Microsoft Defender must not take it for malware: a version it flags is removed from users' PCs. Report-only
+// scans (-DisableRemediation); Defender's own real-time protection may already have removed a flagged file.
+step("Defender");
+const programs = [join(dir, "src-tauri", "target", "release", "cablebag.exe"), join(dir, "rdp-helper", "publish", "cablebag-rdp.exe"), join(nsis, setup)];
+const mpcmd = join(process.env.ProgramFiles ?? "C:\\Program Files", "Windows Defender", "MpCmdRun.exe");
+if (!existsSync(mpcmd)) throw new Error(`Microsoft Defender's scanner is missing (${mpcmd}); the draft of ${version} stays unpublished.`);
+const flagged = programs.filter((file) => {
+  if (!existsSync(file)) return true;
+  try {
+    const said = out(mpcmd, ["-Scan", "-ScanType", "3", "-File", file, "-DisableRemediation"]);
+    console.log(said.split("\n").pop());
+    return !said.includes("found no threats");
+  } catch {
+    return true;
+  }
+});
+if (flagged.length) {
+  throw new Error(`Microsoft Defender flags ${flagged.join(", ")}. The draft of ${version} stays unpublished (https://github.com/${REPO}/releases); report the files at https://www.microsoft.com/wdsi/filesubmission.`);
+}
+
 step("Publish");
 run("gh", ["release", "edit", tag, "--repo", REPO, "--draft=false", "--latest"]);
 rmSync(dir, { recursive: true, force: true });
-console.log(`
-Released: https://github.com/${REPO}/releases/tag/${tag}`);
+console.log(`\nReleased: https://github.com/${REPO}/releases/tag/${tag}`);
