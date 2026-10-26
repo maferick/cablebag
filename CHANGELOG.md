@@ -6,7 +6,7 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.20.7 · not released yet
+## 0.20.7 · 26 October 2026
 
 - **Web tabs show their page's icon**, as in a browser.
 - **Pins keep their site's own icon.** A site that first sends you to a sign-in page elsewhere (Teams and Outlook
