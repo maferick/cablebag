@@ -36,10 +36,10 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | @jridgewell/resolve-uri (JavaScript) | 3.1.2 | MIT | https://www.npmjs.com/package/@jridgewell/resolve-uri |
 | @jridgewell/sourcemap-codec (JavaScript) | 1.6.0 | MIT | https://www.npmjs.com/package/@jridgewell/sourcemap-codec |
 | @jridgewell/trace-mapping (JavaScript) | 0.3.31 | MIT | https://www.npmjs.com/package/@jridgewell/trace-mapping |
-| @lucide/svelte (JavaScript) | 1.61.0 | ISC | https://www.npmjs.com/package/@lucide/svelte |
+| @lucide/svelte (JavaScript) | 1.64.0 | ISC | https://www.npmjs.com/package/@lucide/svelte |
 | @sveltejs/acorn-typescript (JavaScript) | 1.0.13 | MIT | https://www.npmjs.com/package/@sveltejs/acorn-typescript |
 | @tauri-apps/api (JavaScript) | 2.12.4 | Apache-2.0 OR MIT | https://www.npmjs.com/package/@tauri-apps/api |
-| @tauri-apps/plugin-dialog (JavaScript) | 2.8.3 | MIT OR Apache-2.0 | https://www.npmjs.com/package/@tauri-apps/plugin-dialog |
+| @tauri-apps/plugin-dialog (JavaScript) | 2.8.4 | MIT OR Apache-2.0 | https://www.npmjs.com/package/@tauri-apps/plugin-dialog |
 | @tauri-apps/plugin-opener (JavaScript) | 2.7.2 | MIT OR Apache-2.0 | https://www.npmjs.com/package/@tauri-apps/plugin-opener |
 | @types/estree (JavaScript) | 1.0.9 | MIT | https://www.npmjs.com/package/@types/estree |
 | @xterm/addon-fit (JavaScript) | 0.11.0 | MIT | https://www.npmjs.com/package/@xterm/addon-fit |
@@ -58,7 +58,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | is-reference (JavaScript) | 3.0.3 | MIT | https://www.npmjs.com/package/is-reference |
 | locate-character (JavaScript) | 3.0.0 | MIT | https://www.npmjs.com/package/locate-character |
 | magic-string (JavaScript) | 0.30.21 | MIT | https://www.npmjs.com/package/magic-string |
-| svelte (JavaScript) | 5.57.2 | MIT | https://www.npmjs.com/package/svelte |
+| svelte (JavaScript) | 5.57.3 | MIT | https://www.npmjs.com/package/svelte |
 | zimmerframe (JavaScript) | 1.1.5 | MIT | https://www.npmjs.com/package/zimmerframe |
 | adler2 (Rust) | 2.0.1 | 0BSD OR MIT OR Apache-2.0 | https://github.com/oyvindln/adler2 |
 | aead (Rust) | 0.5.2 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
@@ -258,7 +258,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | lazy-regex-proc_macros (Rust) | 3.6.2 | MIT | https://github.com/Canop/lazy-regex/tree/main/src/proc_macros |
 | libc (Rust) | 0.2.191 | MIT OR Apache-2.0 | https://github.com/rust-lang/libc |
 | libm (Rust) | 0.2.16 | MIT | https://github.com/rust-lang/compiler-builtins |
-| libsqlite3-sys (Rust) | 0.38.2 | MIT | https://github.com/rusqlite/rusqlite |
+| libsqlite3-sys (Rust) | 0.39.1 | MIT | https://github.com/rusqlite/rusqlite |
 | litemap (Rust) | 0.8.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | lock_api (Rust) | 0.4.14 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
 | lock_api (Rust) | 0.5.0 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
@@ -295,7 +295,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | p256 (Rust) | 0.14.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/elliptic-curves |
 | p384 (Rust) | 0.14.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/elliptic-curves |
 | p521 (Rust) | 0.14.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/elliptic-curves |
-| pageant (Rust) | 0.2.4 | Apache-2.0 | https://github.com/warp-tech/russh |
+| pageant (Rust) | 0.2.5 | Apache-2.0 | https://github.com/warp-tech/russh |
 | parking_lot (Rust) | 0.12.5 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
 | parking_lot (Rust) | 0.13.0 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
 | parking_lot_core (Rust) | 0.10.0 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
@@ -349,12 +349,12 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | regex-syntax (Rust) | 0.8.11 | MIT OR Apache-2.0 | https://github.com/rust-lang/regex |
 | reqwest (Rust) | 0.13.5 | MIT OR Apache-2.0 | https://github.com/seanmonstar/reqwest |
 | rfc6979 (Rust) | 0.6.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/signatures |
-| rfd (Rust) | 0.16.0 | MIT | https://github.com/PolyMeilex/rfd |
+| rfd (Rust) | 0.17.2 | MIT | https://github.com/PolyMeilex/rfd |
 | ring (Rust) | 0.17.14 | Apache-2.0 AND ISC | https://github.com/briansmith/ring |
 | rsa (Rust) | 0.10.0-rc.18 | MIT OR Apache-2.0 | https://github.com/RustCrypto/RSA |
 | rsa (Rust) | 0.9.10 | MIT OR Apache-2.0 | https://github.com/RustCrypto/RSA |
-| rusqlite (Rust) | 0.40.2 | MIT | https://github.com/rusqlite/rusqlite |
-| russh (Rust) | 0.64.1 | Apache-2.0 | https://github.com/warp-tech/russh |
+| rusqlite (Rust) | 0.41.1 | MIT | https://github.com/rusqlite/rusqlite |
+| russh (Rust) | 0.65.0 | Apache-2.0 | https://github.com/warp-tech/russh |
 | russh-cryptovec (Rust) | 0.62.0 | Apache-2.0 | https://github.com/warp-tech/russh |
 | russh-sftp (Rust) | 3.0.1 | Apache-2.0 | https://github.com/AspectUnk/russh-sftp |
 | russh-util (Rust) | 0.52.0 | Apache-2.0 | https://github.com/warp-tech/russh |
@@ -432,17 +432,17 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | syn (Rust) | 3.0.9 | MIT OR Apache-2.0 | https://github.com/dtolnay/syn |
 | sync_wrapper (Rust) | 1.0.2 | Apache-2.0 | https://github.com/Actyx/sync_wrapper |
 | synstructure (Rust) | 0.14.0 | MIT | https://github.com/mystor/synstructure |
-| sysinfo (Rust) | 0.39.6 | MIT | https://github.com/GuillaumeGomez/sysinfo |
+| sysinfo (Rust) | 0.40.0 | MIT | https://github.com/GuillaumeGomez/sysinfo |
 | tao (Rust) | 0.37.1 | Apache-2.0 | https://github.com/tauri-apps/tao |
 | tauri (Rust) | 2.12.5 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | tauri-build (Rust) | 2.7.4 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | tauri-codegen (Rust) | 2.7.4 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | tauri-macros (Rust) | 2.7.4 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | tauri-plugin (Rust) | 2.7.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
-| tauri-plugin-dialog (Rust) | 2.8.3 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
+| tauri-plugin-dialog (Rust) | 2.8.4 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
 | tauri-plugin-fs (Rust) | 2.7.1 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
 | tauri-plugin-opener (Rust) | 2.7.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
-| tauri-plugin-updater (Rust) | 2.14.0 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
+| tauri-plugin-updater (Rust) | 2.14.1 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
 | tauri-runtime (Rust) | 2.12.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | tauri-runtime-wry (Rust) | 2.12.3 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | tauri-utils (Rust) | 2.10.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
@@ -480,6 +480,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | tray-icon (Rust) | 0.25.1 | MIT OR Apache-2.0 | https://github.com/tauri-apps/tray-icon |
 | try-lock (Rust) | 0.2.5 | MIT | https://github.com/seanmonstar/try-lock |
 | tungstenite (Rust) | 0.30.0 | MIT OR Apache-2.0 | https://github.com/snapview/tungstenite-rs |
+| typed-path (Rust) | 0.13.0 | MIT OR Apache-2.0 | https://github.com/chipsenkbeil/typed-path |
 | typeid (Rust) | 1.0.3 | MIT OR Apache-2.0 | https://github.com/dtolnay/typeid |
 | typenum (Rust) | 1.20.1 | MIT OR Apache-2.0 | https://github.com/paholg/typenum |
 | unicode-ident (Rust) | 1.0.27 | (MIT OR Apache-2.0) AND Unicode-3.0 | https://github.com/dtolnay/unicode-ident |
@@ -490,7 +491,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | url (Rust) | 2.5.8 | MIT OR Apache-2.0 | https://github.com/servo/rust-url |
 | urlpattern (Rust) | 0.6.0 | MIT | https://github.com/denoland/rust-urlpattern |
 | utf8_iter (Rust) | 1.0.4 | Apache-2.0 OR MIT | https://github.com/hsivonen/utf8_iter |
-| uuid (Rust) | 1.28.0 | Apache-2.0 OR MIT | https://github.com/uuid-rs/uuid |
+| uuid (Rust) | 1.29.0 | Apache-2.0 OR MIT | https://github.com/uuid-rs/uuid |
 | vcpkg (Rust) | 0.2.15 | MIT/Apache-2.0 | https://github.com/mcgoo/vcpkg-rs |
 | version_check (Rust) | 0.9.5 | MIT/Apache-2.0 | https://github.com/SergioBenitez/version_check |
 | vnc-rs (Rust) | 0.6.0 | MIT OR Apache-2.0 | https://github.com/HsuJv/vnc-rs |
@@ -500,7 +501,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | want (Rust) | 0.3.2 | MIT | https://github.com/seanmonstar/want |
 | web_atoms (Rust) | 0.2.6 | MIT OR Apache-2.0 | https://github.com/servo/html5ever |
 | web-time (Rust) | 1.1.0 | MIT OR Apache-2.0 | https://github.com/daxpedda/web-time |
-| webpki-roots (Rust) | 1.0.10 | CDLA-Permissive-2.0 | https://github.com/rustls/webpki-roots |
+| webpki-roots (Rust) | 1.0.11 | CDLA-Permissive-2.0 | https://github.com/rustls/webpki-roots |
 | webview2-com (Rust) | 0.39.1 | MIT | https://github.com/wravery/webview2-rs |
 | webview2-com-macros (Rust) | 0.8.1 | MIT | https://github.com/wravery/webview2-rs |
 | webview2-com-sys (Rust) | 0.39.1 | MIT | https://github.com/wravery/webview2-rs |
@@ -509,7 +510,6 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | window-vibrancy (Rust) | 0.8.1 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri-plugin-vibrancy |
 | windows (Rust) | 0.62.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | windows_x86_64_msvc (Rust) | 0.52.6 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| windows_x86_64_msvc (Rust) | 0.53.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | windows-collections (Rust) | 0.3.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | windows-core (Rust) | 0.62.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | windows-future (Rust) | 0.3.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
@@ -525,10 +525,8 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | windows-strings (Rust) | 0.100.0 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | windows-strings (Rust) | 0.5.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | windows-sys (Rust) | 0.52.0 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| windows-sys (Rust) | 0.60.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | windows-sys (Rust) | 0.61.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | windows-targets (Rust) | 0.52.6 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| windows-targets (Rust) | 0.53.5 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | windows-threading (Rust) | 0.2.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | windows-version (Rust) | 0.1.7 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | winnow (Rust) | 1.0.4 | MIT | https://github.com/winnow-rs/winnow |
@@ -549,6 +547,6 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | zerotrie (Rust) | 0.2.5 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | zerovec (Rust) | 0.11.8 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | zerovec-derive (Rust) | 0.11.6 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
-| zip (Rust) | 4.6.1 | MIT | https://github.com/zip-rs/zip2.git |
+| zip (Rust) | 9.2.1 | MIT | https://github.com/zip-rs/zip2 |
 | zlib-rs (Rust) | 0.6.8 | Zlib | https://github.com/trifectatechfoundation/zlib-rs |
 | zmij (Rust) | 1.0.23 | MIT | https://github.com/dtolnay/zmij |
