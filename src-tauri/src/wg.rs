@@ -315,7 +315,7 @@ fn addresses(s: &str) -> Vec<IpAddr> {
 
 /// Whether this PC already has one of these addresses on an adapter, which means the WireGuard app runs the same tunnel.
 fn local_clash(addrs: &[IpAddr]) -> bool {
-    let nets = sysinfo::Networks::new_with_refreshed_list();
+    let Ok(nets) = sysinfo::Networks::new_with_refreshed_list() else { return false };
     nets.iter().any(|(_, data)| data.ip_networks().iter().any(|n| addrs.contains(&n.addr)))
 }
 

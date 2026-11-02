@@ -85,7 +85,7 @@ fn born(pid: u32) -> Option<u64> {
 
 #[cfg(not(windows))]
 fn born(pid: u32) -> Option<u64> {
-    let mut sys = System::new();
+    let mut sys = System::new().ok()?;
     sys.refresh_processes_specifics(ProcessesToUpdate::Some(&[Pid::from_u32(pid)]), true, ProcessRefreshKind::nothing());
     proc_of(&sys, pid).map(|p| p.start)
 }
@@ -100,7 +100,8 @@ fn allowed(pid: u32) -> bool {
     if let Some(ok) = born.and_then(|b| CACHE.lock().get(pid, b)) {
         return ok;
     }
-    let mut sys = System::new();
+    // Without the list of processes nothing can be checked, so the answer is no (and is not remembered).
+    let Ok(mut sys) = System::new() else { return false };
     sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
     let ok = descends(pid, own, |p| proc_of(&sys, p));
     if let Some(b) = born {
@@ -207,7 +208,7 @@ mod tests {
         let _ = child.kill();
         assert!(ok, "a child of this process");
         // Our own parent (cargo, a shell) did not come from us.
-        let mut sys = System::new();
+        let mut sys = System::new().unwrap();
         sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
         if let Some(parent) = proc_of(&sys, std::process::id()).and_then(|p| p.parent) {
             assert!(!allowed(parent));
