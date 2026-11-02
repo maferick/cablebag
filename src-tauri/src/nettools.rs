@@ -296,10 +296,16 @@ pub fn open_ports() -> Result<Vec<Socket>> {
     use netstat2::{get_sockets_info, AddressFamilyFlags, ProtocolFlags, ProtocolSocketInfo};
     let sockets = get_sockets_info(AddressFamilyFlags::IPV4 | AddressFamilyFlags::IPV6, ProtocolFlags::TCP | ProtocolFlags::UDP)
         .map_err(|e| anyhow!("could not list sockets: {e}"))?;
-    let mut sys = sysinfo::System::new();
-    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+    // Without the list of processes the ports are still listed, without the names of their programs.
+    let mut sys = sysinfo::System::new().ok();
+    if let Some(sys) = sys.as_mut() {
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+    }
     let name_of = |pid: u32| {
-        sys.process(sysinfo::Pid::from_u32(pid)).map(|p| p.name().to_string_lossy().to_string()).unwrap_or_default()
+        sys.as_ref()
+            .and_then(|sys| sys.process(sysinfo::Pid::from_u32(pid)))
+            .map(|p| p.name().to_string_lossy().to_string())
+            .unwrap_or_default()
     };
     let mut out = Vec::new();
     for s in sockets {
