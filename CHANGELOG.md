@@ -6,6 +6,12 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.20.8 · not released yet
+
+- Updated the parts Cablebag is built on, among them the SSH library (russh 0.65), the database library
+  (rusqlite 0.41), the process list behind "Open ports on this PC" (sysinfo 0.40), Svelte and the Tauri dialog
+  and update plug-ins.
+
 ## 0.20.7 · 26 October 2026
 
 - **Web tabs show their page's icon**, as in a browser.
