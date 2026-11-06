@@ -328,6 +328,7 @@ fn putty_like(_path: &str) -> Result<Vec<Item>> {
 
 // ---- WinSCP: the registry, or WinSCP.ini next to the program or in %APPDATA% ----
 
+#[cfg(windows)]
 const WINSCP: &str = r"Software\Martin Prikryl\WinSCP 2\Sessions";
 
 /// FSProtocol: 0 SCP, 1 SFTP with SCP fallback, 2 SFTP, 5 FTP. Ftps: 0 none, 1 implicit, 2 and 3 explicit.
