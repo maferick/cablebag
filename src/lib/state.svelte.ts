@@ -352,7 +352,7 @@ class AppState {
       const profile = ((this.settings["browser.profiles"] ?? []) as { id: string; color: string }[]).find((p) => p.id === s.data?.browser_profile);
       this.push({ id: uid(), title: s.name || s.host, type: "browser", proto: "browser", session: s, status: "connecting", color: color ?? (profile?.color || undefined), gen: 0 });
     } else if (s.kind === "file") {
-      // A file or folder opens in its own Windows program; links in the web browser.
+      // A file or folder opens in the program this PC uses for it; links in the web browser.
       const target = (s.host || s.data?.target || s.data?.path || "").trim();
       if (!target) return this.notify("This session has no path.", "error");
       api.fileOpen(target).catch((e) => this.notify(String(e), "error"));

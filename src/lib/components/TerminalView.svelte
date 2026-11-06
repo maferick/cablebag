@@ -16,6 +16,7 @@
   import { schemeById } from "../schemes";
   import { terminals, emitOutput } from "../terms";
   import { Highlighter, BUILTIN_SYNTAX, compile, type SyntaxSet } from "../highlight";
+  import { windows } from "../kinds";
   import { macros } from "../macros.svelte";
   import { termFolders } from "../termFolders.svelte";
   import { menu } from "../menu.svelte";
@@ -272,7 +273,8 @@
       .replace(/&([SHUPYMDT])/g, (_, k) => vars[k] ?? "")
       .replace(/[<>:"/\\|?*]+/g, "_");
     const dir = String(app.settings["log.dir"]).replace(/[\\/]+$/, "");
-    return { path: `${dir}\\${name}`, kind: String(app.settings["log.kind"] || "text") };
+    // Cablebag writes the log itself, so the separator is this PC's.
+    return { path: `${dir}${windows ? "\\" : "/"}${name}`, kind: String(app.settings["log.kind"] || "text") };
   }
 
   $effect(() => {

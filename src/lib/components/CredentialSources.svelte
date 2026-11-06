@@ -4,6 +4,7 @@
   import { app } from "../state.svelte";
   import { ask } from "../ask.svelte";
   import { vault, SOURCE_KINDS } from "../vault.svelte";
+  import { windows } from "../kinds";
   import SettingsSection from "./SettingsSection.svelte";
   import SettingsRow from "./SettingsRow.svelte";
   import CyberArkFields from "./sources/CyberArkFields.svelte";
@@ -152,8 +153,8 @@
     help={app.settings["vault.unlock"] === "password"
       ? "Safest: nothing about your sources stays on this PC; every start asks for the master password or sign-in."
       : app.settings["vault.unlock"] === "hello"
-        ? "This PC keeps the vault key or sign-in, readable only by your Windows account; Windows Hello confirms it is you once per start."
-        : "This PC keeps the vault key or sign-in, readable only by your Windows account, and uses it without asking: anyone using your Windows account can open them."}
+        ? `This PC keeps the vault key or sign-in, readable only by your ${windows ? "Windows" : "user"} account; ${windows ? "Windows Hello" : "biometric unlock"} confirms it is you once per start.`
+        : `This PC keeps the vault key or sign-in, readable only by your ${windows ? "Windows" : "user"} account, and uses it without asking: anyone using your ${windows ? "Windows" : "user"} account can open them.`}
   >
     <select
       value={app.settings["vault.unlock"]}
@@ -164,7 +165,7 @@
         await vault.refresh();
       }}
     >
-      <option value="hello" disabled={!vault.hello}>Windows Hello (PIN, fingerprint or face){vault.hello ? "" : ", not set up here"}</option>
+      <option value="hello" disabled={!vault.hello}>{windows ? "Windows Hello (PIN, fingerprint or face)" : "Biometric unlock (PIN, fingerprint or face)"}{vault.hello ? "" : ", not set up here"}</option>
       <option value="remember">Without asking</option>
       <option value="password">Ask every time</option>
     </select>
