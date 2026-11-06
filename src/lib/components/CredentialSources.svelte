@@ -148,13 +148,14 @@
 {/if}
 
 <SettingsSection title="At start" find="windows hello remember unlock start ask">
+  {@const account = windows ? "Windows" : "user"}
   <SettingsRow
     label="Remember the unlock on this PC"
     help={app.settings["vault.unlock"] === "password"
       ? "Safest: nothing about your sources stays on this PC; every start asks for the master password or sign-in."
       : app.settings["vault.unlock"] === "hello"
-        ? `This PC keeps the vault key or sign-in, readable only by your ${windows ? "Windows" : "user"} account; ${windows ? "Windows Hello" : "biometric unlock"} confirms it is you once per start.`
-        : `This PC keeps the vault key or sign-in, readable only by your ${windows ? "Windows" : "user"} account, and uses it without asking: anyone using your ${windows ? "Windows" : "user"} account can open them.`}
+        ? `This PC keeps the vault key or sign-in, readable only by your ${account} account; Windows Hello confirms it is you once per start.`
+        : `This PC keeps the vault key or sign-in, readable only by your ${account} account, and uses it without asking: anyone using your ${account} account can open them.`}
   >
     <select
       value={app.settings["vault.unlock"]}
@@ -165,7 +166,9 @@
         await vault.refresh();
       }}
     >
-      <option value="hello" disabled={!vault.hello}>{windows ? "Windows Hello (PIN, fingerprint or face)" : "Biometric unlock (PIN, fingerprint or face)"}{vault.hello ? "" : ", not set up here"}</option>
+      {#if windows}
+        <option value="hello">Windows Hello (PIN, fingerprint or face)</option>
+      {/if}
       <option value="remember">Without asking</option>
       <option value="password">Ask every time</option>
     </select>

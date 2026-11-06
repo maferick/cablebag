@@ -1,7 +1,7 @@
 import { ask } from "./ask.svelte";
 import { SvelteSet } from "svelte/reactivity";
 import { api, type Folder, type LocalShell, type PromptRequest, type ProxmoxSource, type Session } from "./api";
-import { kindInfo } from "./kinds";
+import { kindInfo, windows } from "./kinds";
 import { tiles } from "./tiles.svelte";
 
 export type TabStatus = "idle" | "connecting" | "connected" | "closed" | "failed";
@@ -75,7 +75,7 @@ export const DEFAULT_SETTINGS: Record<string, any> = {
   /** Size of everything in the window, in percent. */
   "ui.scale": 100,
   "update.auto": true,
-  "vault.unlock": "hello",
+  "vault.unlock": windows ? "hello" : "remember",
   "reach.enabled": true,
   "reach.mode": "ping",
   "reach.interval": 120,
