@@ -562,6 +562,7 @@ dependencies = [
  "hex",
  "hkdf",
  "hmac 0.13.0",
+ "libc",
  "log",
  "md-5",
  "native-tls",

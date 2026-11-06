@@ -85,6 +85,9 @@ pageant = "0.2.4"
 # Windows notifications for what web tabs (Teams, chat) want to show.
 tauri-winrt-notification = "0.8.1"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [dev-dependencies]
 # A mock HTTP server for the CyberArk and Delinea client tests.

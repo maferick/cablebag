@@ -82,7 +82,16 @@ fn local_offset_secs() -> i64 {
 
 #[cfg(not(windows))]
 fn local_offset_secs() -> i64 {
-    0
+    // libc::localtime_r accounts for the TZ environment variable and daylight saving.
+    unsafe {
+        let now = libc::time(std::ptr::null_mut());
+        let mut tm: libc::tm = std::mem::zeroed();
+        if libc::localtime_r(&now, &mut tm).is_null() {
+            0
+        } else {
+            tm.tm_gmtoff as i64
+        }
+    }
 }
 
 impl Logger {

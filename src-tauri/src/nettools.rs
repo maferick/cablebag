@@ -157,8 +157,54 @@ fn ping(ip: Ipv4Addr, timeout_ms: u32) -> Option<u32> {
 }
 
 #[cfg(not(windows))]
-fn ping(_ip: Ipv4Addr, _timeout_ms: u32) -> Option<u32> {
-    None
+fn ping(ip: Ipv4Addr, timeout_ms: u32) -> Option<u32> {
+    // shortcut: uses the distro's ping, which reaches hosts even when the kernel only lets the
+    // ping group send raw ICMP; if the scan needs to work without iputils, switch to a ICMP
+    // datagram socket.
+    let out = std::process::Command::new("ping")
+        .args(["-n", "-c", "1", "-W", &timeout_ms.div_ceil(1000).max(1).to_string(), &ip.to_string()])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    rtt_from_ping_output(&String::from_utf8_lossy(&out.stdout))
+}
+
+#[cfg(not(windows))]
+fn rtt_from_ping_output(text: &str) -> Option<u32> {
+    let after = text.rsplit("time=").next()?.trim_end_matches(" ms");
+    after.split(" ").next().and_then(|v| v.parse::<f64>().ok()).map(|ms| ms.round() as u32)
+}
+
+#[cfg(not(windows))]
+fn mac_of(ip: Ipv4Addr) -> String {
+    // The kernel learned the MAC while ping or the port probes were out.
+    std::fs::read_to_string("/proc/net/arp")
+        .unwrap_or_default()
+        .lines()
+        .find(|l| l.split_whitespace().next() == Some(&ip.to_string()))
+        .and_then(|l| l.split_whitespace().nth(3))
+        .filter(|m| *m != "00:00:00:00:00:00")
+        .unwrap_or_default()
+        .to_string()
+}
+
+#[cfg(all(test, not(windows)))]
+mod unix_tests {
+    use super::rtt_from_ping_output;
+
+    #[test]
+    fn reads_the_round_trip_time_from_ping_output() {
+        assert_eq!(
+            rtt_from_ping_output("64 bytes from 10.0.0.7: icmp_seq=1 ttl=64 time=4.31 ms"),
+            Some(4)
+        );
+        assert_eq!(rtt_from_ping_output("64 bytes from fe80::1: icmp_seq=1 ttl=64 time=42 ms"), Some(42));
+        assert_eq!(rtt_from_ping_output("no reply"), None);
+    }
 }
 
 #[cfg(windows)]
@@ -171,11 +217,6 @@ fn mac_of(ip: Ipv4Addr) -> String {
         return String::new();
     }
     mac[..6].iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(":")
-}
-
-#[cfg(not(windows))]
-fn mac_of(_ip: Ipv4Addr) -> String {
-    String::new()
 }
 
 /// Finds live hosts: answers to ping or any of the probe ports. Results stream as "scan-host" events.
