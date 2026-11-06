@@ -6,15 +6,21 @@
 //! (checked by the updater before anything is run). The window cannot change any of this: it can only ask
 //! "is there an update" and "install it".
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
+#[cfg(windows)]
+use anyhow::bail;
 use serde::Serialize;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_updater::{Update, UpdaterExt};
+use tauri_plugin_updater::Update;
+#[cfg(windows)]
+use tauri_plugin_updater::UpdaterExt;
 
 /// Where the list of the newest version is published.
+#[cfg(windows)]
 const LATEST: &str = "https://github.com/maferick/cablebag/releases/latest/download/latest.json";
 /// The only place an installer may come from.
+#[cfg(windows)]
 const RELEASES: &str = "https://github.com/maferick/cablebag/releases/download/";
 
 #[derive(Default)]
@@ -29,6 +35,16 @@ pub struct UpdateInfo {
     pub date: String,
 }
 
+/// On Windows the release page lists one platform, so outside it there is nothing this install
+/// could check against; saying so beats a red "could not check" at every start.
+#[cfg(not(windows))]
+pub async fn check(_: &AppHandle) -> Result<UpdateInfo> {
+    Err(anyhow!(
+        "Cablebag publishes updates for Windows only for now; on Linux install a new version with your package manager."
+    ))
+}
+
+#[cfg(windows)]
 pub async fn check(app: &AppHandle) -> Result<UpdateInfo> {
     let current = app.package_info().version.to_string();
     let updater = app
