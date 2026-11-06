@@ -140,9 +140,9 @@ pub async fn open(app: &AppHandle, id: &str, url: &str, wireguard: Option<String
         #[cfg(not(windows))]
         {
             // WebKitGTK applies the proxy to the webview's own data context, which the profile folder gives
-            // this network alone. shortcut: WebKit has no loopback exception, so a localhost page is reached
-            // through the tunnel too; add ignore-hosts when wry exposes them.
-            builder = builder.proxy_url(Url::parse(&format!("http://127.0.0.1:{port}")).expect("a proxy address as a URL"));
+            // this network alone. A localhost page is reached through the tunnel with it: the same choice
+            // the Windows branch makes on purpose with <-loopback>, so pinned tabs never see this PC's services.
+            builder = builder.proxy_url(Url::parse(&format!("http://127.0.0.1:{port}"))?);
         }
     }
     let builder = builder
