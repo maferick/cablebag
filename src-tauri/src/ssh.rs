@@ -78,15 +78,22 @@ pub struct Client {
     x11: X11Slot,
 }
 
-/// One forwarded agent channel: the bytes go to the Windows OpenSSH agent or to Pageant, as switched on in
-/// Settings, SSH (the OpenSSH agent first when both or neither are on).
+/// One forwarded agent channel: the bytes go to the agent this PC runs its own sessions through,
+/// as switched on in Settings, SSH (Windows: the OpenSSH agent first when both or neither are on;
+/// Linux: always the one in SSH_AUTH_SOCK, because ticking Forward SSH agent is the choice there).
 async fn serve_agent(app: AppHandle, channel: russh::Channel<client::Msg>) {
     let mut stream = channel.into_stream();
     let pageant = settings_flag(&app, "ssh.agent.pageant", false);
     let openssh = settings_flag(&app, "ssh.agent.openssh", false);
-    // shortcut: only Windows connects an agent so far; the SSH_AUTH_SOCK path will take this over.
     #[cfg(not(windows))]
-    let _ = (&mut stream, pageant, openssh);
+    {
+        let _ = (pageant, openssh);
+        if let Some(sock) = std::env::var_os("SSH_AUTH_SOCK") {
+            if let Ok(mut agent) = tokio::net::UnixStream::connect(sock).await {
+                let _ = tokio::io::copy_bidirectional(&mut stream, &mut agent).await;
+            }
+        }
+    }
     #[cfg(windows)]
     {
         if openssh || !pageant {
@@ -385,8 +392,19 @@ async fn authenticate(h: &mut Handle, hop: &Hop, app: &AppHandle, out: &impl Sin
     };
     let offers = |m: MethodKind| methods.is_empty() || methods.contains(&m);
 
-    // 1. SSH agents (Pageant and the Windows OpenSSH agent), when switched on in the settings.
+    // 1. SSH agents (Pageant and the OpenSSH agent), when switched on in the settings.
     if offers(MethodKind::PublicKey) {
+        #[cfg(not(windows))]
+        {
+            if settings_flag(app, "ssh.agent.openssh", false) {
+                if let Ok(mut agent) = keys::agent::client::AgentClient::connect_env().await {
+                    if try_agent(h, &user, &mut agent).await {
+                        out.info("Logged in with a key from the SSH agent.");
+                        return Ok(());
+                    }
+                }
+            }
+        }
         #[cfg(windows)]
         {
             if settings_flag(app, "ssh.agent.pageant", false) {

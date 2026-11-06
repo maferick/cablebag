@@ -17,6 +17,9 @@ import {
   SquareChevronRight,
 } from "@lucide/svelte";
 
+/** Running on Windows; the user agent is the host-OS signal available at module load, before Rust answers. */
+export const windows = /Windows NT/.test(navigator.userAgent);
+
 export interface KindInfo {
   id: string;
   label: string;
@@ -32,15 +35,15 @@ export interface KindInfo {
 
 export const KINDS: KindInfo[] = [
   { id: "ssh", label: "SSH", description: "Secure shell with file browser", icon: Terminal, defaultPort: 22, ready: true, needsHost: true },
-  { id: "rdp", label: "RDP", description: "Windows remote desktop", icon: Monitor, defaultPort: 3389, ready: true, needsHost: true },
+  { id: "rdp", label: "RDP", description: "Windows remote desktop", icon: Monitor, defaultPort: 3389, ready: windows, needsHost: true },
   { id: "vnc", label: "VNC", description: "Remote screen", icon: MonitorSmartphone, defaultPort: 5900, ready: true, needsHost: true },
   { id: "winrm", label: "PowerShell remoting", description: "Remote PowerShell on a Windows server", icon: SquareChevronRight, defaultPort: 5985, ready: true, needsHost: true },
   { id: "telnet", label: "Telnet", description: "Unencrypted terminal", icon: Plug, defaultPort: 23, ready: true, needsHost: true },
   { id: "sftp", label: "SFTP", description: "Remote files only", icon: FolderLock, defaultPort: 22, ready: true, needsHost: true },
   { id: "ftp", label: "FTP", description: "File transfer, with optional TLS", icon: FolderUp, defaultPort: 21, ready: true, needsHost: true },
-  { id: "serial", label: "Serial", description: "COM port of a switch or other device", icon: Cable, defaultPort: 0, ready: true, needsHost: false },
-  { id: "shell", label: "Local shell", description: "PowerShell, cmd, Git Bash", icon: TerminalSquare, defaultPort: 0, ready: true, needsHost: false },
-  { id: "wsl", label: "WSL", description: "Linux distribution on this PC", icon: Boxes, defaultPort: 0, ready: true, needsHost: false },
+  { id: "serial", label: "Serial", description: windows ? "COM port of a switch or other device" : "Serial port (ttyUSB, ttyACM) of a switch or other device", icon: Cable, defaultPort: 0, ready: true, needsHost: false },
+  { id: "shell", label: "Local shell", description: windows ? "PowerShell, cmd, Git Bash" : "The shells installed on this PC", icon: TerminalSquare, defaultPort: 0, ready: true, needsHost: false },
+  { id: "wsl", label: "WSL", description: "Linux distribution on this PC", icon: Boxes, defaultPort: 0, ready: windows, hidden: !windows, needsHost: false },
   { id: "mosh", label: "Mosh", description: "Mobile shell over UDP", icon: Smartphone, defaultPort: 22, ready: false, hidden: true, needsHost: true },
   { id: "rsh", label: "Rsh", description: "Legacy remote shell", icon: Server, defaultPort: 514, ready: false, hidden: true, needsHost: true },
   { id: "xdmcp", label: "XDMCP", description: "Remote Unix desktop", icon: Network, defaultPort: 177, ready: false, hidden: true, needsHost: true },

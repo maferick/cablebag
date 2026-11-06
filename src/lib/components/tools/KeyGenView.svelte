@@ -3,6 +3,7 @@
   import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
   import { api, type KeyInfo } from "../../api";
   import { app } from "../../state.svelte";
+  import { windows } from "../../kinds";
   import { writeText } from "../../clipboard";
   import { KeyRound, Copy, Save, Upload, FolderOpen, Sparkles } from "@lucide/svelte";
   import "./tool.css";
@@ -64,7 +65,7 @@
     if (!key) return;
     if (pass1 !== pass2) return app.notify("The two passphrases are not the same.", "error");
     const name = kind === "ed25519" ? "id_ed25519" : kind.startsWith("rsa") ? "id_rsa" : "id_ecdsa";
-    const path = await saveDialog({ title: "Save the private key", defaultPath: `${defaultDir}\\${name}_cablebag` });
+    const path = await saveDialog({ title: "Save the private key", defaultPath: `${defaultDir}${windows ? "\\" : "/"}${name}_cablebag` });
     if (!path) return;
     try {
       const [priv, pub] = await api.keySave(key.id, path, pass1, comment);

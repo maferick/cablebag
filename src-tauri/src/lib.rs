@@ -282,7 +282,7 @@ fn browser_close(app: AppHandle, id: String) {
     browser::close(&app, &id);
 }
 
-/// File or folder sessions: a path opens in the program Windows uses for it, a link in the web browser.
+/// File or folder sessions: a path opens in the program this PC uses for it, a link in the web browser.
 #[tauri::command]
 fn file_open(app: AppHandle, target: String) -> CmdResult<()> {
     use tauri_plugin_opener::OpenerExt;
