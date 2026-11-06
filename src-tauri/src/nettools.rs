@@ -162,6 +162,7 @@ fn ping(ip: Ipv4Addr, timeout_ms: u32) -> Option<u32> {
     // ping group send raw ICMP; if the scan needs to work without iputils, switch to a ICMP
     // datagram socket.
     let out = std::process::Command::new("ping")
+        .env("LC_ALL", "C") // so the time= we look for is the one we can read, whatever the language
         .args(["-n", "-c", "1", "-W", &timeout_ms.div_ceil(1000).max(1).to_string(), &ip.to_string()])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
@@ -170,7 +171,8 @@ fn ping(ip: Ipv4Addr, timeout_ms: u32) -> Option<u32> {
     if !out.status.success() {
         return None;
     }
-    rtt_from_ping_output(&String::from_utf8_lossy(&out.stdout))
+    // A successful exit already means the host answered; an unreadable time only costs the number.
+    Some(rtt_from_ping_output(&String::from_utf8_lossy(&out.stdout)).unwrap_or(0))
 }
 
 #[cfg(not(windows))]
@@ -188,8 +190,9 @@ fn mac_of(ip: Ipv4Addr) -> String {
         .find(|l| l.split_whitespace().next() == Some(&ip.to_string()))
         .and_then(|l| l.split_whitespace().nth(3))
         .filter(|m| *m != "00:00:00:00:00:00")
+        // /proc/net/arp is lowercase; the Windows answer is uppercase.
+        .map(|m| m.to_uppercase())
         .unwrap_or_default()
-        .to_string()
 }
 
 #[cfg(all(test, not(windows)))]
