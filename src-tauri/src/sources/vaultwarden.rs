@@ -301,6 +301,8 @@ mod hello {
 
 #[cfg(not(windows))]
 mod hello {
+    // Same shape as the Windows module; only Unavailable can happen without Windows Hello.
+    #[allow(dead_code)]
     pub enum Outcome {
         Verified,
         Cancelled,
