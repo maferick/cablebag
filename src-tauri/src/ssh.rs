@@ -79,20 +79,18 @@ pub struct Client {
 }
 
 /// One forwarded agent channel: the bytes go to the agent this PC runs its own sessions through,
-/// as switched on in Settings, SSH (the OpenSSH agent first when both or neither are on;
-/// on Linux that is the one in SSH_AUTH_SOCK).
+/// as switched on in Settings, SSH (Windows: the OpenSSH agent first when both or neither are on;
+/// Linux: always the one in SSH_AUTH_SOCK, because ticking Forward SSH agent is the choice there).
 async fn serve_agent(app: AppHandle, channel: russh::Channel<client::Msg>) {
     let mut stream = channel.into_stream();
     let pageant = settings_flag(&app, "ssh.agent.pageant", false);
     let openssh = settings_flag(&app, "ssh.agent.openssh", false);
     #[cfg(not(windows))]
     {
-        let _ = pageant;
-        if openssh {
-            if let Some(sock) = std::env::var_os("SSH_AUTH_SOCK") {
-                if let Ok(mut agent) = tokio::net::UnixStream::connect(sock).await {
-                    let _ = tokio::io::copy_bidirectional(&mut stream, &mut agent).await;
-                }
+        let _ = (pageant, openssh);
+        if let Some(sock) = std::env::var_os("SSH_AUTH_SOCK") {
+            if let Ok(mut agent) = tokio::net::UnixStream::connect(sock).await {
+                let _ = tokio::io::copy_bidirectional(&mut stream, &mut agent).await;
             }
         }
     }
