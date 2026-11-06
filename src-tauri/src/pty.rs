@@ -1,4 +1,5 @@
-//! Local terminals (PowerShell, cmd, WSL, Git Bash...) through the Windows pseudo console.
+//! Local terminals (PowerShell, cmd, WSL, Git Bash on Windows; the shells from /etc/shells on
+//! Linux) through the platform's pseudo terminal.
 
 use crate::term::{TermCmd, TermOut};
 use anyhow::{anyhow, Result};
@@ -21,32 +22,26 @@ fn exists(p: &str) -> bool {
 }
 
 /// Names of installed WSL distributions. `wsl -l -q` prints UTF-16.
+#[cfg(windows)]
 pub fn wsl_distros() -> Vec<String> {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        let Ok(out) = std::process::Command::new("wsl.exe")
-            .args(["-l", "-q"])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-        else {
-            return vec![];
-        };
-        let words: Vec<u16> =
-            out.stdout.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
-        String::from_utf16_lossy(&words)
-            .lines()
-            .map(|l| l.trim_matches(|c: char| c.is_whitespace() || c == '\0').to_string())
-            .filter(|l| !l.is_empty())
-            .collect()
-    }
-    #[cfg(not(windows))]
-    {
-        vec![]
-    }
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let Ok(out) = std::process::Command::new("wsl.exe")
+        .args(["-l", "-q"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+    else {
+        return vec![];
+    };
+    let words: Vec<u16> = out.stdout.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+    String::from_utf16_lossy(&words)
+        .lines()
+        .map(|l| l.trim_matches(|c: char| c.is_whitespace() || c == '\0').to_string())
+        .filter(|l| !l.is_empty())
+        .collect()
 }
 
+#[cfg(windows)]
 pub fn list_shells() -> Vec<LocalShell> {
     let mut v = Vec::new();
     let pf = std::env::var("ProgramFiles").unwrap_or_else(|_| r"C:\Program Files".into());
@@ -87,6 +82,62 @@ pub fn list_shells() -> Vec<LocalShell> {
         });
     }
     v
+}
+
+#[cfg(not(windows))]
+pub fn list_shells() -> Vec<LocalShell> {
+    // /etc/shells is the system's own list; bash on many distros only appears there via its symlink.
+    let mut paths = std::fs::read_to_string("/etc/shells")
+        .unwrap_or_default()
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#') && exists(l))
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    for p in paths.clone() {
+        if let Ok(r) = std::fs::canonicalize(&p) {
+            let r = r.to_string_lossy().to_string();
+            if !paths.contains(&r) && exists(&r) {
+                paths.push(r);
+            }
+        }
+    }
+    if let Some(shell) = std::env::var("SHELL").ok().filter(|s| exists(s)) {
+        if !paths.contains(&shell) {
+            paths.push(shell);
+        }
+    }
+    paths.sort();
+    paths.dedup();
+    paths.into_iter().filter_map(unix_shell).collect()
+}
+
+#[cfg(not(windows))]
+fn unix_shell(path: String) -> Option<LocalShell> {
+    let name = match path.rsplit('/').next().unwrap_or("") {
+        "bash" => "Bash",
+        "zsh" => "Zsh",
+        "fish" => "Fish",
+        "dash" => "Dash",
+        "sh" => "Sh",
+        "nu" => "Nushell",
+        "pwsh" => "PowerShell 7",
+        _ => return None, // screens and the like are not terminals to start a session in
+    };
+    let args = if name.ends_with("PowerShell 7") { vec!["-NoLogo".into()] } else { vec![] };
+    Some(LocalShell { id: path.rsplit('/').next().unwrap_or("").into(), name: name.into(), program: path, args })
+}
+
+#[cfg(all(test, not(windows)))]
+mod unix_tests {
+    use super::unix_shell;
+
+    #[test]
+    fn names_known_shells_and_skips_the_rest() {
+        assert_eq!(unix_shell("/usr/bin/zsh".into()).unwrap().name, "Zsh");
+        assert_eq!(unix_shell("/usr/bin/pwsh".into()).unwrap().args, ["-NoLogo"]);
+        assert!(unix_shell("/usr/bin/nologin".into()).is_none());
+    }
 }
 
 pub struct LocalSpec {
