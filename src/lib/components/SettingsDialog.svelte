@@ -15,6 +15,7 @@
   import { BUILTIN_SYNTAX, type SyntaxSet } from "../highlight";
   import { vault } from "../vault.svelte";
   import { memory } from "../memory.svelte";
+  import { windows } from "../kinds";
   import { update } from "../update.svelte";
   import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
   import { writeText } from "../clipboard";
@@ -152,7 +153,14 @@
   let dataFolder = $state("");
   let sys = $state<{ version: string; windows: string; webview: string; dotnet: string } | null>(null);
   const details = $derived(
-    sys ? [`Cablebag ${sys.version}`, sys.windows, `WebView2 ${sys.webview}`, `.NET 8 Desktop Runtime: ${sys.dotnet || "not installed"}`].join("\n") : "",
+    sys
+      ? [
+          `Cablebag ${sys.version}`,
+          sys.windows,
+          `${windows ? "WebView2" : "WebKitGTK"} ${sys.webview}`,
+          ...(windows ? [`.NET 8 Desktop Runtime: ${sys.dotnet || "not installed"}`] : []),
+        ].join("\n")
+      : "",
   );
   // A clock for "checked ... ago".
   let nowMs = $state(Date.now());
@@ -395,7 +403,7 @@
           </SettingsRow>
           <SettingsRow label="Folder">
             <div class="with-btn">
-              <input value={app.settings["log.dir"]} onchange={set("log.dir")} placeholder="Documents\Cablebag logs" />
+              <input value={app.settings["log.dir"]} onchange={set("log.dir")} placeholder={windows ? "Documents\\Cablebag logs" : "~/Documents/Cablebag logs"} />
               <button class="btn" onclick={chooseLogDir}><FolderOpen size={14} /> Browse</button>
             </div>
           </SettingsRow>
@@ -439,10 +447,12 @@
         </SettingsSection>
 
         <SettingsSection title="Keys from an agent" desc="Agent keys are tried before the key file and password of a session." find="keys agent pageant openssh">
-          <SettingsRow label="PuTTY Pageant">
-            <input type="checkbox" class="switch" checked={app.settings["ssh.agent.pageant"]} onchange={set("ssh.agent.pageant")} />
-          </SettingsRow>
-          <SettingsRow label="Windows OpenSSH agent">
+          {#if windows}
+            <SettingsRow label="PuTTY Pageant">
+              <input type="checkbox" class="switch" checked={app.settings["ssh.agent.pageant"]} onchange={set("ssh.agent.pageant")} />
+            </SettingsRow>
+          {/if}
+          <SettingsRow label={windows ? "Windows OpenSSH agent" : "SSH agent (SSH_AUTH_SOCK)"}>
             <input type="checkbox" class="switch" checked={app.settings["ssh.agent.openssh"]} onchange={set("ssh.agent.openssh")} />
           </SettingsRow>
         </SettingsSection>

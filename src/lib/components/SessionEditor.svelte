@@ -4,7 +4,7 @@
   import Modal from "./Modal.svelte";
   import { open as openDialog } from "@tauri-apps/plugin-dialog";
   import { FOLDER_DEFAULTS, app } from "../state.svelte";
-  import { KINDS, kindInfo } from "../kinds";
+  import { KINDS, kindInfo, windows } from "../kinds";
   import { BUILTIN_SYNTAX } from "../highlight";
   import VaultPicker from "./VaultPicker.svelte";
   import PsmPicker from "./PsmPicker.svelte";
@@ -56,6 +56,9 @@
   );
   const distros = $derived(app.shells.filter((x) => x.id.startsWith("wsl:")).map((x) => x.id.slice(4)));
   const localShells = $derived(app.shells.filter((x) => !x.id.startsWith("wsl:")));
+  const agentForwardHelp = windows
+    ? "The server can use the keys in Pageant or the Windows OpenSSH agent while you are connected, for example to log in further from there. Only for servers you trust."
+    : "The server can use the keys in your SSH agent while you are connected, for example to log in further from there. Only for servers you trust.";
 
   function pickKind(id: string) {
     const old = kindInfo(s.kind);
@@ -303,7 +306,7 @@
       {/if}
       {#if s.kind === "serial"}
         <div class="row3">
-          <label class="field grow"><span>COM port</span>
+          <label class="field grow"><span>{windows ? "COM port" : "Serial device"}</span>
             <select value={s.data.serial_port ?? s.host ?? ""} onchange={(e) => (s.data.serial_port = (e.target as HTMLSelectElement).value)}>
               {#if !ports.some((p) => p.name === (s.data.serial_port ?? s.host))}<option value={s.data.serial_port ?? s.host ?? ""}>{s.data.serial_port || s.host || "Choose a port"}</option>{/if}
               {#each ports as p}<option value={p.name}>{p.name}{p.description ? ` (${p.description})` : ""}</option>{/each}
@@ -353,12 +356,14 @@
       {#if s.kind === "file"}
         <label class="field"><span>File, folder or link</span>
           <div class="with-btn">
-            <input bind:value={s.host} placeholder="C:\\Users\\you\\notes.txt, \\\\server\\share or https://..." />
+            <input bind:value={s.host} placeholder={windows ? "C:\\Users\\you\\notes.txt, \\\\server\\share or https://..." : "/home/you/notes.txt or https://..."} />
             <button class="btn" onclick={() => browsePath(false)}><FolderOpen size={14} /> File</button>
             <button class="btn" onclick={() => browsePath(true)}><FolderOpen size={14} /> Folder</button>
           </div>
         </label>
-        <p class="muted small">Opens with the program Windows uses for it; a folder opens in Explorer, a link in your web browser.</p>
+        <p class="muted small">{windows
+          ? "Opens with the program Windows uses for it; a folder opens in Explorer, a link in your web browser."
+          : "Opens with the program this PC uses for it; a folder opens in the file manager, a link in your web browser."}</p>
       {/if}
       {#if s.kind === "ssh" || s.kind === "rdp" || s.kind === "sftp" || s.kind === "vnc" || s.kind === "telnet" || s.kind === "ftp" || s.kind === "winrm"}
         <div class="field"><span>Login from the vault</span>
@@ -417,7 +422,7 @@
       <div class="grid2">
         <label class="check"><input type="checkbox" bind:checked={s.data.compression} /> Compress traffic (helps on slow links)</label>
         <label class="check"><input type="checkbox" checked={s.data.keepalive !== false} onchange={(e) => (s.data.keepalive = (e.target as HTMLInputElement).checked)} /> Keep the connection alive when idle</label>
-        <label class="check" title="The server can use the keys in Pageant or the Windows OpenSSH agent while you are connected, for example to log in further from there. Only for servers you trust."><input type="checkbox" bind:checked={s.data.agent_forward} /> Forward your SSH agent (only to servers you trust)</label>
+        <label class="check" title={agentForwardHelp}><input type="checkbox" bind:checked={s.data.agent_forward} /> Forward your SSH agent (only to servers you trust)</label>
         <label class="check"><input type="checkbox" checked={s.data.stay_after_command !== false} onchange={(e) => (s.data.stay_after_command = (e.target as HTMLInputElement).checked)} /> Stay logged in after the command ends</label>
         <label class="check" title="Programs with windows that you start on the server, such as a graphical editor, open as windows on this PC. The server needs X11 forwarding switched on and the xauth program installed."><input type="checkbox" checked={!!(s.data.x11 ?? folderValues.values.x11)} onchange={(e) => (s.data.x11 = (e.target as HTMLInputElement).checked)} /> Show Linux windows on this PC (X11)</label>
       </div>

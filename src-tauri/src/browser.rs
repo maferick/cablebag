@@ -129,11 +129,21 @@ pub async fn open(app: &AppHandle, id: &str, url: &str, wireguard: Option<String
         .incognito(private);
     if let Some(wg) = wireguard {
         let port = crate::wg::web_proxy(app, &wg).await?;
-        // Arguments of its own replace wry's, so its defaults are repeated. Without <-loopback> Chromium sends
-        // loopback and link-local addresses around the proxy; WebRTC would show the page this PC's address.
-        builder = builder.additional_browser_args(&format!(
-            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --proxy-server=http://127.0.0.1:{port} --proxy-bypass-list=<-loopback> --force-webrtc-ip-handling-policy=disable_non_proxied_udp"
-        ));
+        #[cfg(windows)]
+        {
+            // Arguments of its own replace wry's, so its defaults are repeated. Without <-loopback> Chromium sends
+            // loopback and link-local addresses around the proxy; WebRTC would show the page this PC's address.
+            builder = builder.additional_browser_args(&format!(
+                "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --proxy-server=http://127.0.0.1:{port} --proxy-bypass-list=<-loopback> --force-webrtc-ip-handling-policy=disable_non_proxied_udp"
+            ));
+        }
+        #[cfg(not(windows))]
+        {
+            // WebKitGTK applies the proxy to the webview's own data context, which the profile folder gives
+            // this network alone. A localhost page is reached through the tunnel with it: the same choice
+            // the Windows branch makes on purpose with <-loopback>, so pinned tabs never see this PC's services.
+            builder = builder.proxy_url(Url::parse(&format!("http://127.0.0.1:{port}"))?);
+        }
     }
     let builder = builder
         .on_navigation(move |u| {

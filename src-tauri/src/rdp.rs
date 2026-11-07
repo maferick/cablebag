@@ -1,5 +1,6 @@
 //! RDP tabs. Each tab runs one `cablebag-rdp` helper process that hosts the Windows Remote Desktop
 //! control as a child window of the Cablebag window; this module starts it and passes commands.
+#![cfg_attr(not(windows), allow(dead_code, unused_imports))] // Outside Windows only the stub `open` is reachable; the rest waits for the engine.
 
 use crate::prompt::{button, field, PromptRequest};
 use crate::ssh::{self, Hop};
@@ -13,15 +14,12 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::Write;
-#[cfg(windows)]
 use std::io::{BufRead, BufReader};
-#[cfg(windows)]
 use std::path::PathBuf;
-use std::process::{Child, ChildStdin};
-#[cfg(windows)]
-use std::process::{Command, Stdio};
+use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
+use tauri::Manager;
 
 pub struct RdpProc {
     stdin: Mutex<ChildStdin>,
