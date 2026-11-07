@@ -6,7 +6,7 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.21.0 · not released yet
+## 0.21.0 · 7 November 2026
 
 - **Cablebag is open source now, under the MIT licence.** You may use, copy, change and share it. The installer
   shows what leaves your PC and the licence, and the project page has a privacy section. This is also the first
