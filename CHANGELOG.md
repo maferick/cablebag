@@ -8,6 +8,9 @@ installs it and starts Cablebag again. Every version is also on the
 
 ## 0.21.0 · not released yet
 
+- **Cablebag is open source now, under the MIT licence.** You may use, copy, change and share it. The installer
+  shows what leaves your PC and the licence, and the project page has a privacy section. This is also the first
+  step towards a signed Windows installer: see the code signing policy on the project page.
 - **Cablebag runs on Linux**, thanks to @martijnvandijk: local shells from `/etc/shells` with your login shell
   first, SSH keys and forwarding through the agent in `SSH_AUTH_SOCK`, the network scanner with the system's ping,
   web tabs in WebKitGTK (also through WireGuard), and settings that say what applies there. It can be built as a

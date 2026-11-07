@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The programs from release.yml's "Upload the programs for signing", before they go into the installer. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <pe-file path="cablebag.exe" product-name="Cablebag">
+      <authenticode-sign/>
+    </pe-file>
+    <pe-file path="cablebag-rdp.exe">
+      <authenticode-sign/>
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

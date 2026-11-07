@@ -578,11 +578,11 @@
           </SettingsRow>
         </SettingsSection>
 
-        <SettingsSection title="Licence" desc="Free to use at home and at work; not open source." find="licence license">
-          <SettingsMore label="What you may and may not do">
+        <SettingsSection title="Licence" desc="Open source under the MIT licence: free at home and at work." find="licence license">
+          <SettingsMore label="What you may do">
             <div class="inner lic">
-              <p><strong>You may</strong> download it from the official page, install it and use it, at home or at work, on as many computers as you like.</p>
-              <p><strong>Not without permission:</strong> pass it on, change it or build on it, sell it or offer it as a service. Others can download it from the official page themselves.</p>
+              <p><strong>You may</strong> use, copy, change and share Cablebag, at home or at work, on as many computers as you like.</p>
+              <p><strong>Keep with it:</strong> the licence and the copyright notice. There is no warranty. Please give a changed copy a name of its own.</p>
             </div>
           </SettingsMore>
           <SettingsRow label="The full text" help="Also the licences of the open-source parts inside Cablebag.">

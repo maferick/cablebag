@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The installer from release.yml's "Upload the installer for signing". -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <pe-file path="Cablebag_*_x64-setup.exe" product-name="Cablebag">
+      <authenticode-sign/>
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

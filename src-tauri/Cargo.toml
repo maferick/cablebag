@@ -2,7 +2,7 @@
 name = "cablebag"
 version = "0.20.8"
 description = "Cablebag: all-in-one remote access workstation"
-license-file = "../LICENSE"
+license = "MIT"
 authors = ["maferick"]
 edition = "2024"
 

@@ -1,6 +1,6 @@
 # Contributing to Cablebag
 
-Thank you for taking an interest. Cablebag is a small project, free to use but not open source, and this
+Thank you for taking an interest. Cablebag is a small open-source project under the MIT licence, and this
 page explains how bug reports, ideas and code reach it. Please read the section on the licence before you
 open a pull request; it is short.
 
@@ -42,28 +42,26 @@ A few practical points:
 
 ## Your contribution and the licence
 
-Cablebag's [licence](LICENSE) is "use only": people may use it, but not redistribute or change it. For your
-work to be part of Cablebag, you therefore need to give permission, and this clause is that permission:
+Cablebag is under the [MIT licence](LICENSE), and contributions are too:
 
-> By opening a pull request, you agree that your contribution may be included in Cablebag and distributed
-> under Cablebag's licence, as it is now and as it may change later, and you confirm that you wrote it or
-> otherwise have the right to give it on these terms. You keep the copyright on your own work and remain free
-> to use it elsewhere.
+> By opening a pull request, you agree that your contribution is licensed under the MIT licence, and you
+> confirm that you wrote it or otherwise have the right to give it on these terms. You keep the copyright on
+> your own work and remain free to use it elsewhere.
 
 If you cannot agree to that (for example because your employer owns what you write), please say so in the
 pull request and we will see what is possible.
 
 ## Building from source
 
-The licence allows building for reading and checking the code, and for working on a contribution; it does not
-allow changed or redistributed builds.
-
-You need:
+On Windows you need:
 
 - [Rust](https://rustup.rs/) (stable);
 - [Node.js](https://nodejs.org/) (LTS);
 - the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0), for the Remote Desktop helper;
 - the Visual Studio C++ build tools (the "Desktop development with C++" workload), which Rust needs on Windows.
+
+On Linux you need Rust, Node.js and the WebKitGTK 4.1 development packages (the list is in
+[ci.yml](.github/workflows/ci.yml)); the Remote Desktop helper is skipped there.
 
 Then, in the repository folder:
 
@@ -73,8 +71,10 @@ npm run build:rdp      # builds the Remote Desktop helper once; the app build ex
 npm run tauri dev      # runs Cablebag from source
 ```
 
-`npm run tauri build` makes the installer in `src-tauri/target/release/bundle/nsis`. It is unsigned, so an
-installed copy built this way will not accept updates from it, and that is intended.
+`npm run tauri build` makes the installer in `src-tauri/target/release/bundle/nsis` on Windows, and a deb and
+an AppImage on Linux. A build of your own does not carry the Cablebag update signature, so official updates are
+what installed copies accept, and that is intended. Without the update key, the Windows build stops at the end
+with a message about the signature; the program itself is already built by then.
 
 ## Running the checks
 

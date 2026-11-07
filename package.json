@@ -15,7 +15,7 @@
     "build:xserver": "node scripts/xserver.mjs",
     "build:all": "npm run build:rdp && npm run build:xserver && npm run build"
   },
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "dependencies": {
     "@lucide/svelte": "^1.64.0",
     "@tauri-apps/api": "^2",

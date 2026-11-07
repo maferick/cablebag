@@ -3,6 +3,11 @@
 # else sees and installed copies do not find. The maintainer's PC then scans the built programs for private words
 # and publishes the draft (see release.mjs). Run by hand (Actions > Release > Run workflow) it builds the same
 # without making a release: a test.
+#
+# Code signing goes through SignPath (see .signpath/README.md) and switches on by itself once the repository
+# variable SIGNPATH_ORGANIZATION_ID is set: the programs are signed before they go into the installer, then the
+# installer, and the update signature is made last because it has to match the final file. Each signing request
+# waits for the maintainer's approval on signpath.io. A test run never signs.
 name: Release
 
 on:
@@ -12,9 +17,13 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: release-${{ github.ref }}
+
+env:
+  SIGN: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' && startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   build:
@@ -54,14 +63,87 @@ jobs:
 
       # beforeBuildCommand builds the Remote Desktop helper, fetches the X server and builds the frontend.
       # Paths of the build machine are taken out of the programs.
+      - name: Build the programs
+        shell: pwsh
+        run: |
+          $env:RUSTFLAGS = "--remap-path-prefix=$env:USERPROFILE=~ --remap-path-prefix=$env:GITHUB_WORKSPACE=cablebag"
+          npm run tauri build -- --no-bundle
+
+      - name: Collect the programs for signing
+        if: env.SIGN == 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force to-sign | Out-Null
+          Copy-Item src-tauri/target/release/cablebag.exe, rdp-helper/publish/cablebag-rdp.exe to-sign/
+
+      - name: Upload the programs for signing
+        id: programs
+        if: env.SIGN == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: programs-to-sign
+          if-no-files-found: error
+          path: to-sign/
+
+      - name: Sign the programs
+        if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: cablebag
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: programs
+          github-artifact-id: ${{ steps.programs.outputs.artifact-id }}
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: signed-programs
+
+      - name: Put the signed programs in place
+        if: env.SIGN == 'true'
+        shell: pwsh
+        run: |
+          Copy-Item -Force signed-programs/cablebag.exe src-tauri/target/release/cablebag.exe
+          Copy-Item -Force signed-programs/cablebag-rdp.exe rdp-helper/publish/cablebag-rdp.exe
+
       - name: Build the installer, signed for updates
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri bundle -- --bundles nsis
+
+      - name: Upload the installer for signing
+        id: installer
+        if: env.SIGN == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: installer-to-sign
+          if-no-files-found: error
+          path: src-tauri/target/release/bundle/nsis/*-setup.exe
+
+      - name: Sign the installer
+        if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: cablebag
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: installer
+          github-artifact-id: ${{ steps.installer.outputs.artifact-id }}
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: signed-installer
+
+      # Signing changes the file, so the update signature is made again for the signed installer.
+      - name: Put the signed installer in place and sign it for updates
+        if: env.SIGN == 'true'
         shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          $env:RUSTFLAGS = "--remap-path-prefix=$env:USERPROFILE=~ --remap-path-prefix=$env:GITHUB_WORKSPACE=cablebag"
-          npm run tauri build
+          $setup = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe
+          Copy-Item -Force "signed-installer/$($setup.Name)" $setup.FullName
+          npx tauri signer sign $setup.FullName
 
       - name: Write the update list and the notes
         run: node scripts/latest.mjs
@@ -91,4 +173,7 @@ jobs:
           $v = "${{ github.ref_name }}".TrimStart("v")
           $b = "src-tauri/target/release/bundle/nsis"
           $setup = "$b/Cablebag_${v}_x64-setup.exe"
+          if ($env:SIGN -eq "true") {
+            Add-Content "$b/notes.md" "`nFree code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org). [Code signing policy](https://github.com/${{ github.repository }}#code-signing-policy)"
+          }
           gh release create "${{ github.ref_name }}" --draft --verify-tag --title "Cablebag $v" --notes-file "$b/notes.md" $setup "$setup.sig" "$b/latest.json"

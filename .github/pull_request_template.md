@@ -15,4 +15,4 @@
 - [ ] `npx svelte-check --threshold error` passes
 - [ ] No secrets or personal data in the code, the tests or this description (no passwords, keys, tokens, private hostnames)
 - [ ] Text that users see is in plain language, British spelling, no em-dash characters, no codes or jargon
-- [ ] I agree that this contribution may be included in Cablebag under its licence (see CONTRIBUTING.md)
+- [ ] I agree that this contribution is licensed under the MIT licence (see CONTRIBUTING.md)

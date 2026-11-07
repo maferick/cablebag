@@ -6,7 +6,7 @@
 [![Latest release](https://img.shields.io/github/v/release/maferick/cablebag?style=flat&label=release)](https://github.com/maferick/cablebag/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/maferick/cablebag/total?style=flat&label=downloads)](https://github.com/maferick/cablebag/releases)
 [![Windows 10 | 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat)](#install)
-[![Licence: free to use](https://img.shields.io/badge/licence-free%20to%20use-2e8b57?style=flat)](LICENSE)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-2e8b57?style=flat)](LICENSE)
 [![WireGuard: per session](https://img.shields.io/badge/WireGuard-per%20session-88171a?style=flat)](#wireguard-per-session)
 [![CI](https://img.shields.io/github/actions/workflow/status/maferick/cablebag/ci.yml?branch=main&style=flat&label=CI)](https://github.com/maferick/cablebag/actions/workflows/ci.yml)
 
@@ -212,9 +212,9 @@ Download `Cablebag_<version>_x64-setup.exe` from the [latest release](https://gi
 and run it. It installs for your Windows account only, no administrator rights needed. Cablebag keeps itself up to
 date: updates come from this page and nowhere else, and are installed only when they carry the Cablebag signature.
 
-The installer is not signed with a code-signing certificate, so Windows SmartScreen may say "Windows protected
-your PC" the first time: **More info**, **Run anyway**. On a work PC your organisation's policy may block it; then
-only your IT department can allow it.
+The installer is not signed with a code-signing certificate yet (see [Code signing policy](#code-signing-policy)),
+so Windows SmartScreen may say "Windows protected your PC" the first time: **More info**, **Run anyway**. On a work
+PC your organisation's policy may block it; then only your IT department can allow it.
 
 Needs Windows 10 or 11. Remote Desktop tabs need the
 [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0). The installer is about 47 MB because
@@ -234,7 +234,7 @@ follow the keyboard, and the terminal has a screen reader setting. What works an
 
 ## FAQ
 
-**Is it free?** Yes, for private and work use, on as many PCs as you like. It is not open source; see Licence.
+**Is it free?** Yes, for private and work use, on as many PCs as you like. It is open source under the MIT licence.
 
 **Does it need admin rights?** No. The installer, the app and WireGuard inside it all run under your own
 Windows account.
@@ -251,17 +251,47 @@ not both at once; or make a key pair of Cablebag's own and add it to the server 
 **Where are my passwords kept?** Either in your credential sources (Vaultwarden or Bitwarden, CyberArk, Delinea
 Secret Server, Proton Pass), or on this PC, encrypted under your Windows account. They never go into Sync and are hidden from the assistant.
 
-**Does it work on Linux or macOS?** No, Windows 10 and 11 only.
+**Does it work on Linux or macOS?** Linux, if you build it from source: see Building from source. Releases and
+updates are for Windows 10 and 11 only so far, Remote Desktop tabs need Windows, and macOS is not supported.
 
 **Where does the assistant send my data?** Only to the AI host you configured yourself, after secrets are
 removed. Without a host it does nothing.
 
 ## Licence
 
-Cablebag is free to use, but it is **not open source**: you may install and use it, but not share copies, change it
-or build on its code. The source is published so you can see what it does. See [LICENSE](LICENSE); the open-source
-components inside, and the programs shipped next to it (the VcXsrv X server, GPL-3.0, with its source), are listed
-in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+Cablebag is open source under the [MIT licence](LICENSE): you may use, copy, change and share it, as long as the
+licence and copyright notice stay with it. The open-source components inside, and the programs shipped next to it
+(the VcXsrv X server, GPL-3.0, with its source), keep their own licences; they are listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+The licence covers the code, not the name. Please give a changed copy a name of its own, so nobody mistakes it for
+the official releases on this page.
+
+## Code signing policy
+
+Cablebag is applying for free code signing from the [SignPath Foundation](https://signpath.org). Until that is
+approved, the Windows installer is not signed with a code-signing certificate. Once it is, signed releases carry
+this credit: free code signing provided by [SignPath.io](https://signpath.io), certificate by
+[SignPath Foundation](https://signpath.org).
+
+- **Committers and reviewers:** [maferick](https://github.com/maferick). Changes from anyone else come in through
+  pull requests that are reviewed before they are merged.
+- **Approvers:** [maferick](https://github.com/maferick) approves every signing request, one by one.
+- **How a release is made:** GitHub builds it from this repository's source on its own servers
+  ([release.yml](.github/workflows/release.yml)), so what is signed is what the source here produces.
+
+Separately from code signing, every update carries the Cablebag update signature, and installed copies refuse an
+update without it.
+
+## Privacy
+
+Cablebag sends nothing about you to its makers: there are no accounts, no statistics and no tracking. This program
+will not transfer any information to other networked systems unless you ask it to, with these specifics:
+
+- **Updates:** it asks GitHub whether a newer version is out. Turn this off in Settings, About Cablebag.
+- **Your sessions and web tabs** connect to the servers and sites you open.
+- **The assistant, Sync and credential sources** only talk to the host you set up yourself, and only once you do.
+- **Report a problem** opens GitHub in your web browser, where you read it over and send it yourself.
 
 <details>
 <summary>Keyboard shortcuts</summary>
@@ -292,9 +322,12 @@ the session tree follow the arrow keys; see [ACCESSIBILITY.md](ACCESSIBILITY.md)
 <details>
 <summary>Building from source</summary>
 
-Building is for reading and checking the code; the licence does not allow changed or redistributed builds.
-Needs Rust, Node.js, the .NET 8 SDK, the Visual Studio C++ build tools and 7-Zip (to unpack the X server).
-Running the Remote Desktop helper needs the .NET 8 Desktop Runtime.
+On Windows: needs Rust, Node.js, the .NET 8 SDK, the Visual Studio C++ build tools and 7-Zip (to unpack the X
+server). Running the Remote Desktop helper needs the .NET 8 Desktop Runtime.
+
+On Linux: needs Rust, Node.js and the WebKitGTK 4.1 development packages (the Linux list is in
+[ci.yml](.github/workflows/ci.yml)). `npm run tauri build` makes a deb and an AppImage. Remote Desktop tabs are
+not available there; use SSH or VNC.
 
 ```
 npm install

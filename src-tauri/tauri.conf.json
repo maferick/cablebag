@@ -41,8 +41,8 @@
     "shortDescription": "All-in-one remote access workstation",
     "publisher": "maferick",
     "createUpdaterArtifacts": true,
-    "licenseFile": "../LICENSE",
-    "copyright": "Copyright (c) 2026 maferick. Use only; see LICENSE.",
+    "licenseFile": "windows/installer-licence.txt",
+    "copyright": "Copyright (c) 2026 maferick and the Cablebag contributors. MIT licence; see LICENSE.",
     "homepage": "https://github.com/maferick/cablebag",
     "windows": {
       "nsis": {
