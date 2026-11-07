@@ -216,10 +216,11 @@ fn server_of(cfg: &SourceConfig) -> String {
 }
 
 /// How the vault opens after Cablebag starts: "password" (the master password every time), "hello"
-/// (Windows Hello, then the key kept on this PC) or "remember" (the kept key without a question).
+/// (Windows Hello, then the key kept on this PC) or "remember" (the kept key without a question). Nothing chosen
+/// yet: the same default as the settings page (DEFAULT_SETTINGS), which has no Hello to offer outside Windows.
 fn unlock_mode(app: &AppHandle) -> String {
     match setting(app, "vault.unlock").as_str() {
-        "" => "hello".into(),
+        "" => if cfg!(windows) { "hello" } else { "remember" }.into(),
         m => m.to_string(),
     }
 }
