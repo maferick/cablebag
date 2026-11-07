@@ -167,7 +167,7 @@
       }}
     >
       {#if windows}
-        <option value="hello">Windows Hello (PIN, fingerprint or face)</option>
+        <option value="hello" disabled={!vault.hello}>Windows Hello (PIN, fingerprint or face){vault.hello ? "" : ", not set up here"}</option>
       {/if}
       <option value="remember">Without asking</option>
       <option value="password">Ask every time</option>

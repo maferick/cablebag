@@ -6,6 +6,14 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.21.0 · not released yet
+
+- **Cablebag runs on Linux**, thanks to @martijnvandijk: local shells from `/etc/shells` with your login shell
+  first, SSH keys and forwarding through the agent in `SSH_AUTH_SOCK`, the network scanner with the system's ping,
+  web tabs in WebKitGTK (also through WireGuard), and settings that say what applies there. It can be built as a
+  deb and an AppImage from the source; releases still only publish the Windows installer and updates. Remote
+  Desktop tabs need Windows for now: on Linux use SSH or VNC.
+
 ## 0.20.8 · 2 November 2026
 
 - Updated the parts Cablebag is built on, among them the SSH library (russh 0.65), the database library
