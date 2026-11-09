@@ -269,16 +269,17 @@ the official releases on this page.
 
 ## Code signing policy
 
-Cablebag is applying for free code signing from the [SignPath Foundation](https://signpath.org). Until that is
-approved, the Windows installer is not signed with a code-signing certificate. Once it is, signed releases carry
-this credit: free code signing provided by [SignPath.io](https://signpath.io), certificate by
+The Windows installer is not signed with a code-signing certificate yet. The plan is free signing through the
+[SignPath Foundation](https://signpath.org), which takes on projects once they are better known; until then, each
+release is checked with Microsoft Defender before it is published. Signed releases will carry this credit: free
+code signing provided by [SignPath.io](https://signpath.io), certificate by
 [SignPath Foundation](https://signpath.org).
 
 - **Committers and reviewers:** [maferick](https://github.com/maferick). Changes from anyone else come in through
   pull requests that are reviewed before they are merged.
-- **Approvers:** [maferick](https://github.com/maferick) approves every signing request, one by one.
+- **Approvers:** [maferick](https://github.com/maferick) will approve every signing request, one by one.
 - **How a release is made:** GitHub builds it from this repository's source on its own servers
-  ([release.yml](.github/workflows/release.yml)), so what is signed is what the source here produces.
+  ([release.yml](.github/workflows/release.yml)), so what gets signed is what the source here produces.
 
 Separately from code signing, every update carries the Cablebag update signature, and installed copies refuse an
 update without it.

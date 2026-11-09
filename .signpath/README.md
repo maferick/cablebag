@@ -1,9 +1,14 @@
 # Code signing with SignPath
 
 Windows releases can be signed through the [SignPath Foundation](https://signpath.org), which offers this free to
-open-source projects. [release.yml](../.github/workflows/release.yml) already has the steps; they stay off until
-the repository variable below is set. The project's [code signing policy](../README.md#code-signing-policy) says
-who does what.
+open-source projects that are already well known. [release.yml](../.github/workflows/release.yml) already has the
+steps; they stay off until the repository variable below is set. The project's
+[code signing policy](../README.md#code-signing-policy) says who does what.
+
+The first application (November 2026) was turned down because the project was still too new and little known:
+the Foundation looks for outside signals such as stars, forks, contributors, articles and discussions elsewhere.
+Apply again at signpath.org/apply once there are more of those. A paid SignPath subscription would also work
+with these steps, but its certificate carries the subscriber's own name.
 
 ## Setting it up, once SignPath has approved the project
 
@@ -27,5 +32,5 @@ The X server in the `vcxsrv` folder is someone else's program, shipped unchanged
 
 ## After the first signed release
 
-Change the code signing policy in the README from "is applying" to what is now true, and remove the sentence in
+Change the code signing policy in the README to say releases are signed now, and remove the sentence in
 its Install section that says the installer is not signed.
