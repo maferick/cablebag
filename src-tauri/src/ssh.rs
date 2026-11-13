@@ -617,11 +617,33 @@ async fn authenticate(h: &mut Handle, hop: &Hop, app: &AppHandle, out: &impl Sin
     bail!("Login failed for {user}@{host}.")
 }
 
+/// The key exchange methods Cablebag offers, best first. russh's own list puts Diffie-Hellman group exchange before
+/// the fixed groups, and some servers (Hetzner's storage boxes, ProFTPD mod_sftp) fail it while the fixed groups
+/// work, so it comes last here. The NIST curves are added after Curve25519, as OpenSSH allows them, for servers and
+/// devices that have nothing newer.
+const KEX_ORDER: &[russh::kex::Name] = &[
+    russh::kex::MLKEM768X25519_SHA256,
+    russh::kex::CURVE25519,
+    russh::kex::CURVE25519_PRE_RFC_8731,
+    russh::kex::ECDH_SHA2_NISTP256,
+    russh::kex::ECDH_SHA2_NISTP384,
+    russh::kex::ECDH_SHA2_NISTP521,
+    russh::kex::DH_G18_SHA512,
+    russh::kex::DH_G17_SHA512,
+    russh::kex::DH_G16_SHA512,
+    russh::kex::DH_G15_SHA512,
+    russh::kex::DH_G14_SHA256,
+    russh::kex::DH_GEX_SHA256,
+    russh::kex::EXTENSION_SUPPORT_AS_CLIENT,
+    russh::kex::EXTENSION_OPENSSH_STRICT_KEX_AS_CLIENT,
+];
+
 pub async fn connect_chain(app: &AppHandle, hops: &[Hop], keepalive: bool, out: &impl Sink) -> Result<SshConn> {
     let config = Arc::new(client::Config {
         keepalive_interval: if keepalive { Some(Duration::from_secs(60)) } else { None },
         keepalive_max: 5,
         nodelay: true,
+        preferred: russh::Preferred { kex: std::borrow::Cow::Borrowed(KEX_ORDER), ..russh::Preferred::DEFAULT },
         ..Default::default()
     });
     let forwards: Forwards = Default::default();

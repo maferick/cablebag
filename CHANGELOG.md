@@ -6,6 +6,14 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.21.1 · not released yet
+
+- **Connections to Hetzner storage boxes and similar servers work again.** They stopped with "Key exchange init
+  failed" before any login question: Cablebag first tried a way of setting up the encryption these servers offer
+  but get wrong. It now tries that one last, and also knows the NIST curve methods that OpenSSH uses for servers
+  and devices without anything newer.
+- Updated the build tools, the icons and a few parts Cablebag is built on, among them the SSH library.
+
 ## 0.21.0 · 7 November 2026
 
 - **Cablebag is open source now, under the MIT licence.** You may use, copy, change and share it. The installer
