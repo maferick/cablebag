@@ -36,7 +36,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | @jridgewell/resolve-uri (JavaScript) | 3.1.2 | MIT | https://www.npmjs.com/package/@jridgewell/resolve-uri |
 | @jridgewell/sourcemap-codec (JavaScript) | 1.6.0 | MIT | https://www.npmjs.com/package/@jridgewell/sourcemap-codec |
 | @jridgewell/trace-mapping (JavaScript) | 0.3.31 | MIT | https://www.npmjs.com/package/@jridgewell/trace-mapping |
-| @lucide/svelte (JavaScript) | 1.64.0 | ISC | https://www.npmjs.com/package/@lucide/svelte |
+| @lucide/svelte (JavaScript) | 1.69.0 | ISC | https://www.npmjs.com/package/@lucide/svelte |
 | @sveltejs/acorn-typescript (JavaScript) | 1.0.13 | MIT | https://www.npmjs.com/package/@sveltejs/acorn-typescript |
 | @tauri-apps/api (JavaScript) | 2.12.4 | Apache-2.0 OR MIT | https://www.npmjs.com/package/@tauri-apps/api |
 | @tauri-apps/plugin-dialog (JavaScript) | 2.8.4 | MIT OR Apache-2.0 | https://www.npmjs.com/package/@tauri-apps/plugin-dialog |
@@ -63,7 +63,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | adler2 (Rust) | 2.0.1 | 0BSD OR MIT OR Apache-2.0 | https://github.com/oyvindln/adler2 |
 | aead (Rust) | 0.5.2 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
 | aead (Rust) | 0.6.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
-| aes (Rust) | 0.9.3 | MIT OR Apache-2.0 | https://github.com/RustCrypto/block-ciphers |
+| aes (Rust) | 0.9.4 | MIT OR Apache-2.0 | https://github.com/RustCrypto/block-ciphers |
 | aes-gcm (Rust) | 0.11.1 | Apache-2.0 OR MIT | https://github.com/RustCrypto/AEADs |
 | aho-corasick (Rust) | 1.1.5 | Unlicense OR MIT | https://github.com/BurntSushi/aho-corasick |
 | alloc-no-stdlib (Rust) | 3.0.0 | BSD-3-Clause | https://github.com/dropbox/rust-alloc-no-stdlib |
@@ -262,7 +262,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | litemap (Rust) | 0.8.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | lock_api (Rust) | 0.4.14 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
 | lock_api (Rust) | 0.5.0 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
-| log (Rust) | 0.4.34 | MIT OR Apache-2.0 | https://github.com/rust-lang/log |
+| log (Rust) | 0.4.35 | MIT OR Apache-2.0 | https://github.com/rust-lang/log |
 | managed (Rust) | 0.8.0 | 0BSD | https://github.com/m-labs/rust-managed.git |
 | markup5ever (Rust) | 0.39.0 | MIT OR Apache-2.0 | https://github.com/servo/html5ever |
 | md-5 (Rust) | 0.11.0 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
@@ -354,7 +354,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | rsa (Rust) | 0.10.0-rc.18 | MIT OR Apache-2.0 | https://github.com/RustCrypto/RSA |
 | rsa (Rust) | 0.9.10 | MIT OR Apache-2.0 | https://github.com/RustCrypto/RSA |
 | rusqlite (Rust) | 0.41.1 | MIT | https://github.com/rusqlite/rusqlite |
-| russh (Rust) | 0.65.0 | Apache-2.0 | https://github.com/warp-tech/russh |
+| russh (Rust) | 0.65.1 | Apache-2.0 | https://github.com/warp-tech/russh |
 | russh-cryptovec (Rust) | 0.62.0 | Apache-2.0 | https://github.com/warp-tech/russh |
 | russh-sftp (Rust) | 3.0.1 | Apache-2.0 | https://github.com/AspectUnk/russh-sftp |
 | russh-util (Rust) | 0.52.0 | Apache-2.0 | https://github.com/warp-tech/russh |
@@ -432,7 +432,7 @@ beyond the cost of providing it: ask in an issue at https://github.com/maferick/
 | syn (Rust) | 3.0.9 | MIT OR Apache-2.0 | https://github.com/dtolnay/syn |
 | sync_wrapper (Rust) | 1.0.2 | Apache-2.0 | https://github.com/Actyx/sync_wrapper |
 | synstructure (Rust) | 0.14.0 | MIT | https://github.com/mystor/synstructure |
-| sysinfo (Rust) | 0.40.0 | MIT | https://github.com/GuillaumeGomez/sysinfo |
+| sysinfo (Rust) | 0.40.1 | MIT | https://github.com/GuillaumeGomez/sysinfo |
 | tao (Rust) | 0.37.1 | Apache-2.0 | https://github.com/tauri-apps/tao |
 | tauri (Rust) | 2.12.5 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | tauri-build (Rust) | 2.7.4 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
