@@ -432,3 +432,28 @@ pub async fn push_back(app: &AppHandle, tab: &str, local: &str, remote: &str) ->
     let mut c = c.lock().await;
     upload_file(app, tab, &mut c, Path::new(local), remote).await
 }
+
+#[cfg(test)]
+mod tests {
+    use suppaftp::list::ListParser;
+
+    /// MLSD lines as common servers send them (ProFTPD, Pure-FTPd, FileZilla Server, IIS, Hetzner storage boxes):
+    /// every one must parse, or the file is left out of the listing.
+    #[test]
+    fn mlsd_lines_from_common_servers_parse() {
+        let lines = [
+            "type=file;size=1830;modify=20261123084512;UNIX.mode=0644;UNIX.owner=1000;UNIX.group=1000; notes.txt",
+            "type=dir;modify=20261123084512.123;perm=flcdmpe; backups",
+            "type=file;size=0;modify=19700101000000;perm=adfrw; empty.log",
+            "type=cdir;sizd=4096;modify=20260101120000;perm=el;unique=802U1A; .",
+            "Type=file;Size=42;Modify=20261123084512.000;Perm=awr; IIS File.TXT",
+            "type=file;size=7;modify=20261123084512; name with spaces.txt",
+        ];
+        for l in lines {
+            assert!(ListParser::parse_mlsd(l).is_ok(), "did not parse: {l}");
+        }
+        let f = ListParser::parse_mlsd(lines[0]).unwrap();
+        assert_eq!(f.name(), "notes.txt");
+        assert_eq!(f.size(), 1830);
+    }
+}

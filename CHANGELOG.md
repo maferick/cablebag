@@ -6,6 +6,12 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.21.3 · not released yet
+
+- Updated the parts Cablebag is built on, among them the database library (rusqlite 0.43, with memory-safety
+  fixes and a newer SQLite), the FTP library (suppaftp 13, which sends each command straight away), Tauri, Svelte
+  and the icons.
+
 ## 0.21.2 · 23 November 2026
 
 - **Panes and browser profiles are easier to tell apart in tiled view.** The pane you type in has a clear border
