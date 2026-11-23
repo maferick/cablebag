@@ -6,7 +6,7 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.21.2 · not released yet
+## 0.21.2 · 23 November 2026
 
 - **Panes and browser profiles are easier to tell apart in tiled view.** The pane you type in has a clear border
   all round and a bright header, and the others step back. A browser profile shows as a stripe down the left of
