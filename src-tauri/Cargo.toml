@@ -35,7 +35,7 @@ dirs = "7.0.0"
 log = "0.4.34"
 parking_lot = "0.13.0"
 futures = "0.3.34"
-rusqlite = { version = "0.41.1", features = ["bundled"] }
+rusqlite = { version = "0.43.0", features = ["bundled"] }
 argon2 = "0.6.0"
 aes-gcm = "0.11.1"
 rand = "0.10.3"
@@ -65,7 +65,7 @@ rsa-sha1 = { package = "sha1", version = "0.10" }
 rsa-sha2 = { package = "sha2", version = "0.10" }
 cipher = { version = "0.5", features = ["alloc", "block-padding"] }
 vnc-rs = "0.6"
-suppaftp = { version = "12.2.1", default-features = false, features = ["tokio", "tokio-rustls-ring", "deprecated"] }
+suppaftp = { version = "13.0.0", default-features = false, features = ["tokio", "tokio-rustls-ring", "deprecated"] }
 serialport = { version = "4.10.1", default-features = false }
 tauri-plugin-updater = "2"
 regex = "1"
