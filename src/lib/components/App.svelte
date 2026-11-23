@@ -52,6 +52,7 @@
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { showOnTaskbar } from "../unread";
   import ProfileLabel from "./ProfileLabel.svelte";
+  import { browserProfiles } from "../browserProfiles.svelte";
 
   let ready = $state(false);
 
@@ -314,6 +315,7 @@
       .then(() => vault.loadHello())
       .then(() => proxmox.load())
       .then(() => wireguard.load())
+      .then(() => browserProfiles.recolourLikeFocus())
       .finally(() => {
         ready = true;
         reach.start();
@@ -662,8 +664,14 @@
   .cell.pane {
     border: 1px solid var(--border);
   }
+  /* Where you type: a thicker border in the accent, which no browser profile uses (see PROFILE_COLORS). The other
+     panes' headers step back; their contents cannot be dimmed (web pages and remote desktops are windows of their
+     own), so the headers and borders carry the difference. */
   .cell.focused {
-    border-color: var(--accent);
+    border: 2px solid var(--accent);
+  }
+  .cell.pane:not(.focused) .ph {
+    opacity: 0.6;
   }
   .cell.splitfocus::after {
     content: "";

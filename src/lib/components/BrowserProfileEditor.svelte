@@ -3,7 +3,7 @@
   import Modal from "./Modal.svelte";
   import { app } from "../state.svelte";
   import { browserProfiles, type BrowserProfile } from "../browserProfiles.svelte";
-  import { TAB_COLORS } from "../tabColors";
+  import { PROFILE_COLORS } from "../tabColors";
 
   let { profile, onclose, onsaved }: { profile: BrowserProfile | null; onclose: () => void; onsaved?: (id: string) => void } = $props();
   // svelte-ignore state_referenced_locally
@@ -27,7 +27,7 @@
     <label class="field"><span>Name</span><input bind:value={editing.name} placeholder="For example: Customer A tenant" /></label>
     <label class="field"><span>Colour of its tabs</span>
       <select bind:value={editing.color}>
-        {#each TAB_COLORS as c}<option value={c.value}>{c.name}</option>{/each}
+        {#each PROFILE_COLORS as c}<option value={c.value}>{c.name}</option>{/each}
       </select>
     </label>
     <label class="check"><input type="checkbox" checked={!editing.muted} onchange={(e) => (editing.muted = !e.currentTarget.checked)} /> Show notifications from its web tabs (such as Teams messages)</label>

@@ -2,7 +2,7 @@
 // account can be signed in next to the first. Kept in the setting browser.profiles, which Sync carries.
 import { api, type Folder, type Session } from "./api";
 import { ask } from "./ask.svelte";
-import { TAB_COLORS } from "./tabColors";
+import { PROFILE_COLORS, looksFocused } from "./tabColors";
 import { app } from "./state.svelte";
 
 export type BrowserProfile = {
@@ -37,8 +37,20 @@ class BrowserProfiles {
   /** A tab colour no other profile has yet, so two tenants never look alike. */
   freeColor(): string {
     const used = new Set(this.list.map((p) => p.color));
-    const colors = TAB_COLORS.map((c) => c.value).filter(Boolean);
+    const colors = PROFILE_COLORS.map((c) => c.value).filter(Boolean);
     return colors.find((c) => !used.has(c)) ?? colors[this.list.length % colors.length];
+  }
+
+  /** Once at the start: profiles made before Brick was left out get a free colour, so none looks focused. */
+  async recolourLikeFocus() {
+    let list = this.list;
+    if (!list.some((p) => looksFocused(p.color))) return;
+    for (const p of list.filter((x) => looksFocused(x.color))) {
+      const used = new Set(list.map((x) => x.color));
+      const color = PROFILE_COLORS.map((c) => c.value).find((c) => c && !used.has(c)) ?? "#4f7fa6";
+      list = list.map((x) => (x.id === p.id ? { ...x, color } : x));
+    }
+    await app.setSetting("browser.profiles", list);
   }
 
   /** A new profile from just a name (suggested from the folder or site); its colour is picked. Null when cancelled. */

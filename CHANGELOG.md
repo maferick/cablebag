@@ -6,6 +6,13 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.21.2 · not released yet
+
+- **Panes and browser profiles are easier to tell apart in tiled view.** The pane you type in has a clear border
+  all round and a bright header, and the others step back. A browser profile shows as a stripe down the left of
+  its web pages instead of a frame all round, so panes of the same profile no longer run into one block. Profiles
+  no longer get Brick, which looked almost like the focus colour; a profile that had it gets a free colour once.
+
 ## 0.21.1 · 14 November 2026
 
 - **Connections to Hetzner storage boxes and similar servers work again.** They stopped with "Key exchange init

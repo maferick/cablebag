@@ -280,7 +280,8 @@
     </button>
     <button class="icon-btn" title="Open in the web browser on this PC" aria-label="Open in the web browser on this PC" onclick={() => openUrl(current)}><ExternalLink size={15} /></button>
   </div>
-  <!-- A frame in the profile's colour around the page, so its identity shows wherever you look. -->
+  <!-- A stripe in the profile's colour down the left of the page, continuing the one beside the address bar, so its
+       identity shows wherever you look without walling panes of one profile into one block. -->
   <div class="frame" class:profiled={!!profile} style:--pc={profile?.color}>
     <div class="area" bind:this={area}>
       {#if error}
@@ -376,7 +377,7 @@
     display: flex;
   }
   .frame.profiled {
-    padding: 0 3px 3px;
+    padding-left: 4px;
     background: var(--pc);
   }
   .dot {
