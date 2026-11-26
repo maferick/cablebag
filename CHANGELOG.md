@@ -6,6 +6,20 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.21.4 · not released yet
+
+- When an SSH connection fails while setting up the encryption, the tab now shows what the server offers next to
+  what Cablebag can use (key exchange, host key, encryption and integrity check), so it is clear which part has
+  nothing in common.
+- CyberArk with single sign-on keeps the sign-in for the next start, when **Remember the unlock on this PC** allows
+  it (Windows Hello or Without asking). With **Ask every time** nothing is kept, as before.
+- When CyberArk sends Cablebag to its sign-in page (for example while a Mobile Authenticator approval is still
+  open), Cablebag now treats that as not signed in and asks you to sign in, instead of showing "error decoding
+  response body".
+- The **Sign-in page** field for CyberArk explains when it is needed: usually it stays empty.
+- **Set up a credential source** now opens on top of the form you are in, so a half-filled new session stays open.
+  The same button is on the Home tab and in an empty session list.
+
 ## 0.21.3 · 25 November 2026
 
 - Updated the parts Cablebag is built on, among them the database library (rusqlite 0.43, with memory-safety
