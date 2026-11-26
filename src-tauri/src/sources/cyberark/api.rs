@@ -285,7 +285,7 @@ pub async fn account(http: &reqwest::Client, root: &str, auth: &str, id: &str) -
     if !resp.status().is_success() {
         return Err(fail(resp).await);
     }
-    Ok(json(resp).await?)
+    json(resp).await
 }
 
 /// Why the person wants the account, when the safe or platform asks for it.

@@ -677,6 +677,8 @@ pub async fn connect_chain(app: &AppHandle, hops: &[Hop], keepalive: bool, out: 
             agent_forward: hop.agent_forward,
             x11: x11.clone(),
         };
+        // Reached straight from this PC (not through a jump host or WireGuard): the check below can reach it too.
+        let direct = prev.is_none() && hop.via_wg.is_empty();
         let fut = async {
             match &prev {
                 None if !hop.via_wg.is_empty() => {
@@ -693,7 +695,15 @@ pub async fn connect_chain(app: &AppHandle, hops: &[Hop], keepalive: bool, out: 
         let mut h = match tokio::time::timeout(Duration::from_secs(20), fut).await {
             Err(_) => bail!("No answer from {}:{} within 20 seconds.", hop.host, hop.port),
             Ok(Err(russh::Error::UnknownKey)) => bail!("The server's host key was not accepted."),
-            Ok(Err(e)) => bail!("Could not connect to {}:{}: {e}", hop.host, hop.port),
+            Ok(Err(e)) => {
+                // Most failures here are the two sides not agreeing on a method: say what the server offers.
+                if direct && let Ok(offer) = crate::sshprobe::read_offer(&hop.host, hop.port).await {
+                    for line in crate::sshprobe::report(&offer, &crate::sshprobe::ours(KEX_ORDER)) {
+                        out.info(&line);
+                    }
+                }
+                bail!("Could not connect to {}:{}: {e}", hop.host, hop.port)
+            }
             Ok(Ok(h)) => h,
         };
         authenticate(&mut h, hop, app, out).await?;

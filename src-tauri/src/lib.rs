@@ -18,6 +18,7 @@ mod rdp;
 mod serial;
 mod sources;
 mod ssh;
+mod sshprobe;
 mod store;
 mod telnet;
 mod term;
