@@ -6,7 +6,7 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.21.6 · not released yet
+## 0.21.6 · 26 November 2026
 
 - CyberArk and PSM for SSH: Cablebag now also signs in first with a CyberArk password, LDAP or RADIUS, and brings
   the short-lived SSH key, so PSM for SSH no longer asks for your password and MFA on every connection. Before,
