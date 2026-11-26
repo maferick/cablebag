@@ -76,10 +76,10 @@
   <SettingsRow
     label="Sign-in page"
     help={auth === "saml"
-      ? "Optional: where the sign-in window starts, such as your identity provider's link to CyberArk. Empty: the PVWA's own sign-in page, where you choose single sign-on."
-      : "Optional: where the sign-in window starts, instead of the Identity address."}
+      ? "Only needed when your organisation reaches CyberArk through a page of its own first, such as a link in Entra ID or My Apps. Leave it empty to start at the PVWA's own sign-in page, where you choose single sign-on."
+      : "Only needed when your organisation reaches CyberArk through a page of its own first, such as a link in Entra ID or My Apps. Leave it empty to sign in at the CyberArk Identity address above."}
   >
-    <input bind:value={source.options.sso_url} placeholder="Optional" />
+    <input bind:value={source.options.sso_url} placeholder="Usually empty" />
   </SettingsRow>
   <SettingsRow label="User name" help="Optional: your CyberArk user name, shown while signed in and used for PSM when CyberArk does not say who you are.">
     <input bind:value={source.account} placeholder="Optional" />

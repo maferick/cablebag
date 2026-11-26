@@ -97,6 +97,24 @@ async fn fail(resp: reqwest::Response) -> anyhow::Error {
     anyhow::Error::new(error_from(status, &body))
 }
 
+/// Reads an answer as JSON. When CyberArk does not accept the sign-in, Privilege Cloud can redirect to the CyberArk
+/// Identity sign-in page instead of answering 401; that page then arrives as HTML. It counts as "not signed in"
+/// (so the sign-in is tried again), never as data Cablebag could not read.
+async fn json(resp: reqwest::Response) -> Result<Value> {
+    let page = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|t| t.to_ascii_lowercase().contains("text/html"));
+    let at_login = resp.url().path().to_ascii_lowercase().contains("login");
+    let body = resp.text().await.unwrap_or_default();
+    match serde_json::from_str(&body) {
+        Ok(v) if !page => Ok(v),
+        _ if page || at_login => Err(anyhow::Error::new(ApiError { status: 401, code: "SIGN_IN_PAGE".into(), message: String::new() })),
+        _ => Err(anyhow!("CyberArk gave an answer Cablebag could not read.")),
+    }
+}
+
 fn reach(root: &str) -> impl FnOnce(reqwest::Error) -> anyhow::Error + '_ {
     move |e| {
         if e.is_timeout() {
@@ -207,7 +225,7 @@ pub async fn whoami(http: &reqwest::Client, root: &str, auth: &str) -> Result<St
     if !resp.status().is_success() {
         return Err(fail(resp).await);
     }
-    let v: Value = resp.json().await?;
+    let v: Value = json(resp).await?;
     Ok(get_str(&v, "UserName"))
 }
 
@@ -233,7 +251,7 @@ pub async fn accounts(http: &reqwest::Client, root: &str, auth: &str, search: &s
     if !resp.status().is_success() {
         return Err(fail(resp).await);
     }
-    let v: Value = resp.json().await?;
+    let v: Value = json(resp).await?;
     let accounts = get(&v, "value").and_then(|a| a.as_array()).cloned().unwrap_or_default();
     let total = get(&v, "count").and_then(|c| c.as_u64());
     Ok(Page { accounts, total })
@@ -267,7 +285,7 @@ pub async fn account(http: &reqwest::Client, root: &str, auth: &str, id: &str) -
     if !resp.status().is_success() {
         return Err(fail(resp).await);
     }
-    Ok(resp.json().await?)
+    Ok(json(resp).await?)
 }
 
 /// Why the person wants the account, when the safe or platform asks for it.
@@ -412,7 +430,7 @@ pub fn parse_platforms(v: &Value) -> HashMap<String, Rules> {
 pub async fn platform_rules(http: &reqwest::Client, root: &str, auth: &str) -> Result<HashMap<String, Rules>> {
     let resp = http.get(format!("{}/Platforms/Targets/", api(root))).header("Authorization", auth).send().await.map_err(reach(root))?;
     if resp.status().is_success() {
-        return Ok(parse_target_platforms(&resp.json().await?));
+        return Ok(parse_target_platforms(&json(resp).await?));
     }
     if resp.status().as_u16() == 401 {
         return Err(fail(resp).await);
@@ -421,7 +439,7 @@ pub async fn platform_rules(http: &reqwest::Client, root: &str, auth: &str) -> R
     if !resp.status().is_success() {
         return Err(fail(resp).await);
     }
-    Ok(parse_platforms(&resp.json().await?))
+    Ok(parse_platforms(&json(resp).await?))
 }
 
 /// The ids of the accounts locked to the person (checked out), from the saved filter "Locked".
@@ -431,7 +449,7 @@ pub async fn locked(http: &reqwest::Client, root: &str, auth: &str) -> Result<Ve
     if !resp.status().is_success() {
         return Err(fail(resp).await);
     }
-    let v: Value = resp.json().await?;
+    let v: Value = json(resp).await?;
     Ok(get(&v, "value").and_then(|a| a.as_array()).map(|a| a.iter().map(|x| get_str(x, "id")).filter(|s| !s.is_empty()).collect()).unwrap_or_default())
 }
 
@@ -517,7 +535,7 @@ pub async fn mfa_key(http: &reqwest::Client, root: &str, auth: &str, key_passwor
     if !resp.status().is_success() {
         return Err(fail(resp).await);
     }
-    parse_mfa_key(&resp.json().await?)
+    parse_mfa_key(&json(resp).await?)
 }
 
 #[cfg(test)]
@@ -602,6 +620,26 @@ mod tests {
         assert_eq!(token_from("{\"CyberArkLogonResult\":\"def\"}").unwrap(), "def");
         assert_eq!(token_from("ghi\n").unwrap(), "ghi");
         assert!(token_from("\"\"").is_err());
+    }
+
+    /// Privilege Cloud that does not accept the token sends the CyberArk Identity sign-in page (seen with Mobile
+    /// Authenticator): that is "not signed in", not an unreadable answer.
+    #[tokio::test]
+    async fn a_redirect_to_the_sign_in_page_reads_as_not_signed_in() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/PasswordVault/API/Accounts"))
+            .respond_with(ResponseTemplate::new(302).insert_header("Location", format!("{}/login?redirectUrl=x", server.uri()).as_str()))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/login"))
+            .respond_with(ResponseTemplate::new(200).set_body_raw("<!DOCTYPE html><html>Sign in</html>", "text/html; charset=utf-8"))
+            .mount(&server)
+            .await;
+        let Err(e) = accounts(&http(), &server.uri(), "Bearer tok", "", 0, 1).await else { panic!("a sign-in page is not an answer") };
+        assert!(is_unauthorised(&e), "{e}");
+        assert_eq!(e.to_string(), "Your CyberArk sign-in is no longer valid.");
     }
 
     #[tokio::test]
