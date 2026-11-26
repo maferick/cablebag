@@ -6,7 +6,7 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.21.4 · not released yet
+## 0.21.4 · 26 November 2026
 
 - When an SSH connection fails while setting up the encryption, the tab now shows what the server offers next to
   what Cablebag can use (key exchange, host key, encryption and integrity check), so it is clear which part has
