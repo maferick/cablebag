@@ -209,8 +209,12 @@ vLLM, Ollama on your own hardware, or a cloud service. Nothing is configured unt
 ## Install
 
 Download `Cablebag_<version>_x64-setup.exe` from the [latest release](https://github.com/maferick/cablebag/releases/latest)
-and run it. It installs for your Windows account only, no administrator rights needed. Cablebag keeps itself up to
-date: updates come from this page and nowhere else, and are installed only when they carry the Cablebag signature.
+and run it. The installer asks whether to install for you only or for everyone on this PC; for everyone needs
+administrator rights. Cablebag keeps itself up to date: updates come from this page and nowhere else, and are
+installed only when they carry the Cablebag signature.
+
+To install for everyone without questions, for example with Intune, run the installer with `/S /AllUsers`
+(`/S /CurrentUser` installs for the signed-in user only).
 
 The installer is not signed with a code-signing certificate yet (see [Code signing policy](#code-signing-policy)),
 so Windows SmartScreen may say "Windows protected your PC" the first time: **More info**, **Run anyway**. On a work
@@ -236,8 +240,9 @@ follow the keyboard, and the terminal has a screen reader setting. What works an
 
 **Is it free?** Yes, for private and work use, on as many PCs as you like. It is open source under the MIT licence.
 
-**Does it need admin rights?** No. The installer, the app and WireGuard inside it all run under your own
-Windows account.
+**Does it need admin rights?** Only to install for everyone on the PC. Installed for you only, the app and
+WireGuard inside it run under your own Windows account. On an account with administrator rights, Windows asks
+for permission each time the installer runs, updates included.
 
 **Does it change my network settings?** No. WireGuard runs inside Cablebag only for the sessions that choose a
 network. No adapter is created, no route is added, and nothing else on the PC goes through it.

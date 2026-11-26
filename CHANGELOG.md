@@ -6,6 +6,13 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
+## 0.21.5 · not released yet
+
+- The installer asks whether to install Cablebag for you only or for everyone on this PC. For everyone needs
+  administrator rights; for a silent install for everyone, such as with Intune, run it with `/S /AllUsers`. A
+  copy installed for you only stays that way when it updates. On an account with administrator rights, Windows
+  now asks for permission when an update installs.
+
 ## 0.21.4 · 26 November 2026
 
 - When an SSH connection fails while setting up the encryption, the tab now shows what the server offers next to
