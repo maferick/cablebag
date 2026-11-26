@@ -105,7 +105,7 @@
 <SettingsRow label="Your user name for PSM for SSH" help="Optional: when it differs from the one you sign in with. On Privilege Cloud, your full login name, such as name@company.com.">
   <input bind:value={source.options.psmp_user} placeholder="Optional" />
 </SettingsRow>
-<SettingsRow label="Sign in to PSM for SSH with a key" help="After you sign in, Cablebag asks CyberArk for a short-lived SSH key, so PSM for SSH does not ask for your password. Needed with single sign-on.">
+<SettingsRow label="Sign in to PSM for SSH with a key" help="Cablebag signs in to CyberArk once and asks for a short-lived SSH key, so PSM for SSH does not ask for your password and MFA on every connection. When the key runs out, you sign in again. Needed with single sign-on.">
   <input type="checkbox" class="switch" bind:checked={source.options.psmp_key} />
 </SettingsRow>
 

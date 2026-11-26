@@ -754,7 +754,7 @@ pub fn hops_for(s: &Session) -> Vec<Hop> {
 }
 
 /// The hop to PSM for SSH (PSMP) that takes the place of a hop to its target: PSMP's address, the combined
-/// login name (vault user, target user and target), and the key CyberArk gave after single sign-on. The
+/// login name (vault user, target user and target), and the key CyberArk gave after signing in. The
 /// target user comes from the session, or else from the CyberArk account linked to it.
 async fn psm_hop(app: &AppHandle, hop: &Hop, out: &impl Sink) -> Result<Hop> {
     let state = app.state::<AppState>();
@@ -768,6 +768,9 @@ async fn psm_hop(app: &AppHandle, hop: &Hop, out: &impl Sink) -> Result<Hop> {
     }
     let p = crate::sources::cyberark::psmp_login(ca, app, &cfg, &user, hop.host.trim(), hop.port).await?;
     out.info(&format!("Through CyberArk PSM for SSH ({}).", p.host));
+    if let Some(note) = &p.note {
+        out.info(note);
+    }
     Ok(Hop {
         host: p.host,
         port: p.port,

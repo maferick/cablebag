@@ -70,8 +70,9 @@
 //! - `ticketing_system`: the ticketing system name filled in when CyberArk asks for a ticket.
 //! - `ask_reason` (bool): ask for a reason every time a password is retrieved.
 //! - `psmp_host`, `psmp_port` (default 22): PSM for SSH. `psmp_user`: the vault user in the PSMP login
-//!   name when it differs from the signed-in one. `psmp_key` (bool, default true): get an MFA caching SSH
-//!   key after signing in, so PSMP does not ask for a password.
+//!   name when it differs from the signed-in one. `psmp_key` (bool, default true): sign in first (with any
+//!   method) and get an MFA caching SSH key, used until it expires, so PSMP does not ask for a password and
+//!   MFA on every connection. When no key comes, the tab says why.
 //! - `psm_host`, `psm_port` (default 3389): the PSM server (or its load balancer) for RDP clients.
 //!   `psm_component` (default "PSM-RDP"): the connection component. `psm_rdp_mode`: "connect" (the
 //!   PSMConnect API hands out the connection), "client" (connect to the PSM server with the start program)
@@ -873,6 +874,8 @@ pub struct PsmpLogin {
     pub user: String,
     /// An OpenSSH private key PSMP accepts for the vault user (MFA caching), when there is one.
     pub key: Option<String>,
+    /// Why there is no key, when one was wanted: shown in the tab, so it is clear why PSMP asks to sign in.
+    pub note: Option<String>,
 }
 
 /// How a Remote Desktop session reaches its target through PSM.
@@ -909,17 +912,37 @@ pub async fn psmp_login(ca: &CyberArk, app: &AppHandle, cfg: &SourceConfig, targ
     }
     let port = cfg.opt("psmp_port").parse::<u16>().ok().filter(|p| *p != 0).unwrap_or(22);
     let want_key = cfg.opt_bool("psmp_key", true);
-    if want_key && Auth::of(cfg).single_sign_on() && !ca.is_unlocked() {
-        ca.unlock_interactive(app, cfg).await?;
+    let mut note = None;
+    // Signing in here once brings a key PSMP takes, so it does not ask again for every connection. With single
+    // sign-on PSMP has nothing else to go on; with a password it can ask for it itself when signing in fails.
+    if want_key && !ca.is_unlocked()
+        && let Err(e) = ca.unlock_interactive(app, cfg).await
+    {
+        if Auth::of(cfg).single_sign_on() || e.to_string().to_lowercase().contains("cancelled") {
+            return Err(e);
+        }
+        note = Some(format!("Signing in to {} did not work ({e}), so PSM for SSH asks for your password for this connection.", cfg.name));
     }
-    // A key is a convenience: without one PSMP asks for the password.
-    let key = if want_key && ca.is_unlocked() { ca.mfa_key(app, cfg).await.ok() } else { None };
+    let key = if want_key && ca.is_unlocked() {
+        match ca.mfa_key(app, cfg).await {
+            Ok(k) => Some(k),
+            Err(e) => {
+                note = Some(format!(
+                    "CyberArk gave no key for PSM for SSH ({e}), so PSM for SSH asks you to sign in for each connection. \
+                     Your CyberArk administrator can turn on MFA caching for PSM for SSH."
+                ));
+                None
+            }
+        }
+    } else {
+        None
+    };
     let vault = vault_user(ca, cfg, "psmp_user");
     if vault.is_empty() {
         bail!("Fill in your CyberArk user name for {} under Settings, Credential sources.", cfg.name);
     }
     let user = psm::psmp_user(&psm::PsmpTarget { vault_user: vault, target_user: target_user.to_string(), target_address: target_host.to_string(), target_port, ..Default::default() });
-    Ok(PsmpLogin { host, port, user, key })
+    Ok(PsmpLogin { host, port, user, key, note })
 }
 
 /// How to reach a Windows target through PSM: from the PSMConnect API (an RDP file for the account), or
