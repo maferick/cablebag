@@ -6,7 +6,7 @@ installs it and starts Cablebag again. Every version is also on the
 
 ---
 
-## 0.21.5 · not released yet
+## 0.21.5 · 26 November 2026
 
 - The installer asks whether to install Cablebag for you only or for everyone on this PC. For everyone needs
   administrator rights; for a silent install for everyone, such as with Intune, run it with `/S /AllUsers`. A
