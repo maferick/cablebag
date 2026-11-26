@@ -40,6 +40,7 @@
   import PromptDialog from "./PromptDialog.svelte";
   import SessionEditor from "./SessionEditor.svelte";
   import ImportDialog from "./ImportDialog.svelte";
+  import SourcesDialog from "./SourcesDialog.svelte";
   import ReportDialog from "./ReportDialog.svelte";
   import Modal from "./Modal.svelte";
   import ProxmoxSettings from "./ProxmoxSettings.svelte";
@@ -587,6 +588,10 @@
 {/if}
 {#if app.importOpen}
   <ImportDialog />
+{/if}
+<!-- After the session editor, so it opens on top of a half-filled new session. -->
+{#if app.sourcesOpen}
+  <SourcesDialog />
 {/if}
 {#if app.reporting}
   <ReportDialog start={app.reporting} />

@@ -196,6 +196,8 @@ class AppState {
   /** The page the Settings tab shows. */
   settingsPage = $state("general");
   importOpen = $state(false);
+  /** Credential sources in a dialog of their own, on top of a half-filled new session (see SourcesDialog). */
+  sourcesOpen = $state(false);
   /** The "Report a problem" window, with what it starts with (an error message, for instance), or closed. */
   reporting = $state<{ what: string } | null>(null);
   paletteOpen = $state(false);
@@ -214,7 +216,7 @@ class AppState {
 
   /** True while something is drawn over the tab area, so native RDP windows must step aside. */
   get overlay(): boolean {
-    return !!(this.prompts.length || this.editing || this.importOpen || this.reporting || this.paletteOpen || this.proxmoxEditing || this.folderEditing || this.dialogs > 0 || ask.current);
+    return !!(this.prompts.length || this.editing || this.importOpen || this.sourcesOpen || this.reporting || this.paletteOpen || this.proxmoxEditing || this.folderEditing || this.dialogs > 0 || ask.current);
   }
 
   get active(): Tab | undefined {

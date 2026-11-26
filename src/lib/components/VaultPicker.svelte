@@ -57,8 +57,8 @@
 
 <div class="vp">
   {#if !configured.length}
-    <p class="muted small">Add a credential source under Settings, Credential sources, to take logins from Vaultwarden, CyberArk, Secret Server or Proton Pass.</p>
-    <button class="btn" onclick={() => app.openSettings("vault")}>Set up a credential source</button>
+    <p class="muted small">Add a credential source to take logins from Vaultwarden, CyberArk, Secret Server or Proton Pass. This session stays open while you do.</p>
+    <button class="btn" onclick={() => (app.sourcesOpen = true)}>Set up a credential source</button>
   {:else if itemId}
     <div class="linked">
       <KeyRound size={15} />

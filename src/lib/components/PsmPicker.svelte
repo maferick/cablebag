@@ -30,7 +30,7 @@
   {/if}
 {:else}
   <p class="muted small">
-    Add a CyberArk source under <button class="link" onclick={() => app.openSettings("vault")}>Credential sources</button> to connect through PSM.
+    <button class="link" onclick={() => (app.sourcesOpen = true)}>Add a CyberArk source</button> to connect through PSM. This session stays open while you do.
   </p>
 {/if}
 

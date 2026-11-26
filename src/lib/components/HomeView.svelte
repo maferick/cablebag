@@ -3,7 +3,7 @@
   import { kindInfo } from "../kinds";
   import Logo from "./Logo.svelte";
   import { workspaces } from "../workspaces.svelte";
-  import { TerminalSquare, Plus, Clock, History, LayoutGrid, X } from "@lucide/svelte";
+  import { TerminalSquare, Plus, Clock, History, LayoutGrid, X, KeyRound } from "@lucide/svelte";
 
   const lastNames = $derived(workspaces.last.map((s) => s.title));
 
@@ -42,6 +42,10 @@
         <button class="item" onclick={() => app.editSession()}>
           <Plus size={15} />
           <span class="nm">New session</span>
+        </button>
+        <button class="item" onclick={() => (app.sourcesOpen = true)}>
+          <KeyRound size={15} />
+          <span class="nm">Set up a credential source</span>
         </button>
       </section>
       <section>

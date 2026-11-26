@@ -643,6 +643,7 @@
         <p>No saved sessions yet.</p>
         <button class="btn" onclick={() => app.editSession()}><Plus size={14} /> New session</button>
         <button class="btn" onclick={() => (app.importOpen = true)}>Import sessions</button>
+        <button class="btn" onclick={() => (app.sourcesOpen = true)}>Set up a credential source</button>
       </div>
     {:else if q && !childSessions(null).length && !childFolders(null).some((f) => hasMatch(f.id))}
       <p class="empty muted">Nothing matches "{filter}".</p>
