@@ -78,10 +78,12 @@
 //!   or "auto" (the default: PSMConnect when there is an account, else the RDP client way). `psm_user`:
 //!   the vault user for the RDP client way.
 //!
-//! Nothing is kept on disk: the session token, the accounts, the passwords handed out and the SSH key
-//! live in memory until the source is locked or Cablebag closes. The single sign-on window keeps the
-//! identity provider's cookies in its own profile (none when the unlock setting is "password every time"),
-//! and removes CyberArk Identity's session cookie from it once read.
+//! The accounts, the passwords handed out and the SSH key live in memory only, until the source is locked or
+//! Cablebag closes. The sign-in itself (the session token) is kept in Cablebag's encrypted store when the unlock
+//! setting allows it ("Without asking", or "Windows Hello" first), so the next start needs no new sign-in until
+//! CyberArk ends the session; with "password every time" nothing is kept. The single sign-on window keeps the
+//! identity provider's cookies in its own profile (none with "password every time"), and removes CyberArk
+//! Identity's session cookie from it once read.
 
 mod api;
 mod psm;
@@ -320,8 +322,40 @@ fn private_window(app: &AppHandle) -> bool {
     super::vaultwarden::keep_mode(app) == "password"
 }
 
+/// The sign-in this PC keeps for a source, in Cablebag's own encrypted store.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Kept {
+    root: String,
+    auth: String,
+    identity: Option<String>,
+    user: String,
+}
+
+fn load_kept(app: &AppHandle, cfg: &SourceConfig) -> Option<Kept> {
+    let state = app.state::<AppState>();
+    let store = state.store.lock();
+    let (n, c) = store.find_secret("token", "session", "cyberark", &cfg.id, 0, "").ok().flatten()?;
+    let text = state.vault.decrypt(&store, &n, &c).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+/// Keeps the sign-in when the person lets sources keep theirs, else removes what was kept.
+fn keep(app: &AppHandle, cfg: &SourceConfig, s: &Session) {
+    if private_window(app) {
+        forget(app, cfg);
+        return;
+    }
+    let kept = Kept { root: s.root.clone(), auth: s.auth.clone(), identity: s.identity.clone(), user: s.user.clone() };
+    let Ok(text) = serde_json::to_string(&kept) else { return };
+    let state = app.state::<AppState>();
+    let store = state.store.lock();
+    if let Ok((n, c)) = state.vault.encrypt(&store, &text) {
+        let _ = store.put_secret("token", "session", "cyberark", &cfg.id, 0, "", &n, &c);
+    }
+}
+
 impl CyberArk {
-    pub fn status(&self, _app: &AppHandle, cfg: &SourceConfig) -> SourceStatus {
+    pub fn status(&self, app: &AppHandle, cfg: &SourceConfig) -> SourceStatus {
         let st = self.st.lock();
         let detail = match &st.session {
             Some(s) if !s.user.is_empty() => format!("Signed in as {} ({}).", s.user, s.method.label()),
@@ -331,7 +365,7 @@ impl CyberArk {
         SourceStatus {
             configured: !root_of(&cfg.url).is_empty(),
             unlocked: st.session.is_some(),
-            remembered: false,
+            remembered: load_kept(app, cfg).is_some(),
             items: st.items.len(),
             synced: st.synced,
             partial: st.partial,
@@ -360,12 +394,43 @@ impl CyberArk {
             bail!("Set up {} first under Settings, Credential sources.", cfg.name);
         }
         let http = client()?;
+        if let Some(session) = self.restore(app, cfg, &http, &root).await? {
+            return self.open(&http, session).await;
+        }
         let session = match Auth::of(cfg) {
             Auth::Saml => self.saml_sign_in(app, cfg, &http, &root).await?,
             Auth::Identity => self.identity_sign_in(app, cfg, &http, &root).await?,
             m => self.password_sign_in(app, cfg, &http, &root, m).await?,
         };
+        keep(app, cfg, &session);
         self.open(&http, session).await
+    }
+
+    /// The sign-in this PC kept, after Windows Hello when that is the choice. None when nothing is kept, it was
+    /// for another address, or CyberArk no longer takes it (signed out there, or timed out), so a new sign-in
+    /// is needed.
+    async fn restore(&self, app: &AppHandle, cfg: &SourceConfig, http: &reqwest::Client, root: &str) -> Result<Option<Session>> {
+        let mode = super::vaultwarden::keep_mode(app);
+        if mode == "password" {
+            forget(app, cfg);
+            return Ok(None);
+        }
+        let Some(kept) = load_kept(app, cfg) else { return Ok(None) };
+        if kept.root != root {
+            forget(app, cfg);
+            return Ok(None);
+        }
+        if mode == "hello" && !super::vaultwarden::hello_confirm(app, &format!("Sign in to {} in Cablebag", cfg.name)).await? {
+            return Ok(None);
+        }
+        match api::accounts(http, root, &kept.auth, "", 0, 1).await {
+            Ok(_) => Ok(Some(Session { root: kept.root, auth: kept.auth, identity: kept.identity, user: kept.user, method: Auth::of(cfg) })),
+            Err(e) if api::is_unauthorised(&e) => {
+                forget(app, cfg);
+                Ok(None)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     async fn password_sign_in(&self, app: &AppHandle, cfg: &SourceConfig, http: &reqwest::Client, root: &str, method: Auth) -> Result<Session> {
@@ -501,8 +566,9 @@ impl CyberArk {
         }
     }
 
-    /// Checks in what this PC checked out, signs out and forgets everything.
-    pub async fn lock(&self, _app: &AppHandle, _cfg: &SourceConfig) {
+    /// Checks in what this PC checked out, signs out and forgets everything. When this PC keeps the sign-in, the
+    /// CyberArk session is left to run out by itself, so the kept sign-in still works after a restart.
+    pub async fn lock(&self, app: &AppHandle, cfg: &SourceConfig) {
         let (session, out) = {
             let mut st = self.st.lock();
             let out: Vec<String> = st.checked_out.iter().map(|c| c.id.clone()).collect();
@@ -514,6 +580,9 @@ impl CyberArk {
         let Ok(http) = client() else { return };
         for id in out {
             let _ = api::check_in(&http, &s.root, &s.auth, &id).await;
+        }
+        if load_kept(app, cfg).is_some() {
+            return;
         }
         match &s.identity {
             Some(i) => {
@@ -785,8 +854,16 @@ fn open_key(pem: &str, pass: &str) -> Result<String> {
     Ok(k.to_openssh(ssh_key::LineEnding::LF).map_err(|_| anyhow!("CyberArk sent an SSH key Cablebag could not read."))?.to_string())
 }
 
-/// CyberArk keeps nothing on this PC: the sign-in, the accounts and the passwords live in memory only.
-pub fn forget(_app: &AppHandle, _cfg: &SourceConfig) {}
+/// Removes the sign-in this PC kept for the source (the accounts and passwords are never kept).
+pub fn forget(app: &AppHandle, cfg: &SourceConfig) {
+    let state = app.state::<AppState>();
+    let store = state.store.lock();
+    if let Ok(list) = store.list_secrets() {
+        for s in list.iter().filter(|s| s.kind == "token" && s.protocol == "cyberark" && s.host == cfg.id) {
+            let _ = store.delete_secret(&s.id);
+        }
+    }
+}
 
 /// How an SSH session reaches its target through PSM for SSH (PSMP).
 pub struct PsmpLogin {

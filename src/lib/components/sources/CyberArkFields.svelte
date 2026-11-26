@@ -44,7 +44,7 @@
 <SettingsRow
   label="Sign in with"
   help={sso
-    ? "You sign in yourself in a Cablebag window, on your organisation's own sign-in page. Cablebag keeps the sign-in in memory only."
+    ? "You sign in yourself in a Cablebag window, on your organisation's own sign-in page. Whether Cablebag keeps the sign-in for the next start follows the setting Remember the unlock on this PC."
     : "Your password is asked for when signing in and never kept."}
 >
   <select bind:value={source.options.auth}>

@@ -23,7 +23,7 @@
     if (!s.configured) return `${kindLabel(s.kind)}: not set up completely yet.`;
     const where = s.url.replace(/^https:\/\//, "");
     const who = s.account ? `${s.account} on ${where}` : where;
-    if (!s.unlocked) return `${who} · ${s.kind === "vaultwarden" ? "locked" : "signed out"}${s.remembered ? ", this PC keeps the key" : ""}`;
+    if (!s.unlocked) return `${who} · ${s.kind === "vaultwarden" ? "locked" : "signed out"}${s.remembered ? `, this PC keeps the ${s.kind === "vaultwarden" ? "key" : "sign-in"}` : ""}`;
     const when = s.synced ? `, loaded ${new Date(s.synced * 1000).toLocaleTimeString()}` : "";
     const count = s.partial ? `the first ${s.items} logins (searching asks the server for the rest)` : `${s.items} logins`;
     return [`${who} · ${count}${when}`, s.detail].filter(Boolean).join(" · ");
